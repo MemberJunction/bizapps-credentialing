@@ -54,7 +54,7 @@ packages/
   CoreEntitiesServer/  - @mj-biz-apps/credentialing-core-entities-server (server-side entity overrides)
   Server/              - @mj-biz-apps/credentialing-server     (server bootstrap -> MJAPI)
   Angular/             - @mj-biz-apps/credentialing-ng         (client bootstrap -> MJExplorer)
-plans/active/credentialing-design.md - the proposed domain model
+plans/active/credentialing-frd.md - the functional requirements document (domain model, roles, requirements, rules)
 docs/                  - how this repo works (branching, publishing, codegen, linking)
 docs/claude/           - the MemberJunction development guide (topic-split, with TOC)
 ```
