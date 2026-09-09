@@ -9,7 +9,7 @@
  *   src/           — hand-written BaseAction subclasses registered as
  *                    @RegisterClass(BaseAction, 'MJ_BizApps_Credentialing: <Action Name>')
  *                    with matching MJ: Actions metadata rows, e.g. the OnIssue / OnExpire /
- *                    OnRenew / OnRevoke hook actions from plans/credentialing-design.md
+ *                    OnRenew / OnRevoke hook actions from plans/active/credentialing-design.md
  *
  * The Load function is imported by the server bootstrap so bundlers cannot tree-shake
  * the @RegisterClass side effects away.

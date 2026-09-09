@@ -11,6 +11,6 @@
  *   server-only packages.
  *
  * Nothing is implemented yet. The domain model is proposed in
- * plans/credentialing-design.md; code lands with the first schema migration.
+ * plans/active/credentialing-design.md; code lands with the first schema migration.
  */
 export {};

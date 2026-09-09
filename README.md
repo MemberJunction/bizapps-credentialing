@@ -12,7 +12,7 @@
   <a href="#installation">Install</a> &middot;
   <a href="#how-it-fits">How It Fits</a> &middot;
   <a href="#what-you-get">What You Get</a> &middot;
-  <a href="plans/credentialing-design.md">Design</a> &middot;
+  <a href="plans/active/credentialing-design.md">Design</a> &middot;
   <a href="#development">Development</a>
 </p>
 
@@ -30,7 +30,7 @@
 > ⚠️ **Status: scaffold.** This repository is the platform wiring for a new BizApp. The
 > packages build and install, but contain no domain entities yet. The proposed domain
 > model — credential types, requirements, holder records, evidence, verification, renewal
-> cycles — is in [`plans/credentialing-design.md`](plans/credentialing-design.md) and is
+> cycles — is in [`plans/active/credentialing-design.md`](plans/active/credentialing-design.md) and is
 > the document to review first.
 
 Associations and non-profits track member certifications, professional licenses, continuing-education requirements, volunteer background checks, and staff compliance training. Today, every application reinvents the same tables and workflows for tracking credentials, evidence, and renewals. BizApps Credentialing provides the thin, reusable primitive layer designed to handle all these scenarios natively on the MemberJunction platform — deliberately thin, in the same spirit as [BizApps Tasks](https://github.com/MemberJunction/bizapps-tasks) and [BizApps Issues](https://github.com/MemberJunction/bizapps-issues).
@@ -85,7 +85,7 @@ mj app remove mj-bizapps-credentialing  # --keep-data to preserve schema
 
 ### Database Tables
 
-None yet. The proposed tables and their phased build order are in the [design document](plans/credentialing-design.md).
+None yet. The proposed tables and their phased build order are in the [design document](plans/active/credentialing-design.md).
 
 ### TypeScript Packages
 

@@ -26,4 +26,4 @@ rulebook is [`CLAUDE.md`](https://github.com/MemberJunction/MJ/blob/next/CLAUDE.
 
 The **format reference** for the manifest is [`../../mj-app.reference.jsonc`](../../mj-app.reference.jsonc);
 the **inventory of what a finished app contains** (required vs optional) is
-[`plans/complete/TEMPLATE-SPEC.md`](../../plans/complete/TEMPLATE-SPEC.md).
+[`TEMPLATE-SPEC.md`](./TEMPLATE-SPEC.md).

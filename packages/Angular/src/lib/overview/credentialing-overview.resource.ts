@@ -10,7 +10,7 @@
  *      generated bootstrap import; dev-linked: you add it yourself)
  * Chain + a "nothing shows up" checklist: docs/template-docs/explorer-visibility.md
  *
- * The cards below name the areas the design proposes (plans/credentialing-design.md).
+ * The cards below name the areas the design proposes (plans/active/credentialing-design.md).
  * They are static copy, not data; each becomes its own nav item as it ships.
  */
 import { Component, OnInit } from '@angular/core';
@@ -36,7 +36,7 @@ interface CredentialingArea {
             <p class="tagline">{{ Tagline }}</p>
             <p class="status">
                 This app is a scaffold: the platform wiring is in place and the domain model is
-                proposed in <code>plans/credentialing-design.md</code>. The areas below arrive as
+                proposed in <code>plans/active/credentialing-design.md</code>. The areas below arrive as
                 that design is implemented.
             </p>
             <div class="areas">
