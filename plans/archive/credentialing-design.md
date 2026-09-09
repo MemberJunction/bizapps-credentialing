@@ -1,3 +1,5 @@
+> **Superseded 2026-09-09** by [`plans/active/credentialing-frd.md`](../active/credentialing-frd.md), the Functional Requirements Document. Retained for history; do not build from it.
+
 # BizApps Credentialing — Domain Design (first pass)
 
 **Status:** Proposal for team review. No tables, entities, or migrations exist yet; this document is the deliverable for the domain.

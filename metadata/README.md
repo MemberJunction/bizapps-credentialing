@@ -17,7 +17,7 @@ Folders push in the order listed in `.mj-sync.json` `directoryOrder`. Only
 dot-prefixed `.json` files inside listed folders are records — do not park
 drafts in this tree. Domain seed folders (credential types, statuses) are added
 alongside the migrations that create their tables; see
-[`plans/active/credentialing-design.md`](../plans/active/credentialing-design.md).
+[`plans/active/credentialing-frd.md`](../plans/active/credentialing-frd.md).
 
 ## Commands
 

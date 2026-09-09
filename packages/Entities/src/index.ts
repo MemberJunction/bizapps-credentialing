@@ -13,6 +13,6 @@
  * @memberjunction/core and @memberjunction/global are PEER dependencies: exactly one
  * copy of each may exist in a host process (docs/template-docs/versioning-and-peer-deps.md).
  *
- * No tables exist yet — the model is proposed in plans/active/credentialing-design.md.
+ * No tables exist yet — the model is specified in plans/active/credentialing-frd.md.
  */
 export * from './generated/entity_subclasses';

@@ -12,7 +12,7 @@
   <a href="#installation">Install</a> &middot;
   <a href="#how-it-fits">How It Fits</a> &middot;
   <a href="#what-you-get">What You Get</a> &middot;
-  <a href="plans/active/credentialing-design.md">Design</a> &middot;
+  <a href="plans/active/credentialing-frd.md">Requirements</a> &middot;
   <a href="#development">Development</a>
 </p>
 
@@ -28,10 +28,11 @@
 ---
 
 > ⚠️ **Status: scaffold.** This repository is the platform wiring for a new BizApp. The
-> packages build and install, but contain no domain entities yet. The proposed domain
-> model — credential types, requirements, holder records, evidence, verification, renewal
-> cycles — is in [`plans/active/credentialing-design.md`](plans/active/credentialing-design.md) and is
-> the document to review first.
+> packages build and install, but contain no domain entities yet. What the product must do —
+> programs of versioned standards, document-grounded intake, AI-assisted human review,
+> committee decision and sign-off, credential issuance and public verification, renewal
+> cycles and continuing-activity audit — is specified in the
+> [Functional Requirements Document](plans/active/credentialing-frd.md), the document to read first.
 
 Associations and non-profits track member certifications, professional licenses, continuing-education requirements, volunteer background checks, and staff compliance training. Today, every application reinvents the same tables and workflows for tracking credentials, evidence, and renewals. BizApps Credentialing provides the thin, reusable primitive layer designed to handle all these scenarios natively on the MemberJunction platform — deliberately thin, in the same spirit as [BizApps Tasks](https://github.com/MemberJunction/bizapps-tasks) and [BizApps Issues](https://github.com/MemberJunction/bizapps-issues).
 
@@ -85,7 +86,7 @@ mj app remove mj-bizapps-credentialing  # --keep-data to preserve schema
 
 ### Database Tables
 
-None yet. The proposed tables and their phased build order are in the [design document](plans/active/credentialing-design.md).
+None yet. The domain model the tables will implement is in the [Functional Requirements Document](plans/active/credentialing-frd.md), section 4.
 
 ### TypeScript Packages
 
@@ -165,7 +166,7 @@ corepack pnpm install && corepack pnpm run build:packages
 │   ├── Server/             # @mj-biz-apps/credentialing-server (MJAPI bootstrap)
 │   └── Angular/            # @mj-biz-apps/credentialing-ng (MJExplorer components & resources)
 ├── plans/                  # Architecture, designs, and specifications
-│   └── credentialing-design.md # Proposed domain data model and architecture
+│   └── active/credentialing-frd.md # Functional Requirements Document
 └── docs/                   # Development guides and template documentation
 ```
 

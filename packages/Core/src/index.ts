@@ -10,7 +10,7 @@
  *   @mj-biz-apps/tasks-entities (Tasks, Task Links) — it must never import
  *   server-only packages.
  *
- * Nothing is implemented yet. The domain model is proposed in
- * plans/active/credentialing-design.md; code lands with the first schema migration.
+ * Nothing is implemented yet. The functional requirements and domain model are in
+ * plans/active/credentialing-frd.md; code lands with the first schema migration.
  */
 export {};
