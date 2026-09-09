@@ -1,0 +1,48 @@
+# CodeGen scratch output (fold what you need into migrations/, then discard)
+codegen.output.log
+migrations/codegen/
+SQL Scripts/
+Schema Files/
+temp_sql_scripts/
+metadata/sql_logging/
+metadata/**/.backups/
+
+# Build output and caches
+node_modules/
+dist/
+dist-browser/
+.turbo/
+.angular/
+.cache/
+*.tsbuildinfo
+coverage/
+*.log
+
+# pnpm is this repo's package manager (see .npmrc / pnpm-workspace.yaml).
+# pnpm-lock.yaml is the lockfile of record and IS committed; a stray `npm install`
+# must not leave a second, conflicting lockfile behind.
+package-lock.json
+
+# Environment and local-only config (never committed)
+.env
+*.env
+.env.*
+*.local
+mj.config.js
+mj.config.ts
+.mjrc
+.mjrc.*
+.config/mjrc*
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/chrome
+report.html
+report.json
+
+# Claude Code local state
+**/.claude/settings.local.json
+**/.claude/settings.local.json.bak
+**/.claude/worktrees/

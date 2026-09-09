@@ -1,0 +1,14 @@
+[
+  {
+    "fields": {
+      "SchemaName": "__mj_BizAppsCredentialing",
+      "EntityIDMin": 10000001,
+      "EntityIDMax": 10099999,
+      "EntityNamePrefix": "MJ_BizApps_Credentialing: ",
+      "Description": "Credentialing, certification, and licensure management: credential types, requirements, holder records, verification, expiration and renewal"
+    },
+    "primaryKey": {
+      "ID": "80C351DC-A6C2-40F2-AD22-4443CC9CD3FA"
+    }
+  }
+]

@@ -1,0 +1,56 @@
+name: Build All Packages
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [next]
+    paths:
+      # pnpm-workspace.yaml + package.json affect resolution (overrides,
+      # onlyBuiltDependencies, deps) — the build must re-run when they change.
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+      - 'package.json'
+      - 'packages/**'
+  pull_request:
+    # No `paths` filter, and `main` included: the release PR (next -> main) is the
+    # highest-stakes merge in the repo — it publishes to npm — and is the one merge
+    # that must never go unbuilt. Skipping on paths is only sound when the BASE is
+    # known green; main's package set is not built by the push trigger above.
+    branches: [next, main]
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-only:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      # Must precede setup-node: `cache: 'pnpm'` needs pnpm already on PATH.
+      # The version comes from package.json "packageManager".
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: 'pnpm'
+          cache-dependency-path: 'pnpm-lock.yaml'
+
+      - name: Validate repository.url in packages
+        run: ./.github/scripts/validate-package-repository.sh
+
+      # Runs on every PR, not only at publish. validate-package-lock-case.sh is a release gate, so
+      # a bug in the GATE would otherwise be discovered during a release — the one-level-up form of
+      # the failure it exists to prevent. These fixtures drive the real script against throwaway
+      # repos, including the mis-cased cases that fail without the fix (taken from bizapps-common).
+      - name: CI guard script tests
+        run: ./.github/scripts/__tests__/validate-package-lock-case.test.sh
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build all packages
+        run: pnpm run build:packages

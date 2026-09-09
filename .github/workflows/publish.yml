@@ -1,0 +1,96 @@
+name: Build and Publish
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  id-token: write
+
+concurrency:
+  group: "publish"
+  cancel-in-progress: false
+
+jobs:
+  build-and-publish:
+    # The TEMPLATE must never publish its own sample packages. Keyed on the repository rather
+    # than a flag or secret, so a generated app inherits a condition that is already true and
+    # has nothing to remember — the failure mode of an opt-in switch is a first release that
+    # reports success and publishes nothing.
+    #
+    # Deliberately NOT solved by marking the samples `private: true`: all three publish gates
+    # skip private packages, so this repo's CI would pass vacuously and a generated app would
+    # inherit gates that had never actually run.
+    if: github.repository != 'MemberJunction/open-app-template'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      # Must precede setup-node: `cache: 'pnpm'` needs pnpm already on PATH.
+      # The version comes from package.json "packageManager".
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: 'pnpm'
+          cache-dependency-path: 'pnpm-lock.yaml'
+
+      - name: Validate pnpm-lock.yaml case-sensitivity
+        run: ./.github/scripts/validate-package-lock-case.sh
+
+      - name: Validate migration filenames
+        run: ./.github/scripts/validate-migration-filenames.sh
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Validate all packages exist on npm
+        if: github.ref == 'refs/heads/main'
+        run: ./.github/scripts/validate-npm-packages.sh
+
+      - name: Validate repository.url for npm provenance
+        run: ./.github/scripts/validate-package-repository.sh
+
+      - name: Configure git credentials
+        run: |
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config --global user.name "github-actions[bot]"
+
+      - name: Validate packages restrict what they ship
+        run: ./.github/scripts/validate-package-files.sh
+
+      - name: Refuse to publish with changesets still pending
+        run: |
+          PENDING=$(find .changeset -name "*.md" -not -name "README.md" 2>/dev/null | wc -l | tr -d ' ')
+          if [ "$PENDING" -ne 0 ]; then
+            echo "::error::$PENDING changeset(s) are still pending on main. Versioning happens in the Version Packages PR on next (version.yml) — merge that first, then release. Publishing now would ship versions that no changelog describes."
+            exit 1
+          fi
+          echo "No pending changesets — versions on main are authoritative"
+
+      - name: Build all packages
+        run: pnpm run build:packages
+
+      - name: Publish to npm
+        run: pnpm exec changeset publish
+
+      - name: Tag the release
+        run: |
+          VERSION="v$(jq -r .version packages/Entities/package.json)"
+          if git ls-remote --exit-code --tags origin "refs/tags/$VERSION" >/dev/null 2>&1; then
+            echo "Tag $VERSION already exists on origin — leaving it alone"
+          else
+            git tag "$VERSION"
+            # Tags are not branches, so a branch ruleset never blocks this push.
+            git push origin "refs/tags/$VERSION"
+            echo "Tagged $VERSION"
+          fi
+          echo "## Released $VERSION" >> "$GITHUB_STEP_SUMMARY"

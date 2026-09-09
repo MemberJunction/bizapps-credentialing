@@ -1,0 +1,20 @@
+[
+  {
+    "fields": {
+      "ApplicationID": "@lookup:MJ: Applications.Name=Credentialing",
+      "RoleID": "@lookup:MJ: Roles.Name=UI",
+      "CanAccess": true,
+      "CanAdmin": false
+    },
+    "primaryKey": { "ID": "218A07B7-A885-4BD3-B5A1-63CBB4FAD5E1" }
+  },
+  {
+    "fields": {
+      "ApplicationID": "@lookup:MJ: Applications.Name=Credentialing",
+      "RoleID": "@lookup:MJ: Roles.Name=Developer",
+      "CanAccess": true,
+      "CanAdmin": true
+    },
+    "primaryKey": { "ID": "CC3C38A6-3C74-4C77-8CD6-E6FDD74FB417" }
+  }
+]

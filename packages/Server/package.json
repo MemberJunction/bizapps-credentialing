@@ -1,0 +1,35 @@
+{
+  "name": "@mj-biz-apps/credentialing-server",
+  "version": "0.0.0",
+  "type": "module",
+  "description": "Server bootstrap package - loaded by MJAPI at startup via the manifest's startupExport. TODO(template): rename.",
+  "main": "dist/index.js",
+  "files": ["/dist"],
+  "publishConfig": { "access": "public" },
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc && tsc-alias -f",
+    "test": "echo \"No tests configured yet\""
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/MemberJunction/bizapps-credentialing"
+  },
+  "license": "BUSL-1.1",
+  "dependencies": {
+    "@mj-biz-apps/credentialing-actions": "0.0.0",
+    "@mj-biz-apps/credentialing-core": "0.0.0",
+    "@mj-biz-apps/credentialing-core-entities-server": "0.0.0",
+    "@mj-biz-apps/credentialing-entities": "0.0.0",
+    "class-validator": "^0.14.3"
+  },
+  "peerDependencies": {
+    "@memberjunction/core": "^6.1.0-edge.5",
+    "@memberjunction/global": "^6.1.0-edge.5",
+    "@memberjunction/server": "^6.1.0-edge.5",
+    "@memberjunction/sqlserver-dataprovider": "^6.1.0-edge.5"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3"
+  }
+}

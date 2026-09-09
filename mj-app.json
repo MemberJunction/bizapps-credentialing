@@ -1,0 +1,67 @@
+{
+  "$schema": "https://schema.memberjunction.org/mj-app/v1.json",
+  "manifestVersion": 1,
+  "name": "mj-bizapps-credentialing",
+  "displayName": "Credentialing",
+  "description": "Credentialing, certification, and licensure management for MemberJunction: credential definitions, requirements, holder records, verification, expiration and renewal cycles.",
+  "version": "0.0.0",
+  "license": "BUSL-1.1",
+  "icon": "fa-solid fa-certificate",
+  "color": "#264FAF",
+  "publisher": {
+    "name": "MemberJunction",
+    "email": "hello@memberjunction.com",
+    "url": "https://memberjunction.com"
+  },
+  "repository": "https://github.com/MemberJunction/bizapps-credentialing",
+  "mjVersionRange": ">=6.1.0-edge.5 <7.0.0",
+  "dependencies": {
+    "mj-bizapps-common": {
+      "version": ">=5.40.0 <6.0.0",
+      "repository": "https://github.com/MemberJunction/bizapps-common"
+    },
+    "mj-bizapps-tasks": {
+      "version": ">=1.4.3 <2.0.0",
+      "repository": "https://github.com/MemberJunction/bizapps-tasks"
+    }
+  },
+  "schema": {
+    "name": "__mj_BizAppsCredentialing",
+    "createIfNotExists": true
+  },
+  "migrations": {
+    "directory": "migrations",
+    "engine": "skyway"
+  },
+  "metadata": {
+    "directory": "metadata"
+  },
+  "packages": {
+    "server": [
+      {
+        "name": "@mj-biz-apps/credentialing-server",
+        "role": "bootstrap",
+        "startupExport": "LoadBizAppsCredentialingServer"
+      }
+    ],
+    "client": [
+      {
+        "name": "@mj-biz-apps/credentialing-ng",
+        "role": "bootstrap",
+        "startupExport": "LoadBizAppsCredentialingClient"
+      }
+    ],
+    "shared": [
+      { "name": "@mj-biz-apps/credentialing-entities", "role": "library" },
+      { "name": "@mj-biz-apps/credentialing-actions", "role": "library" },
+      { "name": "@mj-biz-apps/credentialing-core", "role": "library" },
+      { "name": "@mj-biz-apps/credentialing-core-entities-server", "role": "library" }
+    ]
+  },
+  "code": {
+    "visibility": "public",
+    "sourceDirectory": "packages"
+  },
+  "categories": ["Business", "Credentialing", "Certification"],
+  "tags": ["credential", "certification", "license", "licensure", "renewal", "verification"]
+}

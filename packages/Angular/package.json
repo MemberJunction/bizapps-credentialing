@@ -1,0 +1,42 @@
+{
+  "name": "@mj-biz-apps/credentialing-ng",
+  "version": "0.0.0",
+  "type": "module",
+  "description": "Client bootstrap package - Angular components loaded by MJExplorer via the generated open-app bootstrap import. TODO(template): rename.",
+  "main": "dist/public-api.js",
+  "files": [
+    "/dist"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "types": "dist/public-api.d.ts",
+  "scripts": {
+    "build": "ngc",
+    "test": "echo \"No tests configured yet\""
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/MemberJunction/bizapps-credentialing"
+  },
+  "license": "BUSL-1.1",
+  "dependencies": {
+    "@mj-biz-apps/credentialing-entities": "0.0.0"
+  },
+  "peerDependencies": {
+    "@angular/common": "^21.1.3",
+    "@angular/core": "^21.1.3",
+    "@angular/forms": "^21.1.3",
+    "@memberjunction/core-entities": "^6.1.0-edge.5",
+    "@memberjunction/global": "^6.1.0-edge.5",
+    "@memberjunction/ng-base-forms": "^6.1.0-edge.5",
+    "@memberjunction/ng-entity-viewer": "^6.1.0-edge.5",
+    "@memberjunction/ng-link-directives": "^6.1.0-edge.5",
+    "@memberjunction/ng-shared": "^6.1.0-edge.5"
+  },
+  "devDependencies": {
+    "@angular/compiler": "21.1.3",
+    "@angular/compiler-cli": "21.1.3",
+    "typescript": "^5.9.3"
+  }
+}

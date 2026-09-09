@@ -1,0 +1,32 @@
+{
+  "name": "@mj-biz-apps/credentialing-actions",
+  "version": "0.0.0",
+  "type": "module",
+  "description": "MJ Actions exposed by this app (generated subclasses + hand-written actions). TODO(template): rename.",
+  "main": "dist/index.js",
+  "files": ["/dist"],
+  "publishConfig": { "access": "public" },
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc && tsc-alias -f",
+    "test": "echo \"No tests configured yet\""
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/MemberJunction/bizapps-credentialing"
+  },
+  "license": "BUSL-1.1",
+  "dependencies": {
+    "zod": "^3.25.76"
+  },
+  "peerDependencies": {
+    "@memberjunction/actions": "^6.1.0-edge.5",
+    "@memberjunction/actions-base": "^6.1.0-edge.5",
+    "@memberjunction/core": "^6.1.0-edge.5",
+    "@memberjunction/core-entities": "^6.1.0-edge.5",
+    "@memberjunction/global": "^6.1.0-edge.5"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3"
+  }
+}

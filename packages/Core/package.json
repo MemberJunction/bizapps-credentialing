@@ -1,0 +1,31 @@
+{
+  "name": "@mj-biz-apps/credentialing-core",
+  "version": "0.0.0",
+  "type": "module",
+  "description": "Shared services and business logic for BizApps Credentialing: engines, services, and lifecycle helpers usable on both server and client.",
+  "main": "dist/index.js",
+  "files": ["/dist"],
+  "publishConfig": { "access": "public" },
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc && tsc-alias -f",
+    "test": "echo \"No tests configured yet\""
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/MemberJunction/bizapps-credentialing"
+  },
+  "license": "BUSL-1.1",
+  "dependencies": {
+    "@mj-biz-apps/credentialing-entities": "0.0.0",
+    "@mj-biz-apps/common-entities": "^5.40.0",
+    "@mj-biz-apps/tasks-entities": "^1.4.3"
+  },
+  "peerDependencies": {
+    "@memberjunction/core": "^6.1.0-edge.5",
+    "@memberjunction/global": "^6.1.0-edge.5"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3"
+  }
+}
