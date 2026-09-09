@@ -218,12 +218,13 @@ Note: The human accepted all sixteen recommendations from Checkpoint 1, and `../
 The seven bullets from Checkpoint 1 were resolved by aligning the template with the newer BizApps conventions: adopting the modern `mjVersionRange`, setting the baseline to `6.1.0-edge.5`, porting CI scripts from `bizapps-common` (lock-case, entityfield-sequence), adding the `Core` package and explicit `entityImportPackages` for dependency schemas, removing the `firstParty` flag in favor of the `code` visibility block, and standardizing the schema-info mechanism. 
 
 ## Remaining human steps
-- create the repo
-- push `main` and `next`
-- set `next` default
-- publish placeholders
-- configure Trusted Publisher
-- link an MJ checkout with `mj dev workspace`
+- [x] Create GitHub repository (`MemberJunction/bizapps-credentialing`)
+- [x] Push `main` and `next` branches to `origin`
+- [x] Set `next` as default branch
+- [x] Configure `protect-next` branch ruleset on GitHub
+- [ ] TODO (npm): Publish placeholder 0.0.0 packages under `@mj-biz-apps` scope (requires interactive npm login / 2FA)
+- [ ] TODO (npm): Configure npm Trusted Publisher (OIDC) on npmjs.com package settings for `MemberJunction/bizapps-credentialing`
+- [ ] TODO (Human): Link local MJ checkout once updated to MJ 6.x (`mj dev workspace link`)
 
 ## Not completed, and why
 - no baseline migration and no changeset (D5/D6, by decision)
