@@ -26,30 +26,46 @@ BizApps Credentialing is the credential lifecycle system for credentialing bodie
 
 An organization authors a **program** as versioned **standards** grouped in **sections**. A **subject** (a person or an organization) opens an **application** against the program's active version, answers each standard, and grounds the answers in **evidence documents** it already holds. The system drafts answers from those documents and from the organization's own records where the program allows it; only a person confirms an answer. Submission freezes the record. AI agents prepare the review: they extract values from evidence with locators, verify confirmed answers against instance data, and post findings into the same commentary stream human reviewers use. Reviewers react to every AI finding, and those reactions are the evidence base that decides, standard by standard, what may ever be automated. A committee deliberates in a passive window that any member can interrupt. An executive signs. The signature issues a **credential** with a public verification token. Every issued credential carries its **renewal cycle** from birth; renewals open on schedule and start from what the subject confirmed last time. Between cycles, subjects log **continuing activity claims** toward quantity standards, and a program-configured sample of renewals receives a full evidence audit.
 
+```
+NTD: 
+I think we should consider layering in the `MJ Forms` bizapp that can be used for form intake. The idea would be to have forms setup that take in data, and materialize the results to `Application` records in this app. We could/should also consider the MJ Task Graph infra for the workflows so we can have different workflows per `Program`. We can also consider directly leveraging `bizapps-caliber` which has conversational workflow leveraging the MJ Realtime agent architecture, **if** we think it would be valuable for AI assessment to be real time in nature - meaning an AI has discussions with `subject(s)` to discuss their application/section and gather additional input. I have seen this type of iterative process in some more rigorous cert programs, but especially true in accreditation programs. 
+```
+
 The product is a **BizApp**: one MemberJunction Open App (`mj-bizapps-credentialing`) installed into an existing MemberJunction instance with `mj app install`. It brings its own schema, migrations, metadata and packages (entities, actions, core services, server-side entity overrides, a server bootstrap for MJAPI, and an Angular bootstrap for MJExplorer), and it registers **one** application, Credentialing, whose navigation is scoped by role and standing into three audience areas: **Applicant**, **Review**, and **Staff**. Every screen is a routing-free Angular component, so a member portal or another BizApp can host the applicant surfaces outside Explorer. The server package also serves the public verification registry and the API for machine callers. Everything that is not the credentialing domain itself (identity, files, notifications, scheduling, AI runs, search, change tracking, permissions) is the MemberJunction platform, configured rather than rebuilt.
 
+```
+NTD: 
+Good design - my general though is the above, and that would be one install, and we can also build this to optionally layer on top of `BCSaaS` for a multi-tenant SaaS edition down the road for mid and smaller orgs that might not want all the infra. But an enterprise deployment first makes sense to me as this is always a highly tailored thing in my prior experience, beyond just the workflows, the nature of application, sections, and programs will likely be highly bespoke per org. Those orgs will likely want to implement their own custom schemas to extend the base app by including `IsA` relationships for extending the core app (not modifying the core bizapps-credentialing at all directly as that would violate their ability to upgrade easily)
+```
 ### 2.2 Guiding principles
 
 These principles are requirements in themselves. Every feature below is shaped by them, and a feature that violates one is a defect.
 
-1. **Machine work is drafted; only people confirm.** A drafted answer, a proposed data binding, a proposed standard from a handbook, an AI finding, and an AI-drafted letter are each distinguishable from a human's confirmed work at every point in the record. Nothing counts until a person has read it and confirmed it.
+1. **Machine work is drafted; only people confirm.** A drafted answer, a proposed data binding, a proposed standard from a handbook, an AI finding, and an AI-drafted letter are each distinguishable from a human's confirmed work at every point in the record. Nothing counts until a person has read it and confirmed it. (maybe, some orgs might want full auto in some areas/all areas over time)
 2. **Every conversation declares its audience before anyone types.** Internal discussion, applicant-visible discussion, and private notes are separate lanes, labelled at the composer, enforced on the server.
-3. **Automation is earned, never configured.** No standard is reviewed automatically until live reviewer agreement and replay against historical human review both clear the program's own thresholds. Interpretive and jurisdiction-dependent standards are never automatable. Demotion is always one click. Applications always receive a human decision.
-4. **The value is depth, not volume.** The product exists to remove friction for subjects already in the process and to make the self-examination the process demands easier and better grounded. It sets no throughput target and forces no automation timeline.
+3. **Automation is earned, never configured.** No standard is reviewed automatically until live reviewer agreement and replay against historical human review both clear the program's own thresholds. Interpretive and jurisdiction-dependent standards are never automatable. Demotion is always one click. Applications always receive a human decision. (again, maybe, especially as AI gets smarter, org by org choice here not a philosphy we hardcode)
+4. **The value is depth, not volume.** The product exists to remove friction for subjects already in the process and to make the self-examination the process demands easier and better grounded. It sets no throughput target and forces no automation timeline. (again, an org specific thing, some orgs are all about massive volume and improving automation there at scale is also important)
 5. **Reviewers keep learning.** Peer review is training in how other subjects operate. Automation is designed so reviewers keep gaining cross-subject perspective rather than rubber-stamping machine output.
 6. **Everything is a record that can survive being challenged.** Append-only correspondence, immutable identifiers, server-stamped signatures, frozen submissions, verbatim evidence excerpts, and a provenance chain from every AI finding to the exact model call that produced it.
 7. **Behavior is configuration.** Workflow toggles, thresholds, rollout flags, intake friction, and communication mediation are per-program-version settings with an audit trail. Rollout is a configuration change, never a deployment.
+(Yes, and extensions in standard MJ way, customer defines their own extension schema in DB and uses new tables for net new concepts and `IsA` for extending 1:1 or 1:0 type attributes instead of mutating anything in core, use sub-classing and containment strategies for logic and UX changes, etc.)
 8. **Honesty in the interface.** A control does exactly what its label says or is absent. A refusal states its reason in visible text. An empty state names the real cause. A count is a count, never an unread claim the screen cannot back. A revoked credential is stamped, not hidden.
 
 ### 2.3 In scope
 
 - Multi-program, multi-organization credentialing within one instance.
 - Program authoring: versions, sections, standards, document requirements, workflow and automation settings, handbook import.
+```
+Versioning is particularly important - like a git branch, can share a `head` with another version/branch - need to make this flexible or you'll have explosion of possibilities. This concept of database records having `git-branch-like` behavior is a concept I'd like you to think on more generically it could be an interesting framework level concept. We do this in various places where we inherit things from one row into another based on a `ParentID` or other recursive fkey, would be interesting to have framework have smarts about this and auto-resolve a given record based on its inheritance and override chain, and then simply use this here for versioning and other flavors of same problem
+```
 - Subject onboarding by invitation and by self-service eligibility pre-check; external applicant identity.
 - Document-grounded intake: evidence library, checklist, sensitive-material workaround, prefill and locate from documents and instance records, human confirmation, self-assessment, governing-body attestation, submission gate and freeze.
 - Eligibility criteria, fee requirements, and assessment-result requirements as standards.
 - Continuing activity claims toward quantity standards; audit sampling of renewals; provider accreditation as a program.
 - AI agents for extraction, verification, review preparation, binding drafting, handbook structuring, letter drafting, and conversational assistance; constrained writers; full provenance.
+```
+And a top level agent for the app that has all of those as sub-agents and can coordinate it all with realtime co-agent
+```
 - Human review: assignments, section workspace, findings with reactions, threaded commentary, mentions, anonymized comparable answers.
 - Staff-mediated or direct applicant communication; in-app and outbound notifications.
 - Committee passive-approval docket, objections, executive sign-off, decision and recommendations, staff-editable letters.
@@ -60,6 +76,9 @@ These principles are requirements in themselves. Every feature below is shaped b
 - Historical migration of applications and reviewer commentary from a legacy platform.
 - Reporting: operational KPIs, executive dashboard, cross-subject queryable data.
 - Organization isolation, role and row-level security, API keys, audit and read auditing.
+```
+Study task graphs in MJ and see how we do this type of workflow in Caliber, we need to think about DRY here to reuse parts of Caliber or possibly just layer this on top of Caliber (as a possible optional dependency since Caliber is **not** a free open-code app like this, or this becomes paid as well)
+```
 
 ### 2.4 Boundaries
 
@@ -74,6 +93,9 @@ These principles are requirements in themselves. Every feature below is shaped b
 | Provide a general workflow engine or dynamic status tables | The pipeline is fixed with toggles, which keeps every screen, report and guard truthful | Exposes lifecycle transitions as events for configured automation |
 | Proctor examinations | Partner or integrate | — |
 
+
+- Agreed and we shuold integrate with any number of LMS/LCMS/LXP type products
+- Should this product issue digital credentials like Accredible/Credly type things?
 ---
 
 ## 3. Users and roles
@@ -122,7 +144,9 @@ This section defines the concepts the requirements use. It is conceptual; column
 
 - **Instance.** One MemberJunction install. Multi-tenancy is the hosting control plane's concern; there is no tenant entity in the product.
 - **Accrediting Organization.** The body that owns programs and issues credentials under them. Every program has exactly one owning organization, and that single reference is what makes the whole chain (version → section → standard → application → credential → extraction) resolvable to an owner with one join. An instance may hold several organizations (a society with several boards, a federation, a services provider running programs for clients).
+ NTD: I think an `Accrediting Org` is an `IsA` that extends the `bizapps-common.Organization` entity or possibly actually should be an IsA extension of `Company` instead since Company is the internal org chart I'd lean there first. 
 - **Organization Membership.** User × organization × role (Staff, Committee), unique on the triple. Membership is scope, not identity. A typical install holds one organization, created at first run; several are supported for federations and service providers.
+ NTD: Similarly here we need to layer on top of common and possibly the core MJ Employee concept... needs thinking
 
 ### 4.2 Programs and standards
 
@@ -164,6 +188,10 @@ This section defines the concepts the requirements use. It is conceptual; column
 - **Decision.** One per application: outcome (Approved, Deferred, Denied), conditions, effective date, letter text, letter file, status (Draft, WithExecutive, Signed), signer and time.
 - **Recommendation.** A letter line item tracing to a finding, a staff note, or an optional suggestion; included flag.
 - **Appeal.** A bounded work item linked to a signed decision with outcome Upheld or Overturned.
+
+```
+NTD: Above is _one_ possible workflow basically but we need to support any workflow by program (e.g. the same org might offer a credential for individuals that is a certification of some sort and offer an accreditation to other institutions that has totally different workflows (e.g. Task Graphs in our parlance in MJ))
+```
 
 ### 4.8 Credentials
 
