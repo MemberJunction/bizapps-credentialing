@@ -2,7 +2,7 @@
 
 MJ metadata authored as files and pushed with `mj sync` — the dev-time source
 of truth. Installs never read this folder: they receive the same records as
-`V*_Metadata_Sync.sql` migrations captured from a push (see
+the one `V*_Metadata_Sync.sql` migration generated each release (see
 [`docs/template-docs/codegen-and-metadata-migrations.md`](../docs/template-docs/codegen-and-metadata-migrations.md)).
 
 ## Layout
@@ -28,5 +28,5 @@ pnpm exec mj sync push --dir=metadata --format=json  # push to your dev database
 
 `mj sync push` is a single-author, dev-time tool and performs a full reconcile
 for each entity scope. Authoring rules, `@lookup:`/`@file:` syntax, and the
-push → capture → commit loop:
+edit → push → commit loop:
 [`docs/template-docs/metadata.md`](../docs/template-docs/metadata.md).
