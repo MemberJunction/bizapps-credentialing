@@ -2,7 +2,7 @@
 
 MJ metadata authored as files and pushed with `mj sync` — the dev-time source
 of truth. Installs never read this folder: they receive the same records as
-the one `V*_Metadata_Sync.sql` migration generated each release (see
+the one `V*__Metadata_Sync.sql` migration generated each release (see
 [`docs/template-docs/codegen-and-metadata-migrations.md`](../docs/template-docs/codegen-and-metadata-migrations.md)).
 
 ## Layout
