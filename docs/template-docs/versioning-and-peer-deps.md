@@ -48,6 +48,8 @@ silently starts resolving from the registry instead.
 |---|---|---|---|
 | A **sibling package of this app** (e.g. `@mj-biz-apps/credentialing-entities` from `Server`) | `dependencies` | **exact** (`0.0.0`) | Siblings ship in lock-step (fixed versioning); an exact pin means an install always gets the matched set. Under pnpm the pin must equal the sibling's local version or `linkWorkspacePackages` resolves it from the REGISTRY instead of linking — `changeset version` moves both together, so don't hand-edit one |
 | **`@memberjunction/*`** | `peerDependencies` | caret range (`^6.1.0-edge.3`) | The HOST provides MJ exactly once. A hard dep could nest a second copy of `@memberjunction/global`/`core`, which splits MJ's class-factory registry and silently breaks registration — the single-copy invariant |
+| **Another Open App's packages** (`@mj-biz-apps/common-*`, `@mj-biz-apps/tasks-*`) | `peerDependencies` | caret range (`^5.40.0`) | Same invariant: the host installs each app once (`mj-app.json` `dependencies`). Never in `dependencies` — `.github/scripts/check-dependency-model.mjs` fails CI on that |
+| The exact version a **local build** uses for each of those peers | that package's `devDependencies` | **exact** (`6.1.0-edge.5`) | Anchors the build and tests to the version the lockfile resolves; devDependencies never ship, so a consumer still sees only the caret peer |
 | **`@angular/*`** | `peerDependencies` | caret at the platform pin (`^21.1.3`) | Same reasoning; the host Explorer owns the Angular version. Caret at the pin, matching MJ's own `ng-*` packages — an exact peer pin would veto every other in-range build and turn each Angular patch into a republish of the whole family |
 | Ordinary libraries the package truly owns (e.g. `zod`) | `dependencies` | caret | Normal semver semantics |
 | Build tooling (`typescript`, `@angular/compiler-cli`) | `devDependencies` | caret/pinned | Never shipped |
@@ -80,8 +82,8 @@ manifest honest.
 
 ## Upgrading the MJ baseline
 
-1. Bump every `@memberjunction/*` peer dep + the root `overrides` to the new
-   version.
+1. Bump every `@memberjunction/*` peer dep, its exact `devDependencies` anchor,
+   and the root `overrides` to the new version.
 2. Re-run the loop (migrate → codegen → build) against an MJ instance of that
    version; commit regenerated code.
 3. Changeset: minor (or major if you drop support for an older MJ).
