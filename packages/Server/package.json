@@ -30,6 +30,10 @@
     "@memberjunction/sqlserver-dataprovider": "^6.1.0-edge.5"
   },
   "devDependencies": {
+    "@memberjunction/core": "6.1.0-edge.5",
+    "@memberjunction/global": "6.1.0-edge.5",
+    "@memberjunction/server": "6.1.0-edge.5",
+    "@memberjunction/sqlserver-dataprovider": "6.1.0-edge.5",
     "typescript": "^5.9.3"
   }
 }

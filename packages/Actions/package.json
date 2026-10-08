@@ -27,6 +27,11 @@
     "@memberjunction/global": "^6.1.0-edge.5"
   },
   "devDependencies": {
+    "@memberjunction/actions": "6.1.0-edge.5",
+    "@memberjunction/actions-base": "6.1.0-edge.5",
+    "@memberjunction/core": "6.1.0-edge.5",
+    "@memberjunction/core-entities": "6.1.0-edge.5",
+    "@memberjunction/global": "6.1.0-edge.5",
     "typescript": "^5.9.3"
   }
 }
