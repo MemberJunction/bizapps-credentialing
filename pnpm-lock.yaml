@@ -5,8 +5,8 @@ settings:
   excludeLinksFromLockfile: false
 
 overrides:
-  '@memberjunction/core': ^6.1.0-edge.5
-  '@memberjunction/global': ^6.1.0-edge.5
+  '@memberjunction/core': 6.1.0-edge.5
+  '@memberjunction/global': 6.1.0-edge.5
 
 importers:
 
@@ -34,13 +34,13 @@ importers:
         specifier: 6.1.0-edge.5
         version: 6.1.0-edge.5(@aws-sdk/credential-provider-node@3.972.81)(@aws-sdk/credential-providers@3.1116.0)(@modelcontextprotocol/sdk@1.30.0(zod@3.25.76))(@smithy/signature-v4@5.7.3)(@types/node@22.20.1)(axios@1.19.0)(chokidar@3.6.0)(encoding@0.1.13)(socks@2.8.9)(typescript@5.9.3)(ws@8.21.3)
       '@memberjunction/core':
-        specifier: ^6.1.0-edge.5
+        specifier: 6.1.0-edge.5
         version: 6.1.0-edge.5
       '@memberjunction/core-entities':
         specifier: 6.1.0-edge.5
         version: 6.1.0-edge.5
       '@memberjunction/global':
-        specifier: ^6.1.0-edge.5
+        specifier: 6.1.0-edge.5
         version: 6.1.0-edge.5
       '@memberjunction/ng-base-forms':
         specifier: 6.1.0-edge.5
@@ -85,13 +85,13 @@ importers:
         specifier: ^6.1.0-edge.5
         version: 6.1.0-edge.5
       '@memberjunction/core':
-        specifier: ^6.1.0-edge.5
+        specifier: 6.1.0-edge.5
         version: 6.1.0-edge.5
       '@memberjunction/core-entities':
         specifier: ^6.1.0-edge.5
         version: 6.1.0-edge.5
       '@memberjunction/global':
-        specifier: ^6.1.0-edge.5
+        specifier: 6.1.0-edge.5
         version: 6.1.0-edge.5
       zod:
         specifier: ^3.25.76
@@ -116,7 +116,7 @@ importers:
         specifier: ^6.1.0-edge.5
         version: 6.1.0-edge.5
       '@memberjunction/global':
-        specifier: ^6.1.0-edge.5
+        specifier: 6.1.0-edge.5
         version: 6.1.0-edge.5
       '@memberjunction/ng-base-forms':
         specifier: ^6.1.0-edge.5
@@ -147,10 +147,10 @@ importers:
   packages/Core:
     dependencies:
       '@memberjunction/core':
-        specifier: ^6.1.0-edge.5
+        specifier: 6.1.0-edge.5
         version: 6.1.0-edge.5
       '@memberjunction/global':
-        specifier: ^6.1.0-edge.5
+        specifier: 6.1.0-edge.5
         version: 6.1.0-edge.5
       '@mj-biz-apps/common-entities':
         specifier: ^5.40.0
@@ -169,13 +169,13 @@ importers:
   packages/CoreEntitiesServer:
     dependencies:
       '@memberjunction/core':
-        specifier: ^6.1.0-edge.5
+        specifier: 6.1.0-edge.5
         version: 6.1.0-edge.5
       '@memberjunction/core-entities':
         specifier: ^6.1.0-edge.5
         version: 6.1.0-edge.5
       '@memberjunction/global':
-        specifier: ^6.1.0-edge.5
+        specifier: 6.1.0-edge.5
         version: 6.1.0-edge.5
       '@memberjunction/sqlserver-dataprovider':
         specifier: ^6.1.0-edge.5
@@ -191,10 +191,10 @@ importers:
   packages/Entities:
     dependencies:
       '@memberjunction/core':
-        specifier: ^6.1.0-edge.5
+        specifier: 6.1.0-edge.5
         version: 6.1.0-edge.5
       '@memberjunction/global':
-        specifier: ^6.1.0-edge.5
+        specifier: 6.1.0-edge.5
         version: 6.1.0-edge.5
       zod:
         specifier: ^3.25.76
@@ -207,10 +207,10 @@ importers:
   packages/Server:
     dependencies:
       '@memberjunction/core':
-        specifier: ^6.1.0-edge.5
+        specifier: 6.1.0-edge.5
         version: 6.1.0-edge.5
       '@memberjunction/global':
-        specifier: ^6.1.0-edge.5
+        specifier: 6.1.0-edge.5
         version: 6.1.0-edge.5
       '@memberjunction/server':
         specifier: ^6.1.0-edge.5
@@ -2154,14 +2154,14 @@ packages:
   '@mj-biz-apps/common-entities@5.40.0':
     resolution: {integrity: sha512-RH1EEf5NandGGEvncnQ0QBCKLznCxw0/JFHy+XJFexGrUnse1g11MoSF60jo7YMPtSGM/dCMBwMFsH63DHygYw==}
     peerDependencies:
-      '@memberjunction/core': ^6.1.0-edge.5
-      '@memberjunction/global': ^6.1.0-edge.5
+      '@memberjunction/core': 6.1.0-edge.5
+      '@memberjunction/global': 6.1.0-edge.5
 
   '@mj-biz-apps/tasks-entities@1.4.3':
     resolution: {integrity: sha512-NhBnGt15zNcViri7blnpcm78FSm91rTUJafb/LSP2RbSw59kCdVxO+riAtdXjUK1x0rkNrSaWuQ9XXc0U6gUzg==}
     peerDependencies:
-      '@memberjunction/core': ^6.1.0-edge.5
-      '@memberjunction/global': ^6.1.0-edge.5
+      '@memberjunction/core': 6.1.0-edge.5
+      '@memberjunction/global': 6.1.0-edge.5
 
   '@modelcontextprotocol/sdk@1.30.0':
     resolution: {integrity: sha512-xKd8OIzlqNzcqcNumGAa6g+PW2kjD5vrpcKOnfldAUPP3j7lnqMPwlTXQm8gF+UwH72z0lqaRbjr9hqGz0eITA==}
