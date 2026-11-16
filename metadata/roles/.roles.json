@@ -1,0 +1,52 @@
+[
+  {
+    "fields": {
+      "Name": "Credentialing Admin",
+      "Description": "Provisions accrediting organizations and their first staff members (Credentialing > Staff > Organizations). Works in programs only through a staff membership of an organization. Holds no UI role grant; its entity permissions are granted by the Credentialing app.",
+      "SQLName": null
+    },
+    "primaryKey": {
+      "ID": "80290ACA-F042-4E0F-841B-EB14C289115B"
+    }
+  },
+  {
+    "fields": {
+      "Name": "Credentialing Staff",
+      "Description": "Program staff of an accrediting organization: authors programs and runs the credentialing pipeline. Scope comes from Organization Membership rows; a staff member sees only the programs of organizations they are a member of.",
+      "SQLName": null
+    },
+    "primaryKey": {
+      "ID": "E848FF4F-F00B-4129-8F6C-2E1761E8AFC8"
+    }
+  },
+  {
+    "fields": {
+      "Name": "Credentialing Committee",
+      "Description": "Member of a program's deciding committee: works the committee docket in the Review area. External role; every permission it holds is row-filtered.",
+      "SQLName": null
+    },
+    "primaryKey": {
+      "ID": "EFCAE5A6-D60C-4941-9057-91AD4E80E921"
+    }
+  },
+  {
+    "fields": {
+      "Name": "Credentialing Reviewer",
+      "Description": "Peer reviewer assigned sections of applications in the Review area. External role; every permission it holds is row-filtered.",
+      "SQLName": null
+    },
+    "primaryKey": {
+      "ID": "F7DEA8E3-7B11-4156-9320-AA9FD6BA9190"
+    }
+  },
+  {
+    "fields": {
+      "Name": "Credentialing Applicant",
+      "Description": "Contact of a credentialing subject who prepares and submits applications in the Applicant area. External role; every permission it holds is row-filtered.",
+      "SQLName": null
+    },
+    "primaryKey": {
+      "ID": "2B77ACC6-71DB-4ED4-8FF4-A37BC04C3ED3"
+    }
+  }
+]

@@ -15,7 +15,10 @@ export interface WorldCommittee {
     Name: string;
 }
 
-/** The users every credentialing check can act as. They hold no credentialing role yet. */
+/**
+ * The users every credentialing check can act as. Until the role grants of the permissions task,
+ * only `StaffA` (`Credentialing Staff`) and `Admin` (`Credentialing Admin`) hold a credentialing role.
+ */
 export interface WorldUsers {
     /** Staff member of OrgA (`staff.a@example.test`). */
     StaffA: UserInfo;
@@ -23,6 +26,8 @@ export interface WorldUsers {
     StaffB: UserInfo;
     /** A user with no organization membership (`staff.none@example.test`). */
     StaffNoMembership: UserInfo;
+    /** The credentialing administrator who sets up organizations (`admin@example.test`). */
+    Admin: UserInfo;
 }
 
 /** The organizations, committee and sample program the checks read. */

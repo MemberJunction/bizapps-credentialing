@@ -1,17 +1,14 @@
 /**
- * @mj-biz-apps/credentialing-core — shared services for BizApps Credentialing.
+ * @mj-biz-apps/credentialing-core — shared code for BizApps Credentialing, usable on both server and
+ * client. It must never import server-only packages.
  *
- * WHAT WILL LIVE HERE
- *   Engines and services that run on both server and client: credential
- *   lifecycle orchestration, renewal scheduling that spawns BizApps Tasks
- *   records, requirement evaluation, and the typed helpers UI packages call.
- *   This package may import entity classes from @mj-biz-apps/credentialing-entities,
- *   @mj-biz-apps/common-entities (People, Organizations) and
- *   @mj-biz-apps/tasks-entities (Tasks, Task Links) — it must never import
- *   server-only packages.
+ * - `entity-names` — the entity name constants.
+ * - `rules/` — the pure ruling classes the server entity subclasses enforce.
+ * - `operations/` — the contracts (key, input and output types) of the remote operations that write
+ *   several records as one unit of work. A browser and server code call them the same way; the server
+ *   bodies live in @mj-biz-apps/credentialing-core-entities-server.
  *
- * Nothing is implemented yet. The functional requirements and domain model are in
- * plans/active/credentialing-frd.md; code lands with the first schema migration.
+ * The functional requirements and domain model are in plans/active/credentialing-frd.md.
  */
 export * from './entity-names.js';
 export * from './rules/RuleResult.js';
@@ -19,3 +16,8 @@ export * from './rules/VersionLifecycleRules.js';
 export * from './rules/VersionSettingsRules.js';
 export * from './rules/StandardAuthoringRules.js';
 export * from './rules/ProgramRules.js';
+export * from './operations/OperationKeys.js';
+export * from './operations/CreateProgramOperation.js';
+export * from './operations/CloneVersionToDraftOperation.js';
+export * from './operations/ReorderVersionTreeOperation.js';
+export * from './operations/CreateOrganizationOperation.js';

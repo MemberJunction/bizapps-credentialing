@@ -344,11 +344,34 @@ A user API key (`mj_sk_…`, `x-api-key` header) is not used by this harness.
 | `cred-schema` | `CRD-01 - Schema` | server and client |
 | `cred-version-rules` | `CRD-02 - Version rules` | server only |
 | `cred-standard-rules` | `CRD-03 - Standard rules` | server only |
+| `cred-operations` | `CRD-04 - Operations` | server only |
+| `cred-operations-wire` | — (client harness only) | client only |
 
 ```sh
 MJ_INTEGRATION_TEST=1 RUN_MUTATION_TESTS=1 corepack pnpm mj test run --name "CRD-02 - Version rules"   # 11 checks
 MJ_INTEGRATION_TEST=1 RUN_MUTATION_TESTS=1 corepack pnpm mj test run --name "CRD-03 - Standard rules"  # 8 checks
+MJ_INTEGRATION_TEST=1 RUN_MUTATION_TESTS=1 corepack pnpm mj test run --name "CRD-04 - Operations"     # 10 checks
+corepack pnpm run test:integration cred-operations-wire                                               # 3 checks, GraphQL
 ```
+
+`cred-operations` is server only for three reasons: `.3` writes one `EvaluationMode` with SQL
+(the provider's `ExecuteSQL`, which GraphQL does not have), `.6` sets the static test seam
+`CloneVersionToDraftServerOperation.FailAfterStandards` (it exists only in the server process, reached
+through the class factory registration), and `.7` and `.9` need separate provider instances. It acts
+as three users: `operations.staff@example.test` (holds `Credentialing Staff` for the operations'
+`Authorize` and `Developer` for entity permissions — the credentialing roles hold no entity
+permissions until the permissions task, which replaces this user), the world's `admin@example.test`
+(`Credentialing Admin`) and the world's `StaffA` (`Credentialing Staff`).
+
+`cred-operations-wire` proves the browser path: the shared contract classes of
+`@mj-biz-apps/credentialing-core`, called with no provider (as a browser calls them) or with a second
+`GraphQLDataProvider` session signed in through `POST /auth/dev-login`, against the running MJAPI.
+Its precondition is that the world exists and MJAPI's user cache holds the world's role grants: run
+`CRD-04 - Operations` once on the server transport, then `servers.sh restart api`, then the wire
+bundle. Measured: `.1` FORBIDDEN for the `System` user on both operations, `.2` staff create a
+program and get `REFUSED` + the guard's sentence for a blank label with no row left, `.3` an admin
+sets up an organization and the new staff member's dev-login, made straight after the call returned,
+lists `Credentialing Staff` in its roles.
 
 Build `packages/IntegrationTests` (or `build:packages`) and push `metadata-tests` first. A
 change to `packages/CoreEntitiesServer` needs a build and an MJAPI restart before anything that
@@ -393,6 +416,67 @@ transport was not needed for these checks.
   Active-with-an-empty-section scratch versions from that control run remain in the dev database
   (scratch residue nothing reads).
 
+## Remote operations (Task 7 discovery, MJ v6.2.2 source)
+
+The four multi-record writes (`Credentialing.CreateProgram`, `.CloneVersionToDraft`,
+`.ReorderVersionTree`, `.CreateOrganization`) are hand-written, code-only remote operations: a
+contract class per operation in `packages/Core/src/operations` (key and types, no body) and a server
+subclass per operation in `packages/CoreEntitiesServer/src/operations`. They have no
+`MJ: Remote Operations` metadata row; `RemoteOperationEngineBase.IsInvokable` returns
+`{ Invokable: true }` when no row exists (`mj/packages/MJCoreEntities/src/engines/RemoteOperationEngineBase.ts:83-87`).
+
+**Which class the server runs is decided by registration order.** Both classes register under the
+same key, `@RegisterClass(BaseRemotableOperation, <key>)`, with no explicit priority. For a priority of
+0 the class factory assigns the highest existing priority for that key plus one
+(`mj/packages/MJGlobal/src/ClassFactory.ts:264-293`), and lookup returns the highest priority
+(`ClassFactory.ts:747-766`). The server subclass imports and extends its contract, so the contract's
+decorator has always run first and the subclass always outranks it — the "last registration wins by
+import order" rule of `mj/packages/MJCore/src/generic/baseRemotableOperation.ts:149-151`, the same as
+`mj/packages/RecordCloning/engine/src/operations.ts:432-455` and
+`mj/packages/MJCoreEntities/src/custom/operations/AuthorizationCheckOperation.ts:27`. The one
+requirement is that the server package is loaded in the process: `LoadBizAppsCredentialingEntitiesServer()`
+references the four classes so tree-shaking keeps them. Without it the key still resolves — to the
+contract, whose default `InternalExecute` throws — and the caller gets `EXECUTION_ERROR`
+`Remote operation '<key>' has no server implementation…` (seen in the failing-first run of `CRD-04`,
+before the server package was rebuilt).
+
+**Dispatch.** Server code calls `new XOperation().Execute(input, { provider, user })`;
+`DatabaseProviderBase.InternalRouteOperation` → `DispatchRemoteOperationInProcess`
+(`mj/packages/MJCore/src/generic/remoteOperationDispatch.ts:26-76`) creates the registered class by
+key and runs `ExecuteServer`. A browser calls the same line with no options; `GraphQLDataProvider`
+sends the `ExecuteRemoteOperation` mutation (`mj/packages/GraphQLDataProvider/src/graphQLDataProvider.ts:2248`)
+and `ExecuteRemoteOperationResolver` (`mj/packages/MJServer/src/resolvers/ExecuteRemoteOperationResolver.ts:81-170`)
+resolves the user, applies the metadata gate and routes through the request's own provider, so the
+browser needs only the contract class.
+
+**How a failure reaches the caller** (`baseRemotableOperation.ts:290-316`): `Authorize` returning
+false gives `Success: false`, `ResultCode: 'FORBIDDEN'`, `Not authorized to run operation '<key>'`; a
+thrown `RemoteOperationError(code, message)` gives `ResultCode: code` and `ErrorMessage: message`;
+any other throw gives `EXECUTION_ERROR` and the error's message. The resolver copies
+`success`/`resultCode`/`errorMessage` onto the wire and the GraphQL provider copies them back
+(`graphQLDataProvider.ts:2296-2306`), so both tiers read the same `RemoteOpResult`. The operations
+throw `RemoteOperationError('REFUSED', <entity>.LatestResult.CompleteMessage)` for the first refused
+save, which also rolls back the operation's transaction (`OperationSupport.InTransaction`, which
+refuses to run on a provider that is not a `DatabaseProviderBase`, because `RunInEntityTransaction`
+would otherwise run the work without a transaction).
+
+**Organization setup acts as the system user** (`UserCache.Instance.GetSystemUser()`, imported from
+`@memberjunction/generic-database-provider`; the `@memberjunction/sqlserver-dataprovider` re-export is
+marked deprecated at `mj/packages/SQLServerDataProvider/src/index.ts:9-19`). After the commit it
+calls `UserCache.Instance.RefreshNow()`, not `Refresh(provider)`: `Refresh` stores the provider it is
+given for every later self-refresh and timer (`mj/packages/GenericDatabaseProvider/src/UserCache.ts:170-189`),
+which would rebind the process-wide cache to one request's provider; `RefreshNow` reloads through the
+provider `SetupSQLServerClient` gave the cache at startup (`UserCache.ts:544-565`,
+`mj/packages/SQLServerDataProvider/src/config.ts:30`). `POST /auth/dev-login` resolves users and their
+roles from that cache only (`mj/packages/MJServer/src/auth/localDevAuth.ts:307-336`), which is what
+`cred-operations-wire.3` reads back. On an instance with more than one MJAPI process, the others
+pick the grant up from the cache's shared-store notice, its staleness check
+(`cacheSettings.userCacheCheckIntervalSeconds`, default 300) or a restart.
+
+**`mj sync validate` does not exit.** `corepack pnpm exec mj sync validate --dir=metadata` prints the
+report (`✓ Validation passed!`) and then stays running; run it under `timeout` and read the report.
+`mj sync push` exits normally.
+
 ## Role grants and the user cache
 
 MJAPI builds each request's user from an in-memory cache populated at startup
@@ -400,4 +484,8 @@ MJAPI builds each request's user from an in-memory cache populated at startup
 application grant applied while MJAPI is running is not seen by that user's
 requests until the cache refreshes. In development, restart MJAPI after loading
 test data or granting a role outside operations that refresh the cache
-themselves, and before signing in as the affected user.
+themselves, and before signing in as the affected user. `Credentialing.CreateOrganization` is
+such an operation: it refreshes the cache of the MJAPI process that ran it. The `mj test` run creates
+the world's grants (`admin@example.test` → `Credentialing Admin`, `staff.a@example.test` →
+`Credentialing Staff`) in its own process, so restart MJAPI after it before signing in as them or
+running `cred-operations-wire`.

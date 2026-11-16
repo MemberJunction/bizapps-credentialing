@@ -1,5 +1,5 @@
 import type { BaseEntity, UserInfo } from '@memberjunction/core';
-import type { MJUserEntity } from '@memberjunction/core-entities';
+import type { MJUserEntity, MJUserRoleEntity } from '@memberjunction/core-entities';
 import { Assert, type IntegrationCheckContext } from '@memberjunction/testing-integration/registry';
 import type { mjBizAppsCommonOrganizationEntity } from '@mj-biz-apps/common-entities';
 import type { mjBizAppsCommitteesCommitteeEntity } from '@mj-biz-apps/committees-entities';
@@ -21,6 +21,8 @@ import {
 } from './world.js';
 
 const USERS_ENTITY = 'MJ: Users';
+const ROLES_ENTITY = 'MJ: Roles';
+const USER_ROLES_ENTITY = 'MJ: User Roles';
 const COMMON_ORGANIZATIONS_ENTITY = 'MJ_BizApps_Common: Organizations';
 const COMMITTEES_ENTITY = 'Committees: Committees';
 const COMMITTEE_TYPES_ENTITY = 'Committees: Types';
@@ -30,6 +32,12 @@ const COMMITTEE_TYPE_NAME = 'Standing Committee';
 const STAFF_A_EMAIL = 'staff.a@example.test';
 const STAFF_B_EMAIL = 'staff.b@example.test';
 const STAFF_NONE_EMAIL = 'staff.none@example.test';
+const ADMIN_EMAIL = 'admin@example.test';
+
+/** The credentialing role every staff member of an accrediting organization holds. */
+export const STAFF_ROLE = 'Credentialing Staff';
+/** The credentialing role that sets up organizations. */
+export const ADMIN_ROLE = 'Credentialing Admin';
 
 const ORG_A_NAME = 'Sample Accrediting Body A';
 const ORG_B_NAME = 'Sample Accrediting Body B';
@@ -42,19 +50,53 @@ async function findEntity<T extends BaseEntity>(ctx: IntegrationCheckContext, en
     return res.Results[0] ?? null;
 }
 
-/** Finds a user by email, or creates it as an active `User`, and returns it with its roles. */
-async function ensureUser(ctx: IntegrationCheckContext, email: string, lastName: string): Promise<UserInfo> {
+/** Finds a user by email, or creates it as an active `User`, and returns its ID. */
+async function ensureUserRow(ctx: IntegrationCheckContext, email: string, firstName: string, lastName: string): Promise<string> {
     const rows = await FindRows<{ ID: string }>(ctx, USERS_ENTITY, `Email = '${Quote(email)}'`, ['ID']);
-    if (rows.length === 0) {
-        const user = await ctx.Provider.GetEntityObject<MJUserEntity>(USERS_ENTITY, ctx.User);
-        user.NewRecord();
-        user.Name = email;
-        user.Email = email;
-        user.FirstName = 'Staff';
-        user.LastName = lastName;
-        user.Type = 'User';
-        user.IsActive = true;
-        await RequireSave(user, `user ${email}`);
+    if (rows.length > 0) {
+        return rows[0].ID;
+    }
+    const user = await ctx.Provider.GetEntityObject<MJUserEntity>(USERS_ENTITY, ctx.User);
+    user.NewRecord();
+    user.Name = email;
+    user.Email = email;
+    user.FirstName = firstName;
+    user.LastName = lastName;
+    user.Type = 'User';
+    user.IsActive = true;
+    await RequireSave(user, `user ${email}`);
+    return user.ID;
+}
+
+/** Finds or creates the `MJ: User Roles` row giving the user `userID` the role named `roleName`. */
+export async function EnsureUserRole(ctx: IntegrationCheckContext, userID: string, roleName: string): Promise<void> {
+    const roles = await FindRows<{ ID: string }>(ctx, ROLES_ENTITY, `Name = '${Quote(roleName)}'`, ['ID']);
+    Assert(roles.length === 1, `expected the role '${roleName}', found ${roles.length}`);
+    const grants = await FindRows<{ ID: string }>(ctx, USER_ROLES_ENTITY, `UserID = '${Quote(userID)}' AND RoleID = '${Quote(roles[0].ID)}'`, ['ID']);
+    if (grants.length > 0) {
+        return;
+    }
+    const grant = await ctx.Provider.GetEntityObject<MJUserRoleEntity>(USER_ROLES_ENTITY, ctx.User);
+    grant.NewRecord();
+    grant.UserID = userID;
+    grant.RoleID = roles[0].ID;
+    await RequireSave(grant, `role ${roleName} for user ${userID}`);
+}
+
+/**
+ * Finds or creates an active user with `email`, gives it each of `roleNames`, and returns it with its
+ * roles (as the context user reads them).
+ */
+export async function EnsureUser(
+    ctx: IntegrationCheckContext,
+    email: string,
+    lastName: string,
+    roleNames: readonly string[] = [],
+    firstName: string = 'Staff',
+): Promise<UserInfo> {
+    const userID = await ensureUserRow(ctx, email, firstName, lastName);
+    for (const roleName of roleNames) {
+        await EnsureUserRole(ctx, userID, roleName);
     }
     return LoadUserInfo(ctx, email);
 }
@@ -65,9 +107,10 @@ async function ensureUser(ctx: IntegrationCheckContext, email: string, lastName:
  */
 export async function EnsureWorldUsers(ctx: IntegrationCheckContext): Promise<WorldUsers> {
     return {
-        StaffA: await ensureUser(ctx, STAFF_A_EMAIL, 'A'),
-        StaffB: await ensureUser(ctx, STAFF_B_EMAIL, 'B'),
-        StaffNoMembership: await ensureUser(ctx, STAFF_NONE_EMAIL, 'None'),
+        StaffA: await EnsureUser(ctx, STAFF_A_EMAIL, 'A', [STAFF_ROLE]),
+        StaffB: await EnsureUser(ctx, STAFF_B_EMAIL, 'B'),
+        StaffNoMembership: await EnsureUser(ctx, STAFF_NONE_EMAIL, 'None'),
+        Admin: await EnsureUser(ctx, ADMIN_EMAIL, 'Admin', [ADMIN_ROLE], 'Credentialing'),
     };
 }
 

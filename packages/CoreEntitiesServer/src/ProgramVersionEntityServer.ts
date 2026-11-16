@@ -30,6 +30,9 @@ import { ParentVersionLoader } from './guards/ParentVersionLoader.js';
 
 const SOURCE = 'ProgramVersionEntityServer';
 
+/** The refusal given for a version label that is empty once trimmed. */
+export const BLANK_LABEL_REASON = 'Enter a label for this version.';
+
 /** Another version of the same program, as the label and one-draft rules read it. */
 interface SiblingVersion {
     ID: string;
@@ -231,6 +234,10 @@ export class ProgramVersionEntityServer extends mjBizAppsCredentialingProgramVer
 
     private labelRefusal(siblings: SiblingVersion[]): string | null {
         const label = (this.Label ?? '').trim();
+        // An empty string passes the entity's required-field check (it is not null), so it is refused here.
+        if (label.length === 0) {
+            return BLANK_LABEL_REASON;
+        }
         const taken = siblings.some((s) => s.Label.trim().toLowerCase() === label.toLowerCase());
         return taken ? `A version labelled ${label} already exists for this program.` : null;
     }

@@ -27,6 +27,7 @@ process.env.RUN_MUTATION_TESTS = process.env.RUN_MUTATION_TESTS ?? '1';
 const ALL_BUNDLES = [
     'cred-smoke',
     'cred-schema',
+    'cred-operations-wire',
 ];
 
 /**
@@ -36,6 +37,7 @@ const ALL_BUNDLES = [
 const SERVER_ONLY_BUNDLES = {
     'cred-version-rules': 'CRD-02 - Version rules',
     'cred-standard-rules': 'CRD-03 - Standard rules',
+    'cred-operations': 'CRD-04 - Operations',
 };
 
 const args = process.argv.slice(2);

@@ -1,7 +1,7 @@
 /**
  * @mj-biz-apps/credentialing-core-entities-server — SERVER-ONLY entity subclasses.
  *
- * Each subclass enforces the credentialing rules (packages/Core/src/rules) on the server, where they
+ * Each entity subclass enforces the credentialing rules (packages/Core/src/rules) on the server, where they
  * cannot be bypassed: ownership fields that never change, the version lifecycle, one Draft per
  * program, unique labels, codes and requirement names, and tree edits only on a Draft. Writes under a
  * program version run under transaction-owned authoring locks (guards/AuthoringLock.ts) so a rule
@@ -18,6 +18,10 @@ import { ProgramEntityServer } from './ProgramEntityServer.js';
 import { ProgramVersionEntityServer } from './ProgramVersionEntityServer.js';
 import { SectionEntityServer } from './SectionEntityServer.js';
 import { StandardEntityServer } from './StandardEntityServer.js';
+import { CloneVersionToDraftServerOperation } from './operations/CloneVersionToDraftServerOperation.js';
+import { CreateOrganizationServerOperation } from './operations/CreateOrganizationServerOperation.js';
+import { CreateProgramServerOperation } from './operations/CreateProgramServerOperation.js';
+import { ReorderVersionTreeServerOperation } from './operations/ReorderVersionTreeServerOperation.js';
 
 export { AccreditingOrganizationEntityServer } from './AccreditingOrganizationEntityServer.js';
 export { DocumentRequirementEntityServer } from './DocumentRequirementEntityServer.js';
@@ -36,11 +40,24 @@ export {
     type LoadedVersion,
 } from './guards/ParentVersionLoader.js';
 export { VersionTree } from './guards/VersionTree.js';
+export { BLANK_LABEL_REASON } from './ProgramVersionEntityServer.js';
+export { OperationSupport } from './operations/OperationSupport.js';
+export { CreateProgramServerOperation } from './operations/CreateProgramServerOperation.js';
+export { CloneVersionToDraftServerOperation, CLONE_SOURCE_STATUS_REASON } from './operations/CloneVersionToDraftServerOperation.js';
+export { ReorderVersionTreeServerOperation } from './operations/ReorderVersionTreeServerOperation.js';
+export {
+    CreateOrganizationServerOperation,
+    NoUserWithEmailReason,
+    ORGANIZATION_NAME_REQUIRED_REASON,
+    STAFF_EMAIL_REQUIRED_REASON,
+} from './operations/CreateOrganizationServerOperation.js';
 
 /**
  * Bootstrap / anti-tree-shaking anchor, called by the server bootstrap. Referencing the classes keeps
- * their `@RegisterClass` registrations in every bundle, so the server subclasses win over the
- * generated ones.
+ * their `@RegisterClass` registrations in every bundle, so the server entity subclasses win over the
+ * generated ones and the server operations win over the shared operation contracts of
+ * `@mj-biz-apps/credentialing-core` (each server operation imports and extends its contract, so it
+ * always registers after it under the same key and takes the higher priority — docs/dev-instance.md).
  */
 export function LoadBizAppsCredentialingEntitiesServer(): void {
     const anchor = [
@@ -52,7 +69,13 @@ export function LoadBizAppsCredentialingEntitiesServer(): void {
         StandardEntityServer,
         DocumentRequirementEntityServer,
     ];
-    if (anchor.length !== 7) {
-        throw new Error('credentialing server entity subclasses missing');
+    const operations = [
+        CreateProgramServerOperation,
+        CloneVersionToDraftServerOperation,
+        ReorderVersionTreeServerOperation,
+        CreateOrganizationServerOperation,
+    ];
+    if (anchor.length !== 7 || operations.length !== 4) {
+        throw new Error('credentialing server entity subclasses or operations missing');
     }
 }

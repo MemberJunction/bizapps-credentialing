@@ -1,0 +1,560 @@
+/**
+ * `cred-operations` — the four credentialing remote operations, called in-process on the server
+ * transport with `{ provider, user }`: CreateProgram, CloneVersionToDraft, ReorderVersionTree and
+ * CreateOrganization. Every check works on its own scratch program or run-unique names.
+ *
+ * Server transport only: `.3` writes one column with SQL, `.6` sets a static test seam on the server
+ * operation class, and `.7`/`.9` need separate provider instances. The wire path is proven by
+ * `cred-operations-wire` on the client transport.
+ *
+ * This module imports nothing from `@mj-biz-apps/credentialing-core-entities-server` but types: the
+ * server classes are reached through the class factory, the way MJ dispatches the operations.
+ */
+import { randomUUID } from 'node:crypto';
+import { setTimeout as delay } from 'node:timers/promises';
+import { BaseRemotableOperation, DatabaseProviderBase, type IMetadataProvider, type RemoteOpResult, type UserInfo } from '@memberjunction/core';
+import { MJGlobal } from '@memberjunction/global';
+import {
+    Assert,
+    AssertEqual,
+    IntegrationCheckRegistry,
+    type IntegrationCheckContext,
+    type NamedCheck,
+} from '@memberjunction/testing-integration/registry';
+import {
+    CloneVersionToDraftOperation,
+    CreateOrganizationOperation,
+    CreateProgramOperation,
+    CredentialingEntity,
+    CredentialingOperation,
+    ReorderVersionTreeOperation,
+    type CloneVersionToDraftOutput,
+    type CreateOrganizationOutput,
+    type CreateProgramInput,
+} from '@mj-biz-apps/credentialing-core';
+import type { mjBizAppsCredentialingStandardEntity } from '@mj-biz-apps/credentialing-entities';
+import { Outcome, WithActors } from '../actors.js';
+import { CountRows, FindRows, LoadEntity, Quote, RequireSave } from '../wire.js';
+import { ADMIN_ROLE, EnsureUser, GetOrLoadWorld, STAFF_ROLE } from '../world/load-world.js';
+import { MakeScratchProgram, type ProgramTree } from '../world/program-tree.js';
+import type { CredentialingWorld } from '../world/world.js';
+
+type StandardEntity = mjBizAppsCredentialingStandardEntity;
+
+const APP_SCHEMA = '__mj_BizAppsCredentialing';
+const NOT_FOUND_SENTENCE = 'Record not found.';
+const STALE_SENTENCE = 'This record was changed by someone else. Reload it and try again.';
+const TREE_EDIT_SENTENCE = 'Sections and standards can only be edited on a Draft version. Use "Edit in draft" to create one.';
+const BLANK_LABEL_SENTENCE = 'Enter a label for this version.';
+const COMMON_ORGANIZATIONS_ENTITY = 'MJ_BizApps_Common: Organizations';
+/** Rounds of the reorder-against-edit race in `.7`, alternating which write leads. */
+const REORDER_RACE_ROUNDS = 4;
+/** How long the second of two concurrent writes in `.7` starts after the first. */
+const FOLLOWER_DELAY_MS = 5;
+
+function oneDraftSentence(label: string): string {
+    return `This program already has a draft version (${label}). Finish or delete it before starting another.`;
+}
+
+function noUserSentence(email: string): string {
+    return `No user has the email address ${email}. Create the user first, then set up the organization.`;
+}
+
+function runHex(): string {
+    return randomUUID().replace(/-/g, '').slice(0, 8);
+}
+
+let operationsStaff: UserInfo | null = null;
+
+/**
+ * The user the program operations act as: holds `Credentialing Staff`, which the operations'
+ * `Authorize` requires, and `Developer`, which gives it entity permissions on the credentialing
+ * entities. The credentialing roles hold no entity permissions yet; the permissions task replaces this
+ * with real, row-filtered staff permissions and a staff membership, and this user goes away.
+ */
+async function OperationsStaff(ctx: IntegrationCheckContext): Promise<UserInfo> {
+    operationsStaff ??= await EnsureUser(ctx, 'operations.staff@example.test', 'Operations', [STAFF_ROLE, 'Developer']);
+    return operationsStaff;
+}
+
+/** Asserts a refused result whose message contains `fragment`. */
+function ExpectRefused<T>(result: RemoteOpResult<T>, fragment: string, label: string): void {
+    Assert(!result.Success, `${label}: expected the operation to be refused with "${fragment}", but it succeeded`);
+    Assert((result.ErrorMessage ?? '').includes(fragment), `${label}: expected "${fragment}", got ${result.ResultCode}: "${result.ErrorMessage}"`);
+}
+
+/** Asserts a successful result and returns its output. */
+function ExpectOutput<T>(result: RemoteOpResult<T>, label: string): T {
+    Assert(result.Success && result.Output != null, `${label} failed: ${result.ResultCode}: ${result.ErrorMessage ?? 'no output'}`);
+    return result.Output;
+}
+
+/** Activates the tree's version through its own entity object, as the context user. */
+async function activate(tree: ProgramTree): Promise<void> {
+    tree.Version.Status = 'Active';
+    await RequireSave(tree.Version, `activating version ${tree.Version.Label}`);
+}
+
+/** A scratch program with a committee, activated by the check. */
+async function activatedScratch(
+    ctx: IntegrationCheckContext,
+    world: CredentialingWorld,
+    shape: { Sections: number; StandardsPerSection: number; DocumentRequirements?: number },
+): Promise<ProgramTree> {
+    const tree = await MakeScratchProgram(ctx, world, { ...shape, CommitteeID: world.CommitteeA.ID }, ctx.User);
+    await activate(tree);
+    return tree;
+}
+
+/** Version, section and standard counts of a program, read as the context user. */
+async function programCounts(ctx: IntegrationCheckContext, programID: string): Promise<{ Versions: number; Sections: number; Standards: number }> {
+    const versions = `ProgramVersionID IN (SELECT ID FROM [${APP_SCHEMA}].[vwProgramVersions] WHERE ProgramID = '${Quote(programID)}')`;
+    return {
+        Versions: await CountRows(ctx, CredentialingEntity.ProgramVersion, `ProgramID = '${Quote(programID)}'`),
+        Sections: await CountRows(ctx, CredentialingEntity.Section, versions),
+        Standards: await CountRows(ctx, CredentialingEntity.Standard, versions),
+    };
+}
+
+/** A CreateProgram input in OrgA with a run-unique name and prefix. */
+function programInput(world: CredentialingWorld, label: string): CreateProgramInput {
+    const hex = runHex();
+    return {
+        AccreditingOrganizationID: world.OrgA.ID,
+        Name: `Operations ${hex}`,
+        ProgramType: 'Certification',
+        SubjectType: 'Person',
+        SubjectNoun: 'professional',
+        CredentialPrefix: `O${hex.toUpperCase()}`,
+        Description: null,
+        FirstVersionLabel: label,
+    };
+}
+
+/** Standards of a version as stored: ID, code, lineage, mode, flag, sequence. */
+interface StoredStandard {
+    ID: string;
+    Code: string;
+    Statement: string;
+    LineageKey: string;
+    EvaluationMode: StandardEntity['EvaluationMode'];
+    IsNewForVersion: boolean;
+    Sequence: number;
+}
+
+function readStandards(ctx: IntegrationCheckContext, versionID: string): Promise<StoredStandard[]> {
+    return FindRows<StoredStandard>(ctx, CredentialingEntity.Standard, `ProgramVersionID = '${Quote(versionID)}'`, [
+        'ID',
+        'Code',
+        'Statement',
+        'LineageKey',
+        'EvaluationMode',
+        'IsNewForVersion',
+        'Sequence',
+    ]);
+}
+
+/** Every standard of a tree, in tree order. */
+function treeStandards(tree: ProgramTree): StandardEntity[] {
+    return tree.Sections.flatMap((s) => s.Standards);
+}
+
+/** The positions that reverse the order of `standards`. */
+function reversed(standards: StandardEntity[]): { ID: string; Sequence: number }[] {
+    return standards.map((s, i) => ({ ID: s.ID, Sequence: standards.length - i }));
+}
+
+/** The static test seam of the server clone operation, reached through the class the server dispatches to. */
+interface CloneFailSeam {
+    FailAfterStandards: number | null;
+}
+
+function hasCloneFailSeam(candidate: object | null | undefined): candidate is CloneFailSeam {
+    return candidate != null && 'FailAfterStandards' in candidate;
+}
+
+function CloneFailSeam(): CloneFailSeam {
+    const registration = MJGlobal.Instance.ClassFactory.GetRegistration(BaseRemotableOperation, CredentialingOperation.CloneVersionToDraft);
+    const subClass: object | null = registration?.SubClass ?? null;
+    if (!hasCloneFailSeam(subClass)) {
+        throw new Error('the registered CloneVersionToDraft operation is not the server class with its FailAfterStandards seam');
+    }
+    return subClass;
+}
+
+/** Sets one standard's evaluation mode with SQL: no code path in this release can store another mode. */
+async function setEvaluationModeBySQL(ctx: IntegrationCheckContext, standardID: string, mode: StandardEntity['EvaluationMode']): Promise<void> {
+    const database = ctx.Provider;
+    if (!(database instanceof DatabaseProviderBase)) {
+        throw new Error('this check needs the server transport (a database provider)');
+    }
+    await database.ExecuteSQL(
+        // Positional parameters through the provider-neutral signature: they bind as @p0 and @p1.
+        `UPDATE [${APP_SCHEMA}].[Standard] SET EvaluationMode = @p0 WHERE ID = @p1`,
+        [mode, standardID],
+        { description: 'cred-operations.3: stand-in for the Trust screen' },
+        ctx.User,
+    );
+}
+
+/** Counts of the rows organization setup creates, read as the context user. */
+async function organizationCounts(
+    ctx: IntegrationCheckContext,
+    name: string,
+    userID: string,
+): Promise<{ Accrediting: number; Common: number; Memberships: number; StaffRoles: number; Applications: number }> {
+    const user = `UserID = '${Quote(userID)}'`;
+    return {
+        Accrediting: await CountRows(ctx, CredentialingEntity.AccreditingOrganization, `Name = '${Quote(name)}'`),
+        Common: await CountRows(ctx, COMMON_ORGANIZATIONS_ENTITY, `Name = '${Quote(name)}'`),
+        Memberships: await CountRows(
+            ctx,
+            CredentialingEntity.OrganizationMembership,
+            `${user} AND AccreditingOrganizationID IN (SELECT ID FROM [${APP_SCHEMA}].[vwAccreditingOrganizations] WHERE Name = '${Quote(name)}')`,
+        ),
+        StaffRoles: await CountRows(ctx, 'MJ: User Roles', `${user} AND Role = '${Quote(STAFF_ROLE)}'`),
+        Applications: await CountRows(ctx, 'MJ: User Applications', `${user} AND Application = 'Credentialing'`),
+    };
+}
+
+/** Asserts exactly one row of every kind organization setup creates. */
+async function expectOneOfEach(ctx: IntegrationCheckContext, name: string, output: CreateOrganizationOutput): Promise<void> {
+    const counts = await organizationCounts(ctx, name, output.StaffUserID);
+    AssertEqual(counts.Accrediting, 1, 'accrediting organizations with the name');
+    AssertEqual(counts.Common, 1, 'Common organizations with the name');
+    AssertEqual(counts.Memberships, 1, 'memberships of the staff member');
+    AssertEqual(counts.StaffRoles, 1, 'Credentialing Staff role rows of the staff member');
+    AssertEqual(counts.Applications, 1, 'Credentialing application rows of the staff member');
+    const accrediting = await FindRows<{ OrganizationID: string }>(
+        ctx,
+        CredentialingEntity.AccreditingOrganization,
+        `ID = '${Quote(output.AccreditingOrganizationID)}'`,
+        ['OrganizationID'],
+    );
+    AssertEqual(accrediting.length, 1, 'the accrediting organization returned exists');
+    AssertEqual(await CountRows(ctx, COMMON_ORGANIZATIONS_ENTITY, `ID = '${Quote(accrediting[0].OrganizationID)}' AND Name = '${Quote(name)}'`), 1, 'its Common organization was created with the name');
+}
+
+/** A user no world check reads, for organization setup to make a staff member. */
+function newStaffUser(ctx: IntegrationCheckContext, hex: string): Promise<UserInfo> {
+    return EnsureUser(ctx, `org.staff.${hex}@example.test`, `Org ${hex}`);
+}
+
+function sameOutput(a: CreateOrganizationOutput, b: CreateOrganizationOutput): boolean {
+    return (
+        a.AccreditingOrganizationID.toLowerCase() === b.AccreditingOrganizationID.toLowerCase() &&
+        a.MembershipID.toLowerCase() === b.MembershipID.toLowerCase() &&
+        a.StaffUserID.toLowerCase() === b.StaffUserID.toLowerCase()
+    );
+}
+
+/**
+ * One round of the reorder race in `.7`: on two provider instances, a save of one standard's
+ * `Statement` and a reorder of its version. `editFirst` decides which leads; the other starts
+ * {@link FOLLOWER_DELAY_MS} later, while the leader's transaction is still open.
+ */
+async function reorderAgainstEdit(ctx: IntegrationCheckContext, world: CredentialingWorld, staff: UserInfo, editFirst: boolean): Promise<'edit' | 'stale'> {
+    const tree = await MakeScratchProgram(ctx, world, { Sections: 1, StandardsPerSection: 3 }, ctx.User);
+    const standards = treeStandards(tree);
+    const target = standards[0];
+    const order = reversed(standards);
+    const newStatement = `Edited during a reorder ${runHex()}.`;
+    return WithActors(ctx, 2, async (actors) => {
+        const edit = await LoadEntity<StandardEntity>(ctx, CredentialingEntity.Standard, target.ID, ctx.User, actors[0]);
+        edit.Statement = newStatement;
+        const reorder = (): Promise<RemoteOpResult<unknown>> =>
+            new ReorderVersionTreeOperation().Execute({ VersionID: tree.Version.ID, Sections: [], Standards: order }, { provider: actors[1], user: staff });
+        let saving: Promise<boolean>;
+        let reordering: Promise<RemoteOpResult<unknown>>;
+        if (editFirst) {
+            saving = edit.Save();
+            await delay(FOLLOWER_DELAY_MS);
+            reordering = reorder();
+        } else {
+            reordering = reorder();
+            await delay(FOLLOWER_DELAY_MS);
+            saving = edit.Save();
+        }
+        const [saved, reordered] = await Promise.allSettled([saving, reordering]);
+        Assert(reordered.status === 'fulfilled' && reordered.value.Success, `the reorder succeeds (${reordered.status === 'fulfilled' ? reordered.value.ErrorMessage : String(reordered.reason)})`);
+        const editOutcome = Outcome(saved, () => edit.LatestResult?.CompleteMessage ?? '');
+        const stored = (await readStandards(ctx, tree.Version.ID)).find((s) => s.ID.toLowerCase() === target.ID.toLowerCase());
+        Assert(stored != null, 'the edited standard still exists');
+        AssertEqual(stored.Sequence, order[0].Sequence, 'the standard has its new Sequence');
+        if (editOutcome.Succeeded) {
+            AssertEqual(stored.Statement, newStatement, 'the edit that succeeded is stored (the reorder wrote no older Statement)');
+            return 'edit';
+        }
+        Assert(editOutcome.Message.includes(STALE_SENTENCE), `a refused edit gives the stale sentence, got "${editOutcome.Message}"`);
+        AssertEqual(stored.Statement, target.Statement, 'a refused edit leaves the original Statement');
+        return 'stale';
+    });
+}
+
+const checks: NamedCheck[] = [
+    {
+        Id: 'cred-operations.1',
+        Name: 'CreateProgram creates the program and its Draft; the same name again creates nothing',
+        RequiresMutation: true,
+        Fn: async (ctx: IntegrationCheckContext) => {
+            const world = await GetOrLoadWorld(ctx);
+            const staff = await OperationsStaff(ctx);
+            const input = programInput(world, '2027');
+            const output = ExpectOutput(await new CreateProgramOperation().Execute(input, { provider: ctx.Provider, user: staff }), 'CreateProgram');
+            const versions = await FindRows<{ ID: string; Label: string; Status: string }>(
+                ctx,
+                CredentialingEntity.ProgramVersion,
+                `ProgramID = '${Quote(output.ProgramID)}'`,
+                ['ID', 'Label', 'Status'],
+            );
+            AssertEqual(versions.length, 1, 'versions of the new program');
+            AssertEqual(versions[0].ID.toLowerCase(), output.VersionID.toLowerCase(), 'the version returned');
+            AssertEqual(versions[0].Label, '2027', 'its label');
+            AssertEqual(versions[0].Status, 'Draft', 'its status');
+
+            const again = await new CreateProgramOperation().Execute(input, { provider: ctx.Provider, user: staff });
+            Assert(!again.Success, 'a second program with the same name in the same organization is refused');
+            const byName = `AccreditingOrganizationID = '${Quote(world.OrgA.ID)}' AND Name = '${Quote(input.Name)}'`;
+            AssertEqual(await CountRows(ctx, CredentialingEntity.Program, byName), 1, 'programs with the name');
+            AssertEqual(await CountRows(ctx, CredentialingEntity.ProgramVersion, `ProgramID = '${Quote(output.ProgramID)}'`), 1, 'versions of the program');
+        },
+    },
+    {
+        Id: 'cred-operations.2',
+        Name: 'CreateProgram with a blank first label is refused and leaves no program row',
+        RequiresMutation: true,
+        Fn: async (ctx: IntegrationCheckContext) => {
+            const world = await GetOrLoadWorld(ctx);
+            const staff = await OperationsStaff(ctx);
+            const input = programInput(world, '   ');
+            const result = await new CreateProgramOperation().Execute(input, { provider: ctx.Provider, user: staff });
+            ExpectRefused(result, BLANK_LABEL_SENTENCE, 'CreateProgram with a blank label');
+            AssertEqual(result.ResultCode, 'REFUSED', 'ResultCode');
+            const byName = `AccreditingOrganizationID = '${Quote(world.OrgA.ID)}' AND Name = '${Quote(input.Name)}'`;
+            AssertEqual(await CountRows(ctx, CredentialingEntity.Program, byName), 0, 'program rows (the unit of work rolled back)');
+        },
+    },
+    {
+        Id: 'cred-operations.3',
+        Name: 'CloneVersionToDraft copies the tree, keeps lineage and evaluation mode, and leaves the source Active',
+        RequiresMutation: true,
+        Fn: async (ctx: IntegrationCheckContext) => {
+            const world = await GetOrLoadWorld(ctx);
+            const staff = await OperationsStaff(ctx);
+            const source = await activatedScratch(ctx, world, { Sections: 2, StandardsPerSection: 3, DocumentRequirements: 2 });
+            const assisted = source.Sections[1].Standards[1];
+            await setEvaluationModeBySQL(ctx, assisted.ID, 'AI Assisted');
+            const sourceBefore = await readStandards(ctx, source.Version.ID);
+
+            const output: CloneVersionToDraftOutput = ExpectOutput(
+                await new CloneVersionToDraftOperation().Execute({ SourceVersionID: source.Version.ID, NewLabel: '2028' }, { provider: ctx.Provider, user: staff }),
+                'CloneVersionToDraft',
+            );
+            AssertEqual(output.SectionCount, 2, 'SectionCount');
+            AssertEqual(output.StandardCount, 6, 'StandardCount');
+            AssertEqual(output.DocumentRequirementCount, 2, 'DocumentRequirementCount');
+
+            const draft = await FindRows<{ Status: string; Label: string; ClonedFromVersionID: string | null }>(
+                ctx,
+                CredentialingEntity.ProgramVersion,
+                `ID = '${Quote(output.VersionID)}'`,
+                ['Status', 'Label', 'ClonedFromVersionID'],
+            );
+            AssertEqual(draft.length, 1, 'the new version exists');
+            AssertEqual(draft[0].Status, 'Draft', 'new version status');
+            AssertEqual((draft[0].ClonedFromVersionID ?? '').toLowerCase(), source.Version.ID.toLowerCase(), 'ClonedFromVersionID');
+            AssertEqual(await CountRows(ctx, CredentialingEntity.Section, `ProgramVersionID = '${Quote(output.VersionID)}'`), 2, 'sections of the draft');
+            AssertEqual(await CountRows(ctx, CredentialingEntity.DocumentRequirement, `ProgramVersionID = '${Quote(output.VersionID)}'`), 2, 'requirements of the draft');
+
+            const copies = await readStandards(ctx, output.VersionID);
+            AssertEqual(copies.length, 6, 'standards of the draft');
+            const modeByLineage = new Map(sourceBefore.map((s) => [s.LineageKey.toLowerCase(), s.EvaluationMode]));
+            AssertEqual(
+                [...copies.map((c) => c.LineageKey.toLowerCase())].sort().join(','),
+                [...modeByLineage.keys()].sort().join(','),
+                'the draft has the source lineage keys',
+            );
+            for (const copy of copies) {
+                AssertEqual(copy.EvaluationMode, modeByLineage.get(copy.LineageKey.toLowerCase()), `evaluation mode of ${copy.Code}`);
+                AssertEqual(copy.IsNewForVersion, false, `IsNewForVersion of ${copy.Code}`);
+            }
+            Assert(copies.some((c) => c.EvaluationMode === 'AI Assisted'), 'the AI Assisted mode was carried into the draft');
+
+            const sourceVersion = await FindRows<{ Status: string }>(ctx, CredentialingEntity.ProgramVersion, `ID = '${Quote(source.Version.ID)}'`, ['Status']);
+            AssertEqual(sourceVersion[0]?.Status, 'Active', 'the source is still Active');
+            const sourceAfter = await readStandards(ctx, source.Version.ID);
+            AssertEqual(
+                JSON.stringify(sourceAfter.map((s) => [s.ID.toLowerCase(), s.EvaluationMode, s.Sequence]).sort()),
+                JSON.stringify(sourceBefore.map((s) => [s.ID.toLowerCase(), s.EvaluationMode, s.Sequence]).sort()),
+                'the source standards are unchanged',
+            );
+        },
+    },
+    {
+        Id: 'cred-operations.4',
+        Name: 'CloneVersionToDraft while the program has a Draft gives the one-draft sentence and creates nothing',
+        RequiresMutation: true,
+        Fn: async (ctx: IntegrationCheckContext) => {
+            const world = await GetOrLoadWorld(ctx);
+            const staff = await OperationsStaff(ctx);
+            const tree = await activatedScratch(ctx, world, { Sections: 1, StandardsPerSection: 2 });
+            const draft = await ctx.Provider.GetEntityObject<ProgramTree['Version']>(CredentialingEntity.ProgramVersion, ctx.User);
+            draft.NewRecord();
+            draft.ProgramID = tree.Program.ID;
+            draft.Label = '2028';
+            draft.Status = 'Draft';
+            await RequireSave(draft, 'the existing draft 2028');
+            const before = await programCounts(ctx, tree.Program.ID);
+
+            const result = await new CloneVersionToDraftOperation().Execute({ SourceVersionID: tree.Version.ID, NewLabel: '2029' }, { provider: ctx.Provider, user: staff });
+            ExpectRefused(result, oneDraftSentence('2028'), 'clone while a Draft exists');
+            const after = await programCounts(ctx, tree.Program.ID);
+            AssertEqual(JSON.stringify(after), JSON.stringify(before), 'version, section and standard counts of the program');
+        },
+    },
+    {
+        Id: 'cred-operations.5',
+        Name: 'CloneVersionToDraft to a label the program already uses is refused and creates nothing',
+        RequiresMutation: true,
+        Fn: async (ctx: IntegrationCheckContext) => {
+            const world = await GetOrLoadWorld(ctx);
+            const staff = await OperationsStaff(ctx);
+            const tree = await activatedScratch(ctx, world, { Sections: 1, StandardsPerSection: 2 });
+            const before = await programCounts(ctx, tree.Program.ID);
+            const result = await new CloneVersionToDraftOperation().Execute({ SourceVersionID: tree.Version.ID, NewLabel: '2027' }, { provider: ctx.Provider, user: staff });
+            ExpectRefused(result, 'A version labelled 2027 already exists for this program.', 'clone to an existing label');
+            const after = await programCounts(ctx, tree.Program.ID);
+            AssertEqual(JSON.stringify(after), JSON.stringify(before), 'version, section and standard counts of the program');
+        },
+    },
+    {
+        Id: 'cred-operations.6',
+        Name: 'a clone that fails partway leaves nothing behind',
+        RequiresMutation: true,
+        Fn: async (ctx: IntegrationCheckContext) => {
+            const world = await GetOrLoadWorld(ctx);
+            const staff = await OperationsStaff(ctx);
+            const tree = await activatedScratch(ctx, world, { Sections: 2, StandardsPerSection: 3 });
+            const before = await programCounts(ctx, tree.Program.ID);
+            const seam = CloneFailSeam();
+            seam.FailAfterStandards = 2;
+            let result: RemoteOpResult<CloneVersionToDraftOutput>;
+            try {
+                result = await new CloneVersionToDraftOperation().Execute({ SourceVersionID: tree.Version.ID, NewLabel: '2028' }, { provider: ctx.Provider, user: staff });
+            } finally {
+                seam.FailAfterStandards = null;
+            }
+            Assert(!result.Success, 'the clone stopped partway is reported as failed');
+            const after = await programCounts(ctx, tree.Program.ID);
+            AssertEqual(JSON.stringify(after), JSON.stringify(before), 'version, section and standard counts of the program');
+        },
+    },
+    {
+        Id: 'cred-operations.7',
+        Name: 'ReorderVersionTree reorders a Draft, is refused on Active and for foreign rows, and loses no concurrent edit',
+        RequiresMutation: true,
+        Fn: async (ctx: IntegrationCheckContext) => {
+            const world = await GetOrLoadWorld(ctx);
+            const staff = await OperationsStaff(ctx);
+
+            const draft = await MakeScratchProgram(ctx, world, { Sections: 1, StandardsPerSection: 3 }, ctx.User);
+            const draftStandards = treeStandards(draft);
+            const output = ExpectOutput(
+                await new ReorderVersionTreeOperation().Execute({ VersionID: draft.Version.ID, Sections: [], Standards: reversed(draftStandards) }, { provider: ctx.Provider, user: staff }),
+                'reorder a Draft',
+            );
+            AssertEqual(output.StandardsUpdated, 3, 'StandardsUpdated');
+            const readBack = (await readStandards(ctx, draft.Version.ID)).sort((a, b) => a.Sequence - b.Sequence).map((s) => s.Code);
+            AssertEqual(readBack.join(','), draftStandards.map((s) => s.Code).reverse().join(','), 'the new order');
+
+            const active = await activatedScratch(ctx, world, { Sections: 1, StandardsPerSection: 3 });
+            const activeBefore = await readStandards(ctx, active.Version.ID);
+            const onActive = await new ReorderVersionTreeOperation().Execute(
+                { VersionID: active.Version.ID, Sections: [], Standards: reversed(treeStandards(active)) },
+                { provider: ctx.Provider, user: staff },
+            );
+            ExpectRefused(onActive, TREE_EDIT_SENTENCE, 'reorder an Active version');
+            const activeAfter = await readStandards(ctx, active.Version.ID);
+            AssertEqual(JSON.stringify(activeAfter.map((s) => [s.ID, s.Sequence]).sort()), JSON.stringify(activeBefore.map((s) => [s.ID, s.Sequence]).sort()), 'no Sequence changed on the Active version');
+
+            const other = await MakeScratchProgram(ctx, world, { Sections: 1, StandardsPerSection: 1 }, ctx.User);
+            const draftBefore = await readStandards(ctx, draft.Version.ID);
+            const otherBefore = await readStandards(ctx, other.Version.ID);
+            const foreign = await new ReorderVersionTreeOperation().Execute(
+                { VersionID: draft.Version.ID, Sections: [], Standards: [{ ID: draftStandards[0].ID, Sequence: 9 }, { ID: other.Sections[0].Standards[0].ID, Sequence: 1 }] },
+                { provider: ctx.Provider, user: staff },
+            );
+            ExpectRefused(foreign, NOT_FOUND_SENTENCE, 'reorder naming another program\'s standard');
+            AssertEqual(JSON.stringify(await readStandards(ctx, draft.Version.ID)), JSON.stringify(draftBefore), 'the draft is unchanged');
+            AssertEqual(JSON.stringify(await readStandards(ctx, other.Version.ID)), JSON.stringify(otherBefore), 'the other program is unchanged');
+
+            const outcomes: string[] = [];
+            for (let round = 0; round < REORDER_RACE_ROUNDS; round++) {
+                outcomes.push(await reorderAgainstEdit(ctx, world, staff, round % 2 === 0));
+            }
+            console.log(`  cred-operations.7 reorder race outcomes: ${outcomes.join(', ')}`);
+        },
+    },
+    {
+        Id: 'cred-operations.8',
+        Name: 'CreateOrganization twice with the same input returns the same IDs and creates one row of each kind',
+        RequiresMutation: true,
+        Fn: async (ctx: IntegrationCheckContext) => {
+            const world = await GetOrLoadWorld(ctx);
+            const hex = runHex();
+            const staffUser = await newStaffUser(ctx, hex);
+            const name = `Operations Body ${hex}`;
+            const input = { Name: `  Operations   Body ${hex} `, FirstStaffEmail: ` ${staffUser.Email.toUpperCase()} ` };
+            const first = ExpectOutput(await new CreateOrganizationOperation().Execute(input, { provider: ctx.Provider, user: world.Admin }), 'first CreateOrganization');
+            const second = ExpectOutput(await new CreateOrganizationOperation().Execute(input, { provider: ctx.Provider, user: world.Admin }), 'second CreateOrganization');
+            Assert(sameOutput(first, second), `both calls return the same IDs (${JSON.stringify(first)} vs ${JSON.stringify(second)})`);
+            AssertEqual(first.StaffUserID.toLowerCase(), staffUser.ID.toLowerCase(), 'the staff member is the user with the email');
+            await expectOneOfEach(ctx, name, first);
+        },
+    },
+    {
+        Id: 'cred-operations.9',
+        Name: 'two simultaneous CreateOrganization calls with the same new name both succeed with the same IDs',
+        RequiresMutation: true,
+        Fn: async (ctx: IntegrationCheckContext) => {
+            const world = await GetOrLoadWorld(ctx);
+            const hex = runHex();
+            const staffUser = await newStaffUser(ctx, hex);
+            const name = `Operations Body ${hex}`;
+            const input = { Name: name, FirstStaffEmail: staffUser.Email };
+            const results = await WithActors(ctx, 2, (actors: IMetadataProvider[]) =>
+                Promise.all(actors.map((actor) => new CreateOrganizationOperation().Execute(input, { provider: actor, user: world.Admin }))),
+            );
+            const [first, second] = results.map((r, i) => ExpectOutput(r, `concurrent CreateOrganization ${i + 1}`));
+            Assert(sameOutput(first, second), `both calls return the same IDs (${JSON.stringify(first)} vs ${JSON.stringify(second)})`);
+            await expectOneOfEach(ctx, name, first);
+        },
+    },
+    {
+        Id: 'cred-operations.10',
+        Name: 'CreateOrganization is refused for a non-admin and for an unknown email, and creates nothing',
+        RequiresMutation: true,
+        Fn: async (ctx: IntegrationCheckContext) => {
+            const world = await GetOrLoadWorld(ctx);
+            const hex = runHex();
+            const staffUser = await newStaffUser(ctx, hex);
+            const name = `Operations Body ${hex}`;
+            Assert(!world.StaffA.UserRoles.some((r) => r.Role === ADMIN_ROLE), 'StaffA does not hold Credentialing Admin');
+            const byStaff = await new CreateOrganizationOperation().Execute({ Name: name, FirstStaffEmail: staffUser.Email }, { provider: ctx.Provider, user: world.StaffA });
+            Assert(!byStaff.Success, 'a caller without Credentialing Admin is refused');
+            AssertEqual(byStaff.ResultCode, 'FORBIDDEN', 'ResultCode for a caller without the role');
+            const afterStaff = await organizationCounts(ctx, name, staffUser.ID);
+            AssertEqual(JSON.stringify(afterStaff), JSON.stringify({ Accrediting: 0, Common: 0, Memberships: 0, StaffRoles: 0, Applications: 0 }), 'rows after the refused call');
+
+            const unknownEmail = `nobody.${hex}@example.test`;
+            const unknown = await new CreateOrganizationOperation().Execute({ Name: name, FirstStaffEmail: unknownEmail }, { provider: ctx.Provider, user: world.Admin });
+            ExpectRefused(unknown, noUserSentence(unknownEmail), 'setup for an email no user has');
+            AssertEqual(await CountRows(ctx, COMMON_ORGANIZATIONS_ENTITY, `Name = '${Quote(name)}'`), 0, 'Common organizations with the name');
+            AssertEqual(await CountRows(ctx, CredentialingEntity.AccreditingOrganization, `Name = '${Quote(name)}'`), 0, 'accrediting organizations with the name');
+        },
+    },
+];
+
+for (const check of checks) {
+    IntegrationCheckRegistry.Instance.Register(check);
+}

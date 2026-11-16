@@ -54,6 +54,8 @@ vi.mock('@memberjunction/core', () => {
         get CompleteMessage(): string { return this.Message; }
     }
     class ProviderBase {}
+    // The shared operation contracts in @mj-biz-apps/credentialing-core extend this at import time.
+    class BaseRemotableOperation {}
     const runView = {
         async RunView(p: ViewParams) { return viewResult(p); },
         async RunViews(params: ViewParams[]) { return params.map((p) => viewResult(p)); },
@@ -61,6 +63,7 @@ vi.mock('@memberjunction/core', () => {
     return {
         BaseEntity: class {},
         BaseEntityResult,
+        BaseRemotableOperation,
         ProviderBase,
         LogError: vi.fn(),
         RunInEntityTransaction: async <T>(_provider: object, work: () => Promise<T>): Promise<T> => work(),

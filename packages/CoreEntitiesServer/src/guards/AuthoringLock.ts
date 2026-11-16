@@ -52,6 +52,17 @@ export class AuthoringLock {
         await AuthoringLock.acquire(`cred-version:${versionID.trim().toLowerCase()}`, provider, contextUser);
     }
 
+    /**
+     * Takes the exclusive setup lock of an accrediting organization's name (`cred-org:<name>`) for the
+     * rest of the caller's transaction, so two simultaneous setups of the same organization run one
+     * after the other and the second finds the rows the first created. `normalizedName` is the name
+     * as organization setup normalizes it (trimmed, inner whitespace collapsed); it is lower-cased
+     * here because names compare ignoring case.
+     */
+    public static async ForOrganizationName(normalizedName: string, provider: IMetadataProvider, contextUser: UserInfo): Promise<void> {
+        await AuthoringLock.acquire(`cred-org:${normalizedName.trim().toLowerCase()}`, provider, contextUser);
+    }
+
     private static async acquire(resource: string, provider: IMetadataProvider, contextUser: UserInfo): Promise<void> {
         if (!(provider instanceof SQLServerDataProvider)) {
             throw new Error(`The authoring lock ${resource} needs the SQL Server provider; this write is not running on the server.`);

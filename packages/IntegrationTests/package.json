@@ -28,6 +28,7 @@
     "@memberjunction/core": "^6.2.1",
     "@memberjunction/core-entities": "^6.2.1",
     "@memberjunction/global": "^6.2.1",
+    "@memberjunction/graphql-dataprovider": "^6.2.1",
     "@memberjunction/testing-integration": "^6.2.1",
     "@mj-biz-apps/committees-entities": "^1.5.0",
     "@mj-biz-apps/common-entities": "^5.62.0"
@@ -36,6 +37,7 @@
     "@memberjunction/core": "6.2.2",
     "@memberjunction/core-entities": "6.2.2",
     "@memberjunction/global": "6.2.2",
+    "@memberjunction/graphql-dataprovider": "6.2.2",
     "@memberjunction/testing-integration": "6.2.2",
     "@mj-biz-apps/committees-entities": "1.5.0",
     "@mj-biz-apps/common-entities": "5.66.0",

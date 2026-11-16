@@ -23,10 +23,16 @@ describe('Credentialing Integration Test Bundles', () => {
         expect(ids).toEqual(Array.from({ length: 8 }, (_, i) => `cred-standard-rules.${i + 1}`));
     });
 
-    it('marks every rule check as mutating', () => {
+    it('registers the cred-operations bundle with its ten checks', () => {
+        const ids = IntegrationCheckRegistry.Instance.GetBundle('cred-operations').map((c) => c.Id);
+        expect(ids).toEqual(Array.from({ length: 10 }, (_, i) => `cred-operations.${i + 1}`));
+    });
+
+    it('marks every rule and operation check as mutating', () => {
         const checks = [
             ...IntegrationCheckRegistry.Instance.GetBundle('cred-version-rules'),
             ...IntegrationCheckRegistry.Instance.GetBundle('cred-standard-rules'),
+            ...IntegrationCheckRegistry.Instance.GetBundle('cred-operations'),
         ];
         expect(checks.every((c) => c.RequiresMutation === true)).toBe(true);
     });
