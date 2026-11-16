@@ -17,6 +17,9 @@
 
 // Entity package side-effect import: fires @RegisterClass for entity subclasses once they exist.
 import '@mj-biz-apps/credentialing-entities';
+import './lib/generated/generated-forms.module';
+
+export * from './lib/generated/generated-forms.module';
 
 import { LoadCredentialingOverviewResource } from './lib/overview/credentialing-overview.resource';
 

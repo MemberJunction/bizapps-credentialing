@@ -14,6 +14,9 @@
  *   src/            — hand-written resolvers, event handlers, scheduled jobs
  */
 
+import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
 // Side-effect imports fire @RegisterClass in the shared packages.
 import '@mj-biz-apps/credentialing-entities';
 import '@mj-biz-apps/credentialing-core';
@@ -23,6 +26,16 @@ import { LoadBizAppsCredentialingActions } from '@mj-biz-apps/credentialing-acti
 // Server-side entity subclasses register at priority 2 and must load after the
 // client-shared entities so their overrides win.
 import { LoadBizAppsCredentialingEntitiesServer } from '@mj-biz-apps/credentialing-core-entities-server';
+
+export * from './generated/generated.js';
+
+const __dirname = fileURLToPath(new URL('.', import.meta.url));
+
+/**
+ * Resolver paths for TypeGraphQL schema building.
+ * Includes the CodeGen-generated entity resolvers so MJAPI loads them at startup.
+ */
+export const RESOLVER_PATHS: string[] = [resolve(__dirname, 'generated/*.js')];
 
 /**
  * Bootstrap function named by mj-app.json packages.server[0].startupExport and called by

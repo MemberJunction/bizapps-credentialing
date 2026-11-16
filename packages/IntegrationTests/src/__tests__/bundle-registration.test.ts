@@ -7,4 +7,9 @@ describe('Credentialing Integration Test Bundles', () => {
         const bundleNames = IntegrationCheckRegistry.Instance.GetBundleNames();
         expect(bundleNames).toContain('cred-smoke');
     });
+
+    it('registers the cred-schema integration check bundle', () => {
+        const bundleNames = IntegrationCheckRegistry.Instance.GetBundleNames();
+        expect(bundleNames).toContain('cred-schema');
+    });
 });

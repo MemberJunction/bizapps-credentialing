@@ -13,4 +13,4 @@
  * Nothing is implemented yet. The functional requirements and domain model are in
  * plans/active/credentialing-frd.md; code lands with the first schema migration.
  */
-export {};
+export * from './entity-names.js';

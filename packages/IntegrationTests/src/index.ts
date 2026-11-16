@@ -8,5 +8,6 @@ export * from './wire.js';
 export * from './world/world.js';
 export * from './world/load-world.js';
 export * from './checks/cred-smoke.checks.js';
+export * from './checks/cred-schema.checks.js';
 
 export function LoadCredentialingIntegrationTests(): void {}

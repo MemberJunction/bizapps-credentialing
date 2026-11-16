@@ -1,0 +1,24 @@
+{
+  "fields": {
+    "TypeID": "@lookup:MJ: Test Types.Name=Integration Test",
+    "Name": "CRD-01 - Schema",
+    "Description": "Verify all seven BizApps Credentialing program and standards entities are registered.",
+    "InputDefinition": {},
+    "ExpectedOutcomes": {
+      "summary": "All seven entities in CredentialingEntity are registered in metadata."
+    },
+    "Configuration": {
+      "tier": "deterministic",
+      "transport": "server",
+      "checks": [
+        {
+          "type": "cred-schema"
+        }
+      ]
+    },
+    "Status": "Active"
+  },
+  "primaryKey": {
+    "ID": "974F1C1E-AAE7-434A-9CC1-D9EC1DA68836"
+  }
+}
