@@ -45,8 +45,11 @@ module.exports = {
   // New-entity naming — RECOMMENDED
   // ==========================================================================
   // Prefix generated entity names so they can never collide with MJ core
-  // ("MJ: ...") or other apps. Must agree with the EntityNamePrefix your
-  // baseline migration writes into __mj.SchemaInfo.
+  // ("MJ: ...") or other apps. CodeGen reads NameRulesBySchema first and only
+  // falls back to __mj.SchemaInfo.EntityNamePrefix when unset. The prefix
+  // lives here only (and is omitted from metadata/schema-info/.schema-info.json)
+  // because __mj.SchemaInfo.EntityNamePrefix holds at most 25 characters, while
+  // 'MJ_BizApps_Credentialing: ' is 26 characters.
   newEntityDefaults: {
     NameRulesBySchema: [
       { SchemaName: '${mj_core_schema}', EntityNamePrefix: 'MJ: ' },

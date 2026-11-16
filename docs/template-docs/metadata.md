@@ -41,9 +41,9 @@ metadata/
 ```
 
 `autoCreateMissingRecords: true` lets a record that carries a `primaryKey`
-but doesn't exist in the DB be **created** with that exact ID — that's how
-your `schema-info` row appears on first push once you've activated it (next
-section).
+but doesn't exist in the DB be **created** with that exact ID (or updated via
+an `@lookup:` natural key when an earlier step such as `mj migrate --schema`
+already inserted the row in `__mj.SchemaInfo`).
 
 ## Schema registration (`schema-info/`) — ⚠️ REQUIRED, and you must fill it out
 
@@ -65,10 +65,10 @@ won't apply your prefix). **Activate it before your first real sync:**
    |---|---|
    | `SchemaName` | Exactly your `mj-app.json` `schema.name` |
    | `EntityIDMin` / `EntityIDMax` | An integer range reserved for your app's entities, non-overlapping with other apps (e.g. `10000001`–`10099999`) |
-   | `EntityNamePrefix` | Your prefix (e.g. `MJ_BizApps_Credentialing`) — must agree with `mj.config.cjs` `NameRulesBySchema` |
+   | `EntityNamePrefix` | Omit if > 25 chars (`__mj.SchemaInfo.EntityNamePrefix` is `NVARCHAR(25)`) — CodeGen reads `mj.config.cjs` `NameRulesBySchema` first |
    | `Description` | One line about the schema |
-   | `primaryKey.ID` | A **freshly generated UUID** (`uuidgen`) — keep it stable forever once pushed anywhere |
-3. Push (workflow below) — the row is created with your pinned ID.
+   | `primaryKey.ID` | `@lookup:MJ: Schema Info.SchemaName=<your_schema>` when `mj migrate --schema` runs first (which creates the row), or a freshly generated UUID (`uuidgen`) otherwise |
+3. Push (workflow below) — the row is created or updated with your range and description.
 
 `metadata/schema-info/README.md` carries the same instructions next to the
 file itself.
@@ -189,10 +189,10 @@ when nothing appears, is in
 ## The workflow (edit → push → commit)
 
 ```sh
-# from the MJ repo root, with this app linked (docs/template-docs/linking-to-mj.md)
-pnpm exec mj-sync validate --dir=./metadata     # 1. validate
-pnpm exec mj sync push --dir=./metadata --format=json  # 2. push to YOUR dev DB
-# 3. commit the metadata JSON (uuidgen primaryKey, no sync block) + a changeset.
+# from this app repo's root, with `.env` at the repo root (docs/template-docs/linking-to-mj.md)
+pnpm exec mj sync validate --dir=./metadata     # 1. validate
+pnpm exec mj sync push --dir=./metadata --ci    # 2. push to YOUR dev DB
+# 3. strip any `sync` block written back by push, then commit the metadata JSON + a changeset.
 #    Do NOT capture a Metadata_Sync.sql: the build engineer generates one per release.
 ```
 

@@ -18,8 +18,8 @@ break — so the rules below are non-negotiable.
 You wrote a new migration (new table/column/constraint in your app schema):
 
 1. Apply it: `pnpm run mj:migrate`
-   (from the MJ repo root when linked — see linking-to-mj.md).
-2. Run CodeGen: `pnpm run mj:codegen`. It will:
+   (from this repo's root with `.env` at the repo root — see [linking-to-mj.md](linking-to-mj.md)).
+2. Run CodeGen: `pnpm run mj:codegen` (from this repo's root). It will:
    - add the system columns (`__mj_CreatedAt`/`__mj_UpdatedAt`) + FK indexes
      you deliberately did NOT put in the migration,
    - regenerate entity subclasses / resolvers / forms into `packages/*/src/generated/`,

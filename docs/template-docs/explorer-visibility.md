@@ -56,11 +56,12 @@ in the bundle:
 - export the component (or a thin subclass) from `packages/Angular/src/public-api.ts`;
 - keep the `startupExport` function (`LoadBizAppsCredentialingClient`) — its only job is to
   give the bundler a reason not to tree-shake the module;
-- MJExplorer must import your client package. When the app is **installed**
-  (`mj app install`), the CLI maintains
-  `packages/MJExplorer/src/app/generated/open-app-bootstrap.generated.ts` for
-  you. In a **linked dev** setup you add the `import '@mj-biz-apps/credentialing-ng';` line
-  yourself ([linking-to-mj.md](linking-to-mj.md) §2).
+- MJExplorer must load your client package. In MJ 6.2.2, `dynamicPackages.client`
+  in `mj/mj.config.cjs` + your `-ng` dependency in `mj/packages/MJExplorer/package.json`
+  drives `mj codegen manifest ... --open-app-client-bootstrap`, which writes
+  `OPEN_APP_CLIENT_MODULES` directly into
+  `packages/MJExplorer/src/app/generated/class-registrations-manifest.ts`
+  ([linking-to-mj.md](linking-to-mj.md) §2).
 
 Any change here needs an **MJExplorer rebuild** — the imports are resolved at
 build time, not runtime.
@@ -105,20 +106,21 @@ Nav item kinds:
 | An MJ Dashboard record | `"Dashboards"` | not needed | **required** |
 | A plain route | n/a | n/a | use the `Route` field instead |
 
-**The `DefaultForNewUser` trap.** CodeGen auto-creates a machine-named "bucket"
-Application per schema (`Name` = the schema name, `Description` = "Generated for
-schema") so generated entities have something to hang `MJ: Application Entities`
-links and role grants on. Its INSERT omits `DefaultForNewUser`, so it takes the
-column default of `1` — visible to every new user. If your product app ships
-`false`, a new user sees the bucket in the switcher and **not** your app. Ship
-`true`. Two rows per schema-backed UI app is the normal, expected shape.
+**The `DefaultForNewUser` note.** In earlier MJ versions CodeGen's auto-created
+machine-named bucket `Application` defaulted `DefaultForNewUser` to `1`; in
+MJ 6.2.2 CodeGen sets `DefaultForNewUser = 0` on auto-created schema bucket apps.
+Product apps with open user visibility ship `DefaultForNewUser: true`, while
+role-gated apps (such as Credentialing) intentionally ship `false` so access is
+granted explicitly through `MJ: Application Roles` / `MJ: User Applications`.
 
 ## 5. Access for users who already exist
 
 `DefaultForNewUser` only applies when a user record is **created**. Existing dev
-users need an explicit `MJ: User Applications` row — in an mjdev instance that's
-`mjdev apps enable <slug> <app>`; otherwise add the row (or a
-`UserApplication` row in your metadata) yourself.
+users need an explicit `MJ: User Applications` row — either through Explorer's
+**Application launcher → Configure… → Available Applications → Add → Save Changes**
+(for roles granted access in `metadata/application-roles/`), or through an entity
+save script calling `md.GetEntityObject('MJ: User Applications', contextUser)`
+(never raw SQL DML).
 
 ## Getting it into a release
 
