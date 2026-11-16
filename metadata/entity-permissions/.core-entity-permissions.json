@@ -1,0 +1,1147 @@
+[
+  {
+    "fields": {
+      "EntityID": "@lookup:MJ: Entities.Name=MJ: Workspaces",
+      "RoleID": "@lookup:MJ: Roles.Name=Credentialing Admin",
+      "Type": "Allow",
+      "CanRead": true,
+      "CanCreate": true,
+      "CanUpdate": true,
+      "CanDelete": true,
+      "ReadRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Magic Link: Own Rows by UserID",
+      "CreateRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Magic Link: Own Rows by UserID",
+      "UpdateRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Magic Link: Own Rows by UserID",
+      "DeleteRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Magic Link: Own Rows by UserID"
+    },
+    "primaryKey": {
+      "ID": "B670AD8B-C514-4969-AA93-344AD75BB44A"
+    }
+  },
+  {
+    "fields": {
+      "EntityID": "@lookup:MJ: Entities.Name=MJ: Workspace Items",
+      "RoleID": "@lookup:MJ: Roles.Name=Credentialing Admin",
+      "Type": "Allow",
+      "CanRead": true,
+      "CanCreate": true,
+      "CanUpdate": true,
+      "CanDelete": true,
+      "ReadRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Credentialing: Own Workspace Items",
+      "CreateRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Credentialing: Own Workspace Items",
+      "UpdateRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Credentialing: Own Workspace Items",
+      "DeleteRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Credentialing: Own Workspace Items"
+    },
+    "primaryKey": {
+      "ID": "EDD1FB5D-E935-42B4-A3F8-816DE8E55525"
+    }
+  },
+  {
+    "fields": {
+      "EntityID": "@lookup:MJ: Entities.Name=MJ: User Settings",
+      "RoleID": "@lookup:MJ: Roles.Name=Credentialing Admin",
+      "Type": "Allow",
+      "CanRead": true,
+      "CanCreate": true,
+      "CanUpdate": true,
+      "CanDelete": true,
+      "ReadRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Magic Link: Own Rows by UserID",
+      "CreateRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Magic Link: Own Rows by UserID",
+      "UpdateRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Magic Link: Own Rows by UserID",
+      "DeleteRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Magic Link: Own Rows by UserID"
+    },
+    "primaryKey": {
+      "ID": "D22E5896-E0CF-4D90-BEB9-3DAC9DCD0DE8"
+    }
+  },
+  {
+    "fields": {
+      "EntityID": "@lookup:MJ: Entities.Name=MJ: User Favorites",
+      "RoleID": "@lookup:MJ: Roles.Name=Credentialing Admin",
+      "Type": "Allow",
+      "CanRead": true,
+      "CanCreate": true,
+      "CanUpdate": true,
+      "CanDelete": true,
+      "ReadRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Magic Link: Own Rows by UserID",
+      "CreateRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Magic Link: Own Rows by UserID",
+      "UpdateRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Magic Link: Own Rows by UserID",
+      "DeleteRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Magic Link: Own Rows by UserID"
+    },
+    "primaryKey": {
+      "ID": "B1DC143A-35DA-4440-83FE-08F4BAF344B9"
+    }
+  },
+  {
+    "fields": {
+      "EntityID": "@lookup:MJ: Entities.Name=MJ: User Record Logs",
+      "RoleID": "@lookup:MJ: Roles.Name=Credentialing Admin",
+      "Type": "Allow",
+      "CanRead": true,
+      "CanCreate": true,
+      "CanUpdate": true,
+      "CanDelete": true,
+      "ReadRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Magic Link: Own Rows by UserID",
+      "CreateRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Magic Link: Own Rows by UserID",
+      "UpdateRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Magic Link: Own Rows by UserID",
+      "DeleteRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Magic Link: Own Rows by UserID"
+    },
+    "primaryKey": {
+      "ID": "C26A613A-2CF6-4DF4-8F00-10424744CBF5"
+    }
+  },
+  {
+    "fields": {
+      "EntityID": "@lookup:MJ: Entities.Name=MJ: User Notification Preferences",
+      "RoleID": "@lookup:MJ: Roles.Name=Credentialing Admin",
+      "Type": "Allow",
+      "CanRead": true,
+      "CanCreate": true,
+      "CanUpdate": true,
+      "CanDelete": true,
+      "ReadRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Magic Link: Own Rows by UserID",
+      "CreateRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Magic Link: Own Rows by UserID",
+      "UpdateRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Magic Link: Own Rows by UserID",
+      "DeleteRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Magic Link: Own Rows by UserID"
+    },
+    "primaryKey": {
+      "ID": "A253B5AC-E94A-4E04-A030-D4A331590B2E"
+    }
+  },
+  {
+    "fields": {
+      "EntityID": "@lookup:MJ: Entities.Name=MJ: User Roles",
+      "RoleID": "@lookup:MJ: Roles.Name=Credentialing Admin",
+      "Type": "Allow",
+      "CanRead": true,
+      "CanCreate": false,
+      "CanUpdate": false,
+      "CanDelete": false,
+      "ReadRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Magic Link: Own Rows by UserID"
+    },
+    "primaryKey": {
+      "ID": "DA995673-5DE5-4746-9330-69268F884146"
+    }
+  },
+  {
+    "fields": {
+      "EntityID": "@lookup:MJ: Entities.Name=MJ: User Applications",
+      "RoleID": "@lookup:MJ: Roles.Name=Credentialing Admin",
+      "Type": "Allow",
+      "CanRead": true,
+      "CanCreate": false,
+      "CanUpdate": false,
+      "CanDelete": false,
+      "ReadRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Magic Link: Own Rows by UserID"
+    },
+    "primaryKey": {
+      "ID": "9C2E3F8E-1477-45AD-8DDE-E5236BB00A96"
+    }
+  },
+  {
+    "fields": {
+      "EntityID": "@lookup:MJ: Entities.Name=MJ: Application Roles",
+      "RoleID": "@lookup:MJ: Roles.Name=Credentialing Admin",
+      "Type": "Allow",
+      "CanRead": true,
+      "CanCreate": false,
+      "CanUpdate": false,
+      "CanDelete": false,
+      "ReadRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Magic Link: Own Application Roles"
+    },
+    "primaryKey": {
+      "ID": "B391E000-6428-404F-B27C-01CAA36DA178"
+    }
+  },
+  {
+    "fields": {
+      "EntityID": "@lookup:MJ: Entities.Name=MJ: Workspaces",
+      "RoleID": "@lookup:MJ: Roles.Name=Credentialing Staff",
+      "Type": "Allow",
+      "CanRead": true,
+      "CanCreate": true,
+      "CanUpdate": true,
+      "CanDelete": true,
+      "ReadRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Magic Link: Own Rows by UserID",
+      "CreateRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Magic Link: Own Rows by UserID",
+      "UpdateRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Magic Link: Own Rows by UserID",
+      "DeleteRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Magic Link: Own Rows by UserID"
+    },
+    "primaryKey": {
+      "ID": "BC8094FE-E340-448D-A4AF-7A9EF99EF888"
+    }
+  },
+  {
+    "fields": {
+      "EntityID": "@lookup:MJ: Entities.Name=MJ: Workspace Items",
+      "RoleID": "@lookup:MJ: Roles.Name=Credentialing Staff",
+      "Type": "Allow",
+      "CanRead": true,
+      "CanCreate": true,
+      "CanUpdate": true,
+      "CanDelete": true,
+      "ReadRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Credentialing: Own Workspace Items",
+      "CreateRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Credentialing: Own Workspace Items",
+      "UpdateRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Credentialing: Own Workspace Items",
+      "DeleteRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Credentialing: Own Workspace Items"
+    },
+    "primaryKey": {
+      "ID": "6B033C92-7A8D-4F68-B277-EDA8C41D4267"
+    }
+  },
+  {
+    "fields": {
+      "EntityID": "@lookup:MJ: Entities.Name=MJ: User Settings",
+      "RoleID": "@lookup:MJ: Roles.Name=Credentialing Staff",
+      "Type": "Allow",
+      "CanRead": true,
+      "CanCreate": true,
+      "CanUpdate": true,
+      "CanDelete": true,
+      "ReadRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Magic Link: Own Rows by UserID",
+      "CreateRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Magic Link: Own Rows by UserID",
+      "UpdateRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Magic Link: Own Rows by UserID",
+      "DeleteRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Magic Link: Own Rows by UserID"
+    },
+    "primaryKey": {
+      "ID": "AA396EB7-F967-4FCD-93ED-719EF746CC59"
+    }
+  },
+  {
+    "fields": {
+      "EntityID": "@lookup:MJ: Entities.Name=MJ: User Favorites",
+      "RoleID": "@lookup:MJ: Roles.Name=Credentialing Staff",
+      "Type": "Allow",
+      "CanRead": true,
+      "CanCreate": true,
+      "CanUpdate": true,
+      "CanDelete": true,
+      "ReadRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Magic Link: Own Rows by UserID",
+      "CreateRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Magic Link: Own Rows by UserID",
+      "UpdateRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Magic Link: Own Rows by UserID",
+      "DeleteRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Magic Link: Own Rows by UserID"
+    },
+    "primaryKey": {
+      "ID": "48F9046F-F61F-4870-8A5D-BDCE0ADB110B"
+    }
+  },
+  {
+    "fields": {
+      "EntityID": "@lookup:MJ: Entities.Name=MJ: User Record Logs",
+      "RoleID": "@lookup:MJ: Roles.Name=Credentialing Staff",
+      "Type": "Allow",
+      "CanRead": true,
+      "CanCreate": true,
+      "CanUpdate": true,
+      "CanDelete": true,
+      "ReadRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Magic Link: Own Rows by UserID",
+      "CreateRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Magic Link: Own Rows by UserID",
+      "UpdateRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Magic Link: Own Rows by UserID",
+      "DeleteRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Magic Link: Own Rows by UserID"
+    },
+    "primaryKey": {
+      "ID": "419519C5-EA91-4A1D-AF3F-DDF66E80930C"
+    }
+  },
+  {
+    "fields": {
+      "EntityID": "@lookup:MJ: Entities.Name=MJ: User Notification Preferences",
+      "RoleID": "@lookup:MJ: Roles.Name=Credentialing Staff",
+      "Type": "Allow",
+      "CanRead": true,
+      "CanCreate": true,
+      "CanUpdate": true,
+      "CanDelete": true,
+      "ReadRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Magic Link: Own Rows by UserID",
+      "CreateRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Magic Link: Own Rows by UserID",
+      "UpdateRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Magic Link: Own Rows by UserID",
+      "DeleteRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Magic Link: Own Rows by UserID"
+    },
+    "primaryKey": {
+      "ID": "71AF52E4-B850-4C0B-9EC7-C976FF91B74C"
+    }
+  },
+  {
+    "fields": {
+      "EntityID": "@lookup:MJ: Entities.Name=MJ: User Roles",
+      "RoleID": "@lookup:MJ: Roles.Name=Credentialing Staff",
+      "Type": "Allow",
+      "CanRead": true,
+      "CanCreate": false,
+      "CanUpdate": false,
+      "CanDelete": false,
+      "ReadRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Magic Link: Own Rows by UserID"
+    },
+    "primaryKey": {
+      "ID": "E8978C49-DE0C-432D-A807-3E81A18EB73F"
+    }
+  },
+  {
+    "fields": {
+      "EntityID": "@lookup:MJ: Entities.Name=MJ: User Applications",
+      "RoleID": "@lookup:MJ: Roles.Name=Credentialing Staff",
+      "Type": "Allow",
+      "CanRead": true,
+      "CanCreate": false,
+      "CanUpdate": false,
+      "CanDelete": false,
+      "ReadRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Magic Link: Own Rows by UserID"
+    },
+    "primaryKey": {
+      "ID": "F4B6180A-CD1A-40E3-A78A-70772FBA2ABA"
+    }
+  },
+  {
+    "fields": {
+      "EntityID": "@lookup:MJ: Entities.Name=MJ: Application Roles",
+      "RoleID": "@lookup:MJ: Roles.Name=Credentialing Staff",
+      "Type": "Allow",
+      "CanRead": true,
+      "CanCreate": false,
+      "CanUpdate": false,
+      "CanDelete": false,
+      "ReadRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Magic Link: Own Application Roles"
+    },
+    "primaryKey": {
+      "ID": "050B7404-3332-4D7B-AECC-FF933478935C"
+    }
+  },
+  {
+    "fields": {
+      "EntityID": "@lookup:MJ: Entities.Name=MJ: Workspaces",
+      "RoleID": "@lookup:MJ: Roles.Name=Credentialing Committee",
+      "Type": "Allow",
+      "CanRead": true,
+      "CanCreate": true,
+      "CanUpdate": true,
+      "CanDelete": true,
+      "ReadRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Magic Link: Own Rows by UserID",
+      "CreateRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Magic Link: Own Rows by UserID",
+      "UpdateRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Magic Link: Own Rows by UserID",
+      "DeleteRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Magic Link: Own Rows by UserID"
+    },
+    "primaryKey": {
+      "ID": "F6C825C6-8BA9-41F9-8782-F65F6D74792C"
+    }
+  },
+  {
+    "fields": {
+      "EntityID": "@lookup:MJ: Entities.Name=MJ: Workspace Items",
+      "RoleID": "@lookup:MJ: Roles.Name=Credentialing Committee",
+      "Type": "Allow",
+      "CanRead": true,
+      "CanCreate": true,
+      "CanUpdate": true,
+      "CanDelete": true,
+      "ReadRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Credentialing: Own Workspace Items",
+      "CreateRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Credentialing: Own Workspace Items",
+      "UpdateRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Credentialing: Own Workspace Items",
+      "DeleteRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Credentialing: Own Workspace Items"
+    },
+    "primaryKey": {
+      "ID": "A8DF971E-0619-4965-9AE8-B2D3C81D7131"
+    }
+  },
+  {
+    "fields": {
+      "EntityID": "@lookup:MJ: Entities.Name=MJ: User Settings",
+      "RoleID": "@lookup:MJ: Roles.Name=Credentialing Committee",
+      "Type": "Allow",
+      "CanRead": true,
+      "CanCreate": true,
+      "CanUpdate": true,
+      "CanDelete": true,
+      "ReadRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Magic Link: Own Rows by UserID",
+      "CreateRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Magic Link: Own Rows by UserID",
+      "UpdateRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Magic Link: Own Rows by UserID",
+      "DeleteRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Magic Link: Own Rows by UserID"
+    },
+    "primaryKey": {
+      "ID": "49D96113-6DA7-4D0F-B70B-F017857E1B01"
+    }
+  },
+  {
+    "fields": {
+      "EntityID": "@lookup:MJ: Entities.Name=MJ: User Favorites",
+      "RoleID": "@lookup:MJ: Roles.Name=Credentialing Committee",
+      "Type": "Allow",
+      "CanRead": true,
+      "CanCreate": true,
+      "CanUpdate": true,
+      "CanDelete": true,
+      "ReadRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Magic Link: Own Rows by UserID",
+      "CreateRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Magic Link: Own Rows by UserID",
+      "UpdateRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Magic Link: Own Rows by UserID",
+      "DeleteRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Magic Link: Own Rows by UserID"
+    },
+    "primaryKey": {
+      "ID": "4256117A-9EDC-4AC5-BDCB-DE5D52DA2FF0"
+    }
+  },
+  {
+    "fields": {
+      "EntityID": "@lookup:MJ: Entities.Name=MJ: User Record Logs",
+      "RoleID": "@lookup:MJ: Roles.Name=Credentialing Committee",
+      "Type": "Allow",
+      "CanRead": true,
+      "CanCreate": true,
+      "CanUpdate": true,
+      "CanDelete": true,
+      "ReadRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Magic Link: Own Rows by UserID",
+      "CreateRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Magic Link: Own Rows by UserID",
+      "UpdateRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Magic Link: Own Rows by UserID",
+      "DeleteRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Magic Link: Own Rows by UserID"
+    },
+    "primaryKey": {
+      "ID": "81E648D4-B467-4A69-A496-2E3A8DEA028E"
+    }
+  },
+  {
+    "fields": {
+      "EntityID": "@lookup:MJ: Entities.Name=MJ: User Notification Preferences",
+      "RoleID": "@lookup:MJ: Roles.Name=Credentialing Committee",
+      "Type": "Allow",
+      "CanRead": true,
+      "CanCreate": true,
+      "CanUpdate": true,
+      "CanDelete": true,
+      "ReadRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Magic Link: Own Rows by UserID",
+      "CreateRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Magic Link: Own Rows by UserID",
+      "UpdateRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Magic Link: Own Rows by UserID",
+      "DeleteRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Magic Link: Own Rows by UserID"
+    },
+    "primaryKey": {
+      "ID": "C303FF70-E313-4F68-B255-E8FBCC6FB888"
+    }
+  },
+  {
+    "fields": {
+      "EntityID": "@lookup:MJ: Entities.Name=MJ: User Roles",
+      "RoleID": "@lookup:MJ: Roles.Name=Credentialing Committee",
+      "Type": "Allow",
+      "CanRead": true,
+      "CanCreate": false,
+      "CanUpdate": false,
+      "CanDelete": false,
+      "ReadRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Magic Link: Own Rows by UserID"
+    },
+    "primaryKey": {
+      "ID": "EAA64010-FE55-41E5-9073-3DFF4D16DFEF"
+    }
+  },
+  {
+    "fields": {
+      "EntityID": "@lookup:MJ: Entities.Name=MJ: User Applications",
+      "RoleID": "@lookup:MJ: Roles.Name=Credentialing Committee",
+      "Type": "Allow",
+      "CanRead": true,
+      "CanCreate": false,
+      "CanUpdate": false,
+      "CanDelete": false,
+      "ReadRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Magic Link: Own Rows by UserID"
+    },
+    "primaryKey": {
+      "ID": "BB937AFD-5A83-4EBE-ADF1-8CA4510E0506"
+    }
+  },
+  {
+    "fields": {
+      "EntityID": "@lookup:MJ: Entities.Name=MJ: Application Roles",
+      "RoleID": "@lookup:MJ: Roles.Name=Credentialing Committee",
+      "Type": "Allow",
+      "CanRead": true,
+      "CanCreate": false,
+      "CanUpdate": false,
+      "CanDelete": false,
+      "ReadRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Magic Link: Own Application Roles"
+    },
+    "primaryKey": {
+      "ID": "1E0B121F-395A-44A2-A88A-5359630DDAD8"
+    }
+  },
+  {
+    "fields": {
+      "EntityID": "@lookup:MJ: Entities.Name=MJ: Workspaces",
+      "RoleID": "@lookup:MJ: Roles.Name=Credentialing Reviewer",
+      "Type": "Allow",
+      "CanRead": true,
+      "CanCreate": true,
+      "CanUpdate": true,
+      "CanDelete": true,
+      "ReadRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Magic Link: Own Rows by UserID",
+      "CreateRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Magic Link: Own Rows by UserID",
+      "UpdateRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Magic Link: Own Rows by UserID",
+      "DeleteRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Magic Link: Own Rows by UserID"
+    },
+    "primaryKey": {
+      "ID": "2EDEAAFA-0738-45B8-A6FE-6C93DEE83C2C"
+    }
+  },
+  {
+    "fields": {
+      "EntityID": "@lookup:MJ: Entities.Name=MJ: Workspace Items",
+      "RoleID": "@lookup:MJ: Roles.Name=Credentialing Reviewer",
+      "Type": "Allow",
+      "CanRead": true,
+      "CanCreate": true,
+      "CanUpdate": true,
+      "CanDelete": true,
+      "ReadRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Credentialing: Own Workspace Items",
+      "CreateRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Credentialing: Own Workspace Items",
+      "UpdateRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Credentialing: Own Workspace Items",
+      "DeleteRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Credentialing: Own Workspace Items"
+    },
+    "primaryKey": {
+      "ID": "906713BE-A8D8-4367-8337-4C121B5B340B"
+    }
+  },
+  {
+    "fields": {
+      "EntityID": "@lookup:MJ: Entities.Name=MJ: User Settings",
+      "RoleID": "@lookup:MJ: Roles.Name=Credentialing Reviewer",
+      "Type": "Allow",
+      "CanRead": true,
+      "CanCreate": true,
+      "CanUpdate": true,
+      "CanDelete": true,
+      "ReadRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Magic Link: Own Rows by UserID",
+      "CreateRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Magic Link: Own Rows by UserID",
+      "UpdateRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Magic Link: Own Rows by UserID",
+      "DeleteRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Magic Link: Own Rows by UserID"
+    },
+    "primaryKey": {
+      "ID": "E624C9A0-CA11-4614-B140-034C8187E54E"
+    }
+  },
+  {
+    "fields": {
+      "EntityID": "@lookup:MJ: Entities.Name=MJ: User Favorites",
+      "RoleID": "@lookup:MJ: Roles.Name=Credentialing Reviewer",
+      "Type": "Allow",
+      "CanRead": true,
+      "CanCreate": true,
+      "CanUpdate": true,
+      "CanDelete": true,
+      "ReadRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Magic Link: Own Rows by UserID",
+      "CreateRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Magic Link: Own Rows by UserID",
+      "UpdateRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Magic Link: Own Rows by UserID",
+      "DeleteRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Magic Link: Own Rows by UserID"
+    },
+    "primaryKey": {
+      "ID": "6EFC982B-A42E-4DBE-94B1-AF40E165C6A8"
+    }
+  },
+  {
+    "fields": {
+      "EntityID": "@lookup:MJ: Entities.Name=MJ: User Record Logs",
+      "RoleID": "@lookup:MJ: Roles.Name=Credentialing Reviewer",
+      "Type": "Allow",
+      "CanRead": true,
+      "CanCreate": true,
+      "CanUpdate": true,
+      "CanDelete": true,
+      "ReadRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Magic Link: Own Rows by UserID",
+      "CreateRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Magic Link: Own Rows by UserID",
+      "UpdateRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Magic Link: Own Rows by UserID",
+      "DeleteRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Magic Link: Own Rows by UserID"
+    },
+    "primaryKey": {
+      "ID": "6D6FAAF7-08A0-4C97-BD0F-0D74B6213B8B"
+    }
+  },
+  {
+    "fields": {
+      "EntityID": "@lookup:MJ: Entities.Name=MJ: User Notification Preferences",
+      "RoleID": "@lookup:MJ: Roles.Name=Credentialing Reviewer",
+      "Type": "Allow",
+      "CanRead": true,
+      "CanCreate": true,
+      "CanUpdate": true,
+      "CanDelete": true,
+      "ReadRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Magic Link: Own Rows by UserID",
+      "CreateRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Magic Link: Own Rows by UserID",
+      "UpdateRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Magic Link: Own Rows by UserID",
+      "DeleteRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Magic Link: Own Rows by UserID"
+    },
+    "primaryKey": {
+      "ID": "1C90A47C-979D-437A-AAC1-35B6A0DC9A08"
+    }
+  },
+  {
+    "fields": {
+      "EntityID": "@lookup:MJ: Entities.Name=MJ: User Roles",
+      "RoleID": "@lookup:MJ: Roles.Name=Credentialing Reviewer",
+      "Type": "Allow",
+      "CanRead": true,
+      "CanCreate": false,
+      "CanUpdate": false,
+      "CanDelete": false,
+      "ReadRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Magic Link: Own Rows by UserID"
+    },
+    "primaryKey": {
+      "ID": "48D9D27F-D980-4D1D-91CC-C8D712278ED1"
+    }
+  },
+  {
+    "fields": {
+      "EntityID": "@lookup:MJ: Entities.Name=MJ: User Applications",
+      "RoleID": "@lookup:MJ: Roles.Name=Credentialing Reviewer",
+      "Type": "Allow",
+      "CanRead": true,
+      "CanCreate": false,
+      "CanUpdate": false,
+      "CanDelete": false,
+      "ReadRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Magic Link: Own Rows by UserID"
+    },
+    "primaryKey": {
+      "ID": "C6C42D95-55E1-45B0-86D0-444ED8F45E0C"
+    }
+  },
+  {
+    "fields": {
+      "EntityID": "@lookup:MJ: Entities.Name=MJ: Application Roles",
+      "RoleID": "@lookup:MJ: Roles.Name=Credentialing Reviewer",
+      "Type": "Allow",
+      "CanRead": true,
+      "CanCreate": false,
+      "CanUpdate": false,
+      "CanDelete": false,
+      "ReadRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Magic Link: Own Application Roles"
+    },
+    "primaryKey": {
+      "ID": "870D3713-C2C5-4C87-9CFE-8F3CB4DA5AD3"
+    }
+  },
+  {
+    "fields": {
+      "EntityID": "@lookup:MJ: Entities.Name=MJ: Workspaces",
+      "RoleID": "@lookup:MJ: Roles.Name=Credentialing Applicant",
+      "Type": "Allow",
+      "CanRead": true,
+      "CanCreate": true,
+      "CanUpdate": true,
+      "CanDelete": true,
+      "ReadRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Magic Link: Own Rows by UserID",
+      "CreateRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Magic Link: Own Rows by UserID",
+      "UpdateRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Magic Link: Own Rows by UserID",
+      "DeleteRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Magic Link: Own Rows by UserID"
+    },
+    "primaryKey": {
+      "ID": "923A3E67-5B7F-471C-BEE9-E91D2669063C"
+    }
+  },
+  {
+    "fields": {
+      "EntityID": "@lookup:MJ: Entities.Name=MJ: Workspace Items",
+      "RoleID": "@lookup:MJ: Roles.Name=Credentialing Applicant",
+      "Type": "Allow",
+      "CanRead": true,
+      "CanCreate": true,
+      "CanUpdate": true,
+      "CanDelete": true,
+      "ReadRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Credentialing: Own Workspace Items",
+      "CreateRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Credentialing: Own Workspace Items",
+      "UpdateRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Credentialing: Own Workspace Items",
+      "DeleteRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Credentialing: Own Workspace Items"
+    },
+    "primaryKey": {
+      "ID": "38595D53-C243-4FE6-BCF4-86F3A2459DD0"
+    }
+  },
+  {
+    "fields": {
+      "EntityID": "@lookup:MJ: Entities.Name=MJ: User Settings",
+      "RoleID": "@lookup:MJ: Roles.Name=Credentialing Applicant",
+      "Type": "Allow",
+      "CanRead": true,
+      "CanCreate": true,
+      "CanUpdate": true,
+      "CanDelete": true,
+      "ReadRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Magic Link: Own Rows by UserID",
+      "CreateRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Magic Link: Own Rows by UserID",
+      "UpdateRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Magic Link: Own Rows by UserID",
+      "DeleteRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Magic Link: Own Rows by UserID"
+    },
+    "primaryKey": {
+      "ID": "B328222B-F6E8-4C94-88C8-4BFDBE5BFD59"
+    }
+  },
+  {
+    "fields": {
+      "EntityID": "@lookup:MJ: Entities.Name=MJ: User Favorites",
+      "RoleID": "@lookup:MJ: Roles.Name=Credentialing Applicant",
+      "Type": "Allow",
+      "CanRead": true,
+      "CanCreate": true,
+      "CanUpdate": true,
+      "CanDelete": true,
+      "ReadRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Magic Link: Own Rows by UserID",
+      "CreateRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Magic Link: Own Rows by UserID",
+      "UpdateRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Magic Link: Own Rows by UserID",
+      "DeleteRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Magic Link: Own Rows by UserID"
+    },
+    "primaryKey": {
+      "ID": "8781B817-619D-4911-AE66-1A88AB600C8E"
+    }
+  },
+  {
+    "fields": {
+      "EntityID": "@lookup:MJ: Entities.Name=MJ: User Record Logs",
+      "RoleID": "@lookup:MJ: Roles.Name=Credentialing Applicant",
+      "Type": "Allow",
+      "CanRead": true,
+      "CanCreate": true,
+      "CanUpdate": true,
+      "CanDelete": true,
+      "ReadRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Magic Link: Own Rows by UserID",
+      "CreateRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Magic Link: Own Rows by UserID",
+      "UpdateRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Magic Link: Own Rows by UserID",
+      "DeleteRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Magic Link: Own Rows by UserID"
+    },
+    "primaryKey": {
+      "ID": "BBE96DA0-1D98-4276-8047-2E4BA0AF9CAC"
+    }
+  },
+  {
+    "fields": {
+      "EntityID": "@lookup:MJ: Entities.Name=MJ: User Notification Preferences",
+      "RoleID": "@lookup:MJ: Roles.Name=Credentialing Applicant",
+      "Type": "Allow",
+      "CanRead": true,
+      "CanCreate": true,
+      "CanUpdate": true,
+      "CanDelete": true,
+      "ReadRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Magic Link: Own Rows by UserID",
+      "CreateRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Magic Link: Own Rows by UserID",
+      "UpdateRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Magic Link: Own Rows by UserID",
+      "DeleteRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Magic Link: Own Rows by UserID"
+    },
+    "primaryKey": {
+      "ID": "673621F8-D85D-4412-9191-CB1C3166C50B"
+    }
+  },
+  {
+    "fields": {
+      "EntityID": "@lookup:MJ: Entities.Name=MJ: User Roles",
+      "RoleID": "@lookup:MJ: Roles.Name=Credentialing Applicant",
+      "Type": "Allow",
+      "CanRead": true,
+      "CanCreate": false,
+      "CanUpdate": false,
+      "CanDelete": false,
+      "ReadRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Magic Link: Own Rows by UserID"
+    },
+    "primaryKey": {
+      "ID": "B0882733-F4B2-4989-83D9-96FB2101F9EF"
+    }
+  },
+  {
+    "fields": {
+      "EntityID": "@lookup:MJ: Entities.Name=MJ: User Applications",
+      "RoleID": "@lookup:MJ: Roles.Name=Credentialing Applicant",
+      "Type": "Allow",
+      "CanRead": true,
+      "CanCreate": false,
+      "CanUpdate": false,
+      "CanDelete": false,
+      "ReadRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Magic Link: Own Rows by UserID"
+    },
+    "primaryKey": {
+      "ID": "2CA42FEC-4DD1-4437-A905-3D2CB017EAE4"
+    }
+  },
+  {
+    "fields": {
+      "EntityID": "@lookup:MJ: Entities.Name=MJ: Application Roles",
+      "RoleID": "@lookup:MJ: Roles.Name=Credentialing Applicant",
+      "Type": "Allow",
+      "CanRead": true,
+      "CanCreate": false,
+      "CanUpdate": false,
+      "CanDelete": false,
+      "ReadRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Magic Link: Own Application Roles"
+    },
+    "primaryKey": {
+      "ID": "3F462174-EE64-47EE-A2AE-5CF2490739CB"
+    }
+  },
+  {
+    "fields": {
+      "EntityID": "@lookup:MJ: Entities.Name=MJ: User Notifications",
+      "RoleID": "@lookup:MJ: Roles.Name=Credentialing Admin",
+      "Type": "Allow",
+      "CanRead": true,
+      "CanCreate": false,
+      "CanUpdate": true,
+      "CanDelete": false,
+      "ReadRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Magic Link: Own Rows by UserID",
+      "UpdateRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Magic Link: Own Rows by UserID"
+    },
+    "primaryKey": {
+      "ID": "982427D6-4BEE-4CA2-87E4-F3C079D771FD"
+    }
+  },
+  {
+    "fields": {
+      "EntityID": "@lookup:MJ: Entities.Name=MJ: User Notification Types",
+      "RoleID": "@lookup:MJ: Roles.Name=Credentialing Admin",
+      "Type": "Allow",
+      "CanRead": true,
+      "CanCreate": false,
+      "CanUpdate": false,
+      "CanDelete": false,
+      "ReadRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Credentialing: Shell Empty"
+    },
+    "primaryKey": {
+      "ID": "09A674DC-0388-4F04-A4CD-E077E13644C3"
+    }
+  },
+  {
+    "fields": {
+      "EntityID": "@lookup:MJ: Entities.Name=MJ: User Notifications",
+      "RoleID": "@lookup:MJ: Roles.Name=Credentialing Staff",
+      "Type": "Allow",
+      "CanRead": true,
+      "CanCreate": false,
+      "CanUpdate": true,
+      "CanDelete": false,
+      "ReadRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Magic Link: Own Rows by UserID",
+      "UpdateRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Magic Link: Own Rows by UserID"
+    },
+    "primaryKey": {
+      "ID": "06BC8BAA-E594-45C4-96F7-A77A4DB7359E"
+    }
+  },
+  {
+    "fields": {
+      "EntityID": "@lookup:MJ: Entities.Name=MJ: User Notification Types",
+      "RoleID": "@lookup:MJ: Roles.Name=Credentialing Staff",
+      "Type": "Allow",
+      "CanRead": true,
+      "CanCreate": false,
+      "CanUpdate": false,
+      "CanDelete": false,
+      "ReadRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Credentialing: Shell Empty"
+    },
+    "primaryKey": {
+      "ID": "F3BFA974-510C-4CFD-80E9-4EEF4F408B35"
+    }
+  },
+  {
+    "fields": {
+      "EntityID": "@lookup:MJ: Entities.Name=MJ: User Notifications",
+      "RoleID": "@lookup:MJ: Roles.Name=Credentialing Committee",
+      "Type": "Allow",
+      "CanRead": true,
+      "CanCreate": false,
+      "CanUpdate": true,
+      "CanDelete": false,
+      "ReadRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Magic Link: Own Rows by UserID",
+      "UpdateRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Magic Link: Own Rows by UserID"
+    },
+    "primaryKey": {
+      "ID": "288664C8-FAD4-4924-A257-CA25FAF57DB0"
+    }
+  },
+  {
+    "fields": {
+      "EntityID": "@lookup:MJ: Entities.Name=MJ: User Notification Types",
+      "RoleID": "@lookup:MJ: Roles.Name=Credentialing Committee",
+      "Type": "Allow",
+      "CanRead": true,
+      "CanCreate": false,
+      "CanUpdate": false,
+      "CanDelete": false,
+      "ReadRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Credentialing: Shell Empty"
+    },
+    "primaryKey": {
+      "ID": "E1F32D5D-2CC0-45BF-A49E-98F131F1DCF7"
+    }
+  },
+  {
+    "fields": {
+      "EntityID": "@lookup:MJ: Entities.Name=MJ: User Notifications",
+      "RoleID": "@lookup:MJ: Roles.Name=Credentialing Reviewer",
+      "Type": "Allow",
+      "CanRead": true,
+      "CanCreate": false,
+      "CanUpdate": true,
+      "CanDelete": false,
+      "ReadRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Magic Link: Own Rows by UserID",
+      "UpdateRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Magic Link: Own Rows by UserID"
+    },
+    "primaryKey": {
+      "ID": "087F43C9-FA94-42E7-B1AE-79B43B6FC2D6"
+    }
+  },
+  {
+    "fields": {
+      "EntityID": "@lookup:MJ: Entities.Name=MJ: User Notification Types",
+      "RoleID": "@lookup:MJ: Roles.Name=Credentialing Reviewer",
+      "Type": "Allow",
+      "CanRead": true,
+      "CanCreate": false,
+      "CanUpdate": false,
+      "CanDelete": false,
+      "ReadRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Credentialing: Shell Empty"
+    },
+    "primaryKey": {
+      "ID": "CB114AFA-C162-4ACC-A1B2-13B04F523223"
+    }
+  },
+  {
+    "fields": {
+      "EntityID": "@lookup:MJ: Entities.Name=MJ: User Notifications",
+      "RoleID": "@lookup:MJ: Roles.Name=Credentialing Applicant",
+      "Type": "Allow",
+      "CanRead": true,
+      "CanCreate": false,
+      "CanUpdate": true,
+      "CanDelete": false,
+      "ReadRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Magic Link: Own Rows by UserID",
+      "UpdateRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Magic Link: Own Rows by UserID"
+    },
+    "primaryKey": {
+      "ID": "D73F46B0-DD2F-4F0B-A8B1-41360C459C9E"
+    }
+  },
+  {
+    "fields": {
+      "EntityID": "@lookup:MJ: Entities.Name=MJ: User Notification Types",
+      "RoleID": "@lookup:MJ: Roles.Name=Credentialing Applicant",
+      "Type": "Allow",
+      "CanRead": true,
+      "CanCreate": false,
+      "CanUpdate": false,
+      "CanDelete": false,
+      "ReadRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Credentialing: Shell Empty"
+    },
+    "primaryKey": {
+      "ID": "BE1BF4EA-40B9-4171-A141-0EF226D9D087"
+    }
+  },
+  {
+    "fields": {
+      "EntityID": "@lookup:MJ: Entities.Name=MJ: Resource Types",
+      "RoleID": "@lookup:MJ: Roles.Name=Credentialing Admin",
+      "Type": "Allow",
+      "CanRead": true,
+      "CanCreate": false,
+      "CanUpdate": false,
+      "CanDelete": false,
+      "ReadRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Credentialing: Resource Type Catalog"
+    },
+    "primaryKey": {
+      "ID": "22B5966F-C1F6-472B-9EE1-4FDEF1B24F85"
+    }
+  },
+  {
+    "fields": {
+      "EntityID": "@lookup:MJ: Entities.Name=MJ: Resource Permissions",
+      "RoleID": "@lookup:MJ: Roles.Name=Credentialing Admin",
+      "Type": "Allow",
+      "CanRead": true,
+      "CanCreate": false,
+      "CanUpdate": false,
+      "CanDelete": false,
+      "ReadRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Magic Link: Own Rows by UserID"
+    },
+    "primaryKey": {
+      "ID": "B9CED2AE-48BE-4DD1-A91F-CE35BBD3B332"
+    }
+  },
+  {
+    "fields": {
+      "EntityID": "@lookup:MJ: Entities.Name=MJ: Application Settings",
+      "RoleID": "@lookup:MJ: Roles.Name=Credentialing Admin",
+      "Type": "Allow",
+      "CanRead": true,
+      "CanCreate": false,
+      "CanUpdate": false,
+      "CanDelete": false,
+      "ReadRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Credentialing: Shell Empty"
+    },
+    "primaryKey": {
+      "ID": "E590BBB0-738A-49E4-8605-2D2F988636DA"
+    }
+  },
+  {
+    "fields": {
+      "EntityID": "@lookup:MJ: Entities.Name=MJ: Resource Types",
+      "RoleID": "@lookup:MJ: Roles.Name=Credentialing Staff",
+      "Type": "Allow",
+      "CanRead": true,
+      "CanCreate": false,
+      "CanUpdate": false,
+      "CanDelete": false,
+      "ReadRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Credentialing: Resource Type Catalog"
+    },
+    "primaryKey": {
+      "ID": "D113CA14-9908-4CCD-803F-DE551E143E08"
+    }
+  },
+  {
+    "fields": {
+      "EntityID": "@lookup:MJ: Entities.Name=MJ: Resource Permissions",
+      "RoleID": "@lookup:MJ: Roles.Name=Credentialing Staff",
+      "Type": "Allow",
+      "CanRead": true,
+      "CanCreate": false,
+      "CanUpdate": false,
+      "CanDelete": false,
+      "ReadRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Magic Link: Own Rows by UserID"
+    },
+    "primaryKey": {
+      "ID": "1431DB62-BFF8-49FD-A689-E8C128976D72"
+    }
+  },
+  {
+    "fields": {
+      "EntityID": "@lookup:MJ: Entities.Name=MJ: Application Settings",
+      "RoleID": "@lookup:MJ: Roles.Name=Credentialing Staff",
+      "Type": "Allow",
+      "CanRead": true,
+      "CanCreate": false,
+      "CanUpdate": false,
+      "CanDelete": false,
+      "ReadRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Credentialing: Shell Empty"
+    },
+    "primaryKey": {
+      "ID": "4C11850F-3F01-4197-8719-6913F21D8076"
+    }
+  },
+  {
+    "fields": {
+      "EntityID": "@lookup:MJ: Entities.Name=MJ: Resource Types",
+      "RoleID": "@lookup:MJ: Roles.Name=Credentialing Committee",
+      "Type": "Allow",
+      "CanRead": true,
+      "CanCreate": false,
+      "CanUpdate": false,
+      "CanDelete": false,
+      "ReadRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Credentialing: Resource Type Catalog"
+    },
+    "primaryKey": {
+      "ID": "42A9557A-5278-4F83-994E-B544E925F703"
+    }
+  },
+  {
+    "fields": {
+      "EntityID": "@lookup:MJ: Entities.Name=MJ: Resource Permissions",
+      "RoleID": "@lookup:MJ: Roles.Name=Credentialing Committee",
+      "Type": "Allow",
+      "CanRead": true,
+      "CanCreate": false,
+      "CanUpdate": false,
+      "CanDelete": false,
+      "ReadRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Magic Link: Own Rows by UserID"
+    },
+    "primaryKey": {
+      "ID": "BDA955F3-67C6-4C3F-8F4C-3A10E611D6F4"
+    }
+  },
+  {
+    "fields": {
+      "EntityID": "@lookup:MJ: Entities.Name=MJ: Application Settings",
+      "RoleID": "@lookup:MJ: Roles.Name=Credentialing Committee",
+      "Type": "Allow",
+      "CanRead": true,
+      "CanCreate": false,
+      "CanUpdate": false,
+      "CanDelete": false,
+      "ReadRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Credentialing: Shell Empty"
+    },
+    "primaryKey": {
+      "ID": "FFC404DE-333B-40DF-A4EF-3502E0A938B1"
+    }
+  },
+  {
+    "fields": {
+      "EntityID": "@lookup:MJ: Entities.Name=MJ: Resource Types",
+      "RoleID": "@lookup:MJ: Roles.Name=Credentialing Reviewer",
+      "Type": "Allow",
+      "CanRead": true,
+      "CanCreate": false,
+      "CanUpdate": false,
+      "CanDelete": false,
+      "ReadRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Credentialing: Resource Type Catalog"
+    },
+    "primaryKey": {
+      "ID": "82F0352D-809F-4406-882A-43868290395E"
+    }
+  },
+  {
+    "fields": {
+      "EntityID": "@lookup:MJ: Entities.Name=MJ: Resource Permissions",
+      "RoleID": "@lookup:MJ: Roles.Name=Credentialing Reviewer",
+      "Type": "Allow",
+      "CanRead": true,
+      "CanCreate": false,
+      "CanUpdate": false,
+      "CanDelete": false,
+      "ReadRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Magic Link: Own Rows by UserID"
+    },
+    "primaryKey": {
+      "ID": "E0DE49D0-0ED3-4594-8229-303836B1231A"
+    }
+  },
+  {
+    "fields": {
+      "EntityID": "@lookup:MJ: Entities.Name=MJ: Application Settings",
+      "RoleID": "@lookup:MJ: Roles.Name=Credentialing Reviewer",
+      "Type": "Allow",
+      "CanRead": true,
+      "CanCreate": false,
+      "CanUpdate": false,
+      "CanDelete": false,
+      "ReadRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Credentialing: Shell Empty"
+    },
+    "primaryKey": {
+      "ID": "6E911780-09CA-478E-9DE4-61FBCA21FFCB"
+    }
+  },
+  {
+    "fields": {
+      "EntityID": "@lookup:MJ: Entities.Name=MJ: Resource Types",
+      "RoleID": "@lookup:MJ: Roles.Name=Credentialing Applicant",
+      "Type": "Allow",
+      "CanRead": true,
+      "CanCreate": false,
+      "CanUpdate": false,
+      "CanDelete": false,
+      "ReadRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Credentialing: Resource Type Catalog"
+    },
+    "primaryKey": {
+      "ID": "29358701-4A91-4986-8BD4-B617FAE9C90F"
+    }
+  },
+  {
+    "fields": {
+      "EntityID": "@lookup:MJ: Entities.Name=MJ: Resource Permissions",
+      "RoleID": "@lookup:MJ: Roles.Name=Credentialing Applicant",
+      "Type": "Allow",
+      "CanRead": true,
+      "CanCreate": false,
+      "CanUpdate": false,
+      "CanDelete": false,
+      "ReadRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Magic Link: Own Rows by UserID"
+    },
+    "primaryKey": {
+      "ID": "31379FEB-EAF2-4D87-85CF-5D9B8710921A"
+    }
+  },
+  {
+    "fields": {
+      "EntityID": "@lookup:MJ: Entities.Name=MJ: Application Settings",
+      "RoleID": "@lookup:MJ: Roles.Name=Credentialing Applicant",
+      "Type": "Allow",
+      "CanRead": true,
+      "CanCreate": false,
+      "CanUpdate": false,
+      "CanDelete": false,
+      "ReadRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Credentialing: Shell Empty"
+    },
+    "primaryKey": {
+      "ID": "0870CFD0-3055-4D51-BC3A-CF859B9F88D2"
+    }
+  }
+]

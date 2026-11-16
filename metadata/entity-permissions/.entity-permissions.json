@@ -1,0 +1,165 @@
+[
+  {
+    "fields": {
+      "EntityID": "@lookup:MJ: Entities.Name=MJ_BizApps_Credentialing: Programs",
+      "RoleID": "@lookup:MJ: Roles.Name=Credentialing Staff",
+      "Type": "Allow",
+      "CanRead": true,
+      "CanCreate": true,
+      "CanUpdate": true,
+      "CanDelete": true,
+      "ReadRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Credentialing: Staff Rows By Organization",
+      "CreateRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Credentialing: Staff Rows By Organization",
+      "UpdateRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Credentialing: Staff Rows By Organization",
+      "DeleteRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Credentialing: Staff Rows By Organization"
+    },
+    "primaryKey": {
+      "ID": "8F3B2451-7CC1-43F8-8BE5-53A26E37CE6A"
+    }
+  },
+  {
+    "fields": {
+      "EntityID": "@lookup:MJ: Entities.Name=MJ_BizApps_Credentialing: Program Versions",
+      "RoleID": "@lookup:MJ: Roles.Name=Credentialing Staff",
+      "Type": "Allow",
+      "CanRead": true,
+      "CanCreate": true,
+      "CanUpdate": true,
+      "CanDelete": true,
+      "ReadRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Credentialing: Staff Rows By Program",
+      "CreateRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Credentialing: Staff Rows By Program",
+      "UpdateRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Credentialing: Staff Rows By Program",
+      "DeleteRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Credentialing: Staff Rows By Program"
+    },
+    "primaryKey": {
+      "ID": "446D5634-7A85-42C9-90E9-D44CC0FB90A6"
+    }
+  },
+  {
+    "fields": {
+      "EntityID": "@lookup:MJ: Entities.Name=MJ_BizApps_Credentialing: Sections",
+      "RoleID": "@lookup:MJ: Roles.Name=Credentialing Staff",
+      "Type": "Allow",
+      "CanRead": true,
+      "CanCreate": true,
+      "CanUpdate": true,
+      "CanDelete": true,
+      "ReadRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Credentialing: Staff Rows By Version",
+      "CreateRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Credentialing: Staff Rows By Version",
+      "UpdateRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Credentialing: Staff Rows By Version",
+      "DeleteRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Credentialing: Staff Rows By Version"
+    },
+    "primaryKey": {
+      "ID": "FE837AA8-82DA-4266-B7AA-12E833874B0F"
+    }
+  },
+  {
+    "fields": {
+      "EntityID": "@lookup:MJ: Entities.Name=MJ_BizApps_Credentialing: Standards",
+      "RoleID": "@lookup:MJ: Roles.Name=Credentialing Staff",
+      "Type": "Allow",
+      "CanRead": true,
+      "CanCreate": true,
+      "CanUpdate": true,
+      "CanDelete": true,
+      "ReadRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Credentialing: Staff Rows By Version",
+      "CreateRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Credentialing: Staff Rows By Version",
+      "UpdateRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Credentialing: Staff Rows By Version",
+      "DeleteRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Credentialing: Staff Rows By Version"
+    },
+    "primaryKey": {
+      "ID": "2E6EF6C4-C8C1-4099-B4BA-C1CD317B3770"
+    }
+  },
+  {
+    "fields": {
+      "EntityID": "@lookup:MJ: Entities.Name=MJ_BizApps_Credentialing: Document Requirements",
+      "RoleID": "@lookup:MJ: Roles.Name=Credentialing Staff",
+      "Type": "Allow",
+      "CanRead": true,
+      "CanCreate": true,
+      "CanUpdate": true,
+      "CanDelete": true,
+      "ReadRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Credentialing: Staff Rows By Version",
+      "CreateRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Credentialing: Staff Rows By Version",
+      "UpdateRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Credentialing: Staff Rows By Version",
+      "DeleteRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Credentialing: Staff Rows By Version"
+    },
+    "primaryKey": {
+      "ID": "AC838B26-67A4-4F6D-A910-E2379FD16F8B"
+    }
+  },
+  {
+    "fields": {
+      "EntityID": "@lookup:MJ: Entities.Name=MJ_BizApps_Credentialing: Accrediting Organizations",
+      "RoleID": "@lookup:MJ: Roles.Name=Credentialing Staff",
+      "Type": "Allow",
+      "CanRead": true,
+      "CanCreate": false,
+      "CanUpdate": false,
+      "CanDelete": false,
+      "ReadRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Credentialing: Staff Organizations"
+    },
+    "primaryKey": {
+      "ID": "5518994F-48CF-4B55-AF2B-2A2220CE1E3D"
+    }
+  },
+  {
+    "fields": {
+      "EntityID": "@lookup:MJ: Entities.Name=MJ_BizApps_Credentialing: Organization Memberships",
+      "RoleID": "@lookup:MJ: Roles.Name=Credentialing Staff",
+      "Type": "Allow",
+      "CanRead": true,
+      "CanCreate": false,
+      "CanUpdate": false,
+      "CanDelete": false,
+      "ReadRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Credentialing: Staff Rows By Organization"
+    },
+    "primaryKey": {
+      "ID": "5FA566C0-515A-49F2-9DCB-A9A56C0D74E2"
+    }
+  },
+  {
+    "fields": {
+      "EntityID": "@lookup:MJ: Entities.Name=MJ_BizApps_Credentialing: Accrediting Organizations",
+      "RoleID": "@lookup:MJ: Roles.Name=Credentialing Admin",
+      "Type": "Allow",
+      "CanRead": true,
+      "CanCreate": true,
+      "CanUpdate": true,
+      "CanDelete": true
+    },
+    "primaryKey": {
+      "ID": "8BC54BA9-2857-490A-B5DC-894A0B2B8866"
+    }
+  },
+  {
+    "fields": {
+      "EntityID": "@lookup:MJ: Entities.Name=MJ_BizApps_Credentialing: Organization Memberships",
+      "RoleID": "@lookup:MJ: Roles.Name=Credentialing Admin",
+      "Type": "Allow",
+      "CanRead": true,
+      "CanCreate": true,
+      "CanUpdate": true,
+      "CanDelete": true
+    },
+    "primaryKey": {
+      "ID": "70E8E4B7-7C5C-4746-ABD5-F7A5B5678790"
+    }
+  },
+  {
+    "fields": {
+      "EntityID": "@lookup:MJ: Entities.Name=Committees: Committees",
+      "RoleID": "@lookup:MJ: Roles.Name=Credentialing Staff",
+      "Type": "Allow",
+      "CanRead": true,
+      "CanCreate": false,
+      "CanUpdate": false,
+      "CanDelete": false,
+      "ReadRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Credentialing: Staff Committees"
+    },
+    "primaryKey": {
+      "ID": "4B580B0D-5913-49F9-A401-6D38BCFAA4E3"
+    }
+  }
+]

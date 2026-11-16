@@ -31,7 +31,8 @@ import {
 import { CountRows, FindRows, Quote, RequireSave } from '../wire.js';
 
 const ORG_A_NAME = 'Sample Accrediting Body A';
-const OPERATIONS_STAFF_EMAIL = 'operations.staff@example.test';
+/** The world's staff member of OrgA: holds only `Credentialing Staff` and a membership of OrgA. */
+const STAFF_A_EMAIL = 'staff.a@example.test';
 const ADMIN_EMAIL = 'admin@example.test';
 const STAFF_ROLE = 'Credentialing Staff';
 const BLANK_LABEL_SENTENCE = 'Enter a label for this version.';
@@ -167,7 +168,7 @@ const checks: NamedCheck[] = [
             AssertEqual(await programsNamed(ctx, organizationID, input.Name), 0, 'programs with the name');
 
             const name = `Wire Body ${runHex()}`;
-            const organization = await new CreateOrganizationOperation().Execute({ Name: name, FirstStaffEmail: OPERATIONS_STAFF_EMAIL });
+            const organization = await new CreateOrganizationOperation().Execute({ Name: name, FirstStaffEmail: STAFF_A_EMAIL });
             Assert(!organization.Success, `CreateOrganization as the System user is refused (${describe(organization)})`);
             AssertEqual(organization.ResultCode, 'FORBIDDEN', 'CreateOrganization ResultCode');
             AssertEqual(await CountRows(ctx, CredentialingEntity.AccreditingOrganization, `Name = '${Quote(name)}'`), 0, 'accrediting organizations with the name');
@@ -179,7 +180,7 @@ const checks: NamedCheck[] = [
         RequiresMutation: true,
         Fn: async (ctx: IntegrationCheckContext) => {
             const organizationID = await orgAID(ctx);
-            await withSession(ctx, OPERATIONS_STAFF_EMAIL, async (session) => {
+            await withSession(ctx, STAFF_A_EMAIL, async (session) => {
                 const input = programInput(organizationID, '2027');
                 const created = await new CreateProgramOperation().Execute(input, { provider: session });
                 Assert(created.Success && created.Output != null, `CreateProgram as staff over GraphQL succeeds (${describe(created)})`);

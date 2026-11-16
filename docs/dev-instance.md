@@ -189,9 +189,9 @@ per-schema metadata refresh (`spUpdateSchemaInfoFromDatabase` + entity metadata)
 
 ## App Visibility in MJExplorer
 
-`Credentialing` intentionally sets `DefaultForNewUser: false` and has only a
-`Developer` entry in `metadata/application-roles/.application-roles.json` (no `UI`
-grant). When signing into MJExplorer (`http://localhost:4251`) as
+`Credentialing` intentionally sets `DefaultForNewUser: false`.
+`metadata/application-roles/.application-roles.json` grants it to `Developer` (access + admin)
+and to the five credentialing roles (access); `UI` has no grant. When signing into MJExplorer (`http://localhost:4251`) as
 `admin@memberjunction.org` (`Developer`), `Credentialing` is absent from the app
 switcher initially and is added via **Application launcher → Configure… →
 Available Applications → Add Credentialing → Save Changes** (creating an
@@ -212,6 +212,127 @@ grants for `Developer` and `Integration` only (and never `UI`):
   `AutoAddRolesForNewApplications: true` with `Roles` containing only
   `Developer` (`CanAccess: true, CanAdmin: true`) and `Integration`
   (`CanAccess: true, CanAdmin: false`) for the generated schema application.
+
+## Roles, row filters and permissions (Task 8)
+
+**No credentialing role holds `UI`, and no world user holds `Developer` or `UI` beside a
+credentialing role.** Every permission row is `MJ: Entity Permissions` metadata under
+`metadata/entity-permissions/`, every filter is under `metadata/row-level-security-filters/`.
+
+How MJ v6.2.2 evaluates them (read from source, then confirmed by `CRD-05`):
+
+- **An unfiltered grant from any role exempts the user.** `EntityInfo.UserExemptFromRowLevelSecurity`
+  (`mj/packages/MJCore/src/generic/entityInfo.ts:5012-5046`) returns true when any of the user's
+  roles has an Allow row granting the operation with no filter for it. So a user holding
+  `Credentialing Staff` and `Developer` (or `UI`, wherever `UI` holds an unfiltered read) reads
+  every organization's rows. The filters of the user's other roles are OR'd
+  (`GetUserRowLevelSecurityWhereClause`, `:5121-5139`), and a row that does not grant the operation
+  contributes nothing (`GetUserRowLevelSecurityInfo`, `:5065-5108`).
+- **Reads** add the Read filter to the view query
+  (`mj/packages/GenericDatabaseProvider/src/GenericDatabaseProvider.ts:3219-3224`). A user with no
+  Read permission at all has the read refused: `RunView` fails with
+  `User <email> does not have read permissions on <entity>` (`CheckUserReadPermissions`).
+  `CRD-05` asserts which of the two each "reads nothing" case is.
+- **Writes** (`mj/packages/MJCore/src/generic/databaseProviderBase.ts:2126-2195`): the entity's
+  validation runs first (`BaseEntity.Save` → `Validate`/`ValidateAsync`, then the provider's
+  `OnValidateBeforeSave`), and only then the Create filter (`CheckCreateRLS`, a synthetic-row
+  `SELECT CASE WHEN (<filter>)`; refusal `Access denied for new <entity> record`) or the Update
+  filter (`CheckRecordRLS` on the stored row; refusal
+  `Record not found or access denied for <entity>`), and after the before-save hooks a post-image
+  check of both. A delete checks the Delete filter after the before-delete hooks (`:2447-2459`).
+  The credentialing entity guards of Task 6 read every parent **as the caller**, so a parent of
+  another organization fails validation with `Record not found.` before the platform filter is
+  reached; `cred-isolation.3` proves the refusal for another organization's parent, standard
+  update and standard delete (and for `CreateProgram`, `CloneVersionToDraft`,
+  `ReorderVersionTree`) equals the refusal for a random UUID. A Create-filter refusal message
+  (`Access denied for new …`) is therefore never what a staff member sees for these entities.
+- The Create filter's subquery runs on the saving transaction's connection (the provider's
+  `ExecuteSQL` joins the ambient transaction), so `CreateProgram`'s version insert passes
+  `Credentialing: Staff Rows By Program` against the program row inserted moments earlier in the
+  same transaction — measured: `CRD-04` passes as `StaffA`.
+
+| Filter | Attached to | Text |
+|---|---|---|
+| `Credentialing: Staff Organizations` | Accrediting Organizations | `(ID IN (<membership>))` |
+| `Credentialing: Staff Rows By Organization` | Programs, Organization Memberships | `(AccreditingOrganizationID IN (<membership>))` |
+| `Credentialing: Staff Rows By Program` | Program Versions | `(ProgramID IN (SELECT p.ID FROM [__mj_BizAppsCredentialing].[vwPrograms] p WHERE p.AccreditingOrganizationID IN (<membership>)))` |
+| `Credentialing: Staff Rows By Version` | Sections, Standards, Document Requirements | `(ProgramVersionID IN (SELECT v.ID FROM …[vwProgramVersions] v INNER JOIN …[vwPrograms] p ON p.ID = v.ProgramID WHERE p.AccreditingOrganizationID IN (<membership>)))` |
+| `Credentialing: Staff Committees` | `Committees: Committees` | `(OrganizationID IN (SELECT ao.OrganizationID FROM …[vwAccreditingOrganizations] ao INNER JOIN …[vwOrganizationMemberships] m ON m.AccreditingOrganizationID = ao.ID WHERE m.UserID = TRY_CAST('{{UserID}}' AS UNIQUEIDENTIFIER)))` |
+| `Credentialing: Own Workspace Items` | MJ: Workspace Items (shell) | `(WorkspaceID IN (SELECT w.ID FROM [__mj].[vwWorkspaces] w WHERE w.UserID = TRY_CAST('{{UserID}}' AS UNIQUEIDENTIFIER)))` |
+| `Credentialing: Shell Empty` | shell entities a role must not read | `(1 = 0)` |
+| `Credentialing: Resource Type Catalog` | MJ: Resource Types (shell) | `(1 = 1)` — type names, not records; present so no grant outside the schema is unfiltered |
+
+`<membership>` is `SELECT m.AccreditingOrganizationID FROM [__mj_BizAppsCredentialing].[vwOrganizationMemberships] m WHERE m.UserID = TRY_CAST('{{UserID}}' AS UNIQUEIDENTIFIER)`.
+The view names are the ones CodeGen created (`SELECT name FROM sys.views WHERE schema_id =
+SCHEMA_ID('__mj_BizAppsCredentialing')`: `vwAccreditingOrganizations`, `vwDocumentRequirements`,
+`vwOrganizationMemberships`, `vwPrograms`, `vwProgramVersions`, `vwSections`, `vwStandards`).
+
+**Committees names (Task 8 Step 3 discovery).** Read from `__mj.Entity`/`__mj.EntityField` and
+`bizapps-committees/migrations/B202602151200__v1.0__Committees_Baseline.sql`: entity
+`Committees: Committees`, table `[__mj_BizAppsCommittees].[Committee]`, base view `vwCommittees`;
+the owning-organization column is `OrganizationID`, related entity
+`MJ_BizApps_Common: Organizations`. An accrediting organization's Common organization is
+`AccreditingOrganization.OrganizationID`, which is what the filter joins on. The permission row is
+on the dependency's entity; its schema is untouched.
+
+Grants (`Type: Allow`; every granted operation of a filtered row carries the filter):
+
+| Role | Entity | Grant |
+|---|---|---|
+| Credentialing Staff | Programs, Program Versions, Sections, Standards, Document Requirements | CRUD, filtered |
+| Credentialing Staff | Accrediting Organizations, Organization Memberships | Read, filtered |
+| Credentialing Staff | Committees: Committees | Read, `Credentialing: Staff Committees` |
+| Credentialing Admin | Accrediting Organizations, Organization Memberships | CRUD, unfiltered |
+| Committee, Reviewer, Applicant | the seven entities | none |
+| all five | the shell baseline below | filtered |
+| `UI` | the seven entities | **no row at all** (see below) |
+
+**Task 8 Step 4 discovery — CodeGen does not grant `UI`.** With the override of Task 4
+(`mj.config.cjs` `newEntityDefaults.PermissionDefaults` lists only `Developer` and
+`Integration`), there is no `UI` row to switch off, so no `metadata/entities/.ui-role-permissions.json`
+exists (an `@lookup` primary key of a `UI` row would fail to resolve). After the metadata push,
+`corepack pnpm run mj:codegen` (rc 0, 520 entities) and
+`SELECT e.Name, ep.CanRead FROM __mj.EntityPermission ep JOIN __mj.Entity e ON e.ID=ep.EntityID JOIN __mj.Role r ON r.ID=ep.RoleID WHERE r.Name='UI' AND e.SchemaName='__mj_BizAppsCredentialing'`
+returned **zero rows**, and `git status` showed no change under any `src/generated/` folder or
+`migrations/` (CodeGen's SQL log goes to the gitignored `migrations/codegen/`).
+`cred-isolation.5` (a user holding only `UI` reads nothing; each read is refused for want of
+permission) passes.
+
+**Task 8 Step 6 discovery — the Explorer shell baseline of the credentialing roles.** Signed in
+by dev-login (`MJ_DEV_AUTH_DEFAULT_EMAIL` in `mj/.env`, MJAPI restarted, then removed again) as
+`staff.a@example.test` and as `admin@example.test`, in Orca's built-in browser on
+`http://localhost:4251` (the chrome-devtools MCP could not start: its Chrome profile was held by
+another session's browser). Both load Explorer and open the Credentialing application on its
+scaffold Overview (`/app/credentialing/Overview`); screenshots in
+`../logs/screens/task8-{staff-a,admin}-credentialing.png` (outside the repo). The final list, in
+`metadata/entity-permissions/.core-entity-permissions.json`, for all five roles:
+
+| Entity | Grant | Filter | Why |
+|---|---|---|---|
+| MJ: Workspaces | CRUD | `Magic Link: Own Rows by UserID` | Explorer creates the per-user workspace (Magic Link baseline) |
+| MJ: Workspace Items | CRUD | `Credentialing: Own Workspace Items` | same |
+| MJ: User Settings, MJ: User Favorites, MJ: User Record Logs, MJ: User Notification Preferences | CRUD | `Magic Link: Own Rows by UserID` | per-user stores (Magic Link baseline) |
+| MJ: User Roles, MJ: User Applications | Read | `Magic Link: Own Rows by UserID` | current user and app access (Magic Link baseline) |
+| MJ: Application Roles | Read | `Magic Link: Own Application Roles` | app authorization (Magic Link baseline) |
+| MJ: User Notifications | Read, Update | `Magic Link: Own Rows by UserID` | found here: `UserInfoEngine` loads its seven entities all-or-nothing (`BaseEngine.CheckPermissionsOrSkipAll`, `mj/packages/MJCore/src/generic/baseEngine.ts:2138`); without these two the whole engine loaded empty and the app switcher said "No Applications Available" / "user lacks read permission on: MJ: User Applications" |
+| MJ: User Notification Types | Read | `Credentialing: Shell Empty` | same engine |
+| MJ: Resource Types | Read | `Credentialing: Resource Type Catalog` | found here: the tab container throws `ResourceType ID not found for type: Custom` (`explorer-core/.../tab-container.component.ts:2525`) and the shell stalls on "Taking longer than expected" without it; `ResourcePermissionEngine` loads it with Resource Permissions all-or-nothing |
+| MJ: Resource Permissions | Read | `Magic Link: Own Rows by UserID` | same engine |
+| MJ: Application Settings | Read | `Credentialing: Shell Empty` | `ApplicationSettingEngine` (nav item settings) |
+
+Nothing on `MJ: Record Changes`, `MJ: Queries` or `MJ: Users` (`cred-isolation.8` asserts the first
+two). The remaining console noise is by MJ's design: engines the role cannot read load empty
+(`BaseEngine` "Skipping N config(s)" warnings), `UserInfoEngine.CreateDefaultApplications` cannot
+add the `DefaultForNewUser` apps (no Create on User Applications), and the shell's avatar load
+(`shell.component.ts:3638-3663`, which loads the user's own `MJ: Users` row) is caught and falls
+back to the default avatar.
+
+**The Credentialing application must be in the user's `MJ: User Applications`.** The roles read
+their own rows but cannot create one, and the application is not `DefaultForNewUser`. Organization
+setup creates it for a new staff member (Task 7); the world loader creates it for `StaffA`,
+`StaffB`, `StaffNoMembership` and `Admin` (`ensureCredentialingApplication` in
+`packages/IntegrationTests/src/world/load-world.ts`). How an administrator who is not set up by
+organization setup gets it is not settled by this task.
 
 ## Signing in to Explorer as a chosen user
 
@@ -345,23 +466,27 @@ A user API key (`mj_sk_…`, `x-api-key` header) is not used by this harness.
 | `cred-version-rules` | `CRD-02 - Version rules` | server only |
 | `cred-standard-rules` | `CRD-03 - Standard rules` | server only |
 | `cred-operations` | `CRD-04 - Operations` | server only |
+| `cred-isolation` | `CRD-05 - Isolation` | server only |
 | `cred-operations-wire` | — (client harness only) | client only |
 
 ```sh
 MJ_INTEGRATION_TEST=1 RUN_MUTATION_TESTS=1 corepack pnpm mj test run --name "CRD-02 - Version rules"   # 11 checks
 MJ_INTEGRATION_TEST=1 RUN_MUTATION_TESTS=1 corepack pnpm mj test run --name "CRD-03 - Standard rules"  # 8 checks
 MJ_INTEGRATION_TEST=1 RUN_MUTATION_TESTS=1 corepack pnpm mj test run --name "CRD-04 - Operations"     # 10 checks
+MJ_INTEGRATION_TEST=1 RUN_MUTATION_TESTS=1 corepack pnpm mj test run --name "CRD-05 - Isolation"      # 9 checks
 corepack pnpm run test:integration cred-operations-wire                                               # 3 checks, GraphQL
 ```
 
 `cred-operations` is server only for three reasons: `.3` writes one `EvaluationMode` with SQL
 (the provider's `ExecuteSQL`, which GraphQL does not have), `.6` sets the static test seam
 `CloneVersionToDraftServerOperation.FailAfterStandards` (it exists only in the server process, reached
-through the class factory registration), and `.7` and `.9` need separate provider instances. It acts
-as three users: `operations.staff@example.test` (holds `Credentialing Staff` for the operations'
-`Authorize` and `Developer` for entity permissions — the credentialing roles hold no entity
-permissions until the permissions task, which replaces this user), the world's `admin@example.test`
-(`Credentialing Admin`) and the world's `StaffA` (`Credentialing Staff`).
+through the class factory registration), and `.7` and `.9` need separate provider instances. The
+program operations act as the world's `StaffA` (`staff.a@example.test`: only `Credentialing Staff`, a
+membership of OrgA, where every scratch program is made), so they run under staff's row-filtered
+permissions; organization setup acts as the world's `admin@example.test` (`Credentialing Admin`).
+`cred-operations-wire.2` signs in as `staff.a@example.test` too. (Task 7's stand-in
+`operations.staff@example.test`, which held `Developer` beside `Credentialing Staff`, is no longer
+used; its `Developer` grant was removed from the dev database.)
 
 `cred-operations-wire` proves the browser path: the shared contract classes of
 `@mj-biz-apps/credentialing-core`, called with no provider (as a browser calls them) or with a second
@@ -486,6 +611,7 @@ requests until the cache refreshes. In development, restart MJAPI after loading
 test data or granting a role outside operations that refresh the cache
 themselves, and before signing in as the affected user. `Credentialing.CreateOrganization` is
 such an operation: it refreshes the cache of the MJAPI process that ran it. The `mj test` run creates
-the world's grants (`admin@example.test` → `Credentialing Admin`, `staff.a@example.test` →
-`Credentialing Staff`) in its own process, so restart MJAPI after it before signing in as them or
+the world's grants (`admin@example.test` → `Credentialing Admin`; `staff.a`, `staff.b`,
+`staff.none@example.test` → `Credentialing Staff`; `ui.only@example.test` → `UI`;
+`applicant.a@example.test` → `Credentialing Applicant`) in its own process, so restart MJAPI after it before signing in as them or
 running `cred-operations-wire`.

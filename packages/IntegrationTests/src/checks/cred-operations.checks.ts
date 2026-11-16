@@ -3,6 +3,10 @@
  * transport with `{ provider, user }`: CreateProgram, CloneVersionToDraft, ReorderVersionTree and
  * CreateOrganization. Every check works on its own scratch program or run-unique names.
  *
+ * The program operations act as `StaffA`, who holds only `Credentialing Staff` and a membership of
+ * OrgA (where every scratch program is made), so they run under staff's row-filtered permissions;
+ * organization setup acts as the world's `Admin`.
+ *
  * Server transport only: `.3` writes one column with SQL, `.6` sets a static test seam on the server
  * operation class, and `.7`/`.9` need separate provider instances. The wire path is proven by
  * `cred-operations-wire` on the client transport.
@@ -62,19 +66,6 @@ function noUserSentence(email: string): string {
 
 function runHex(): string {
     return randomUUID().replace(/-/g, '').slice(0, 8);
-}
-
-let operationsStaff: UserInfo | null = null;
-
-/**
- * The user the program operations act as: holds `Credentialing Staff`, which the operations'
- * `Authorize` requires, and `Developer`, which gives it entity permissions on the credentialing
- * entities. The credentialing roles hold no entity permissions yet; the permissions task replaces this
- * with real, row-filtered staff permissions and a staff membership, and this user goes away.
- */
-async function OperationsStaff(ctx: IntegrationCheckContext): Promise<UserInfo> {
-    operationsStaff ??= await EnsureUser(ctx, 'operations.staff@example.test', 'Operations', [STAFF_ROLE, 'Developer']);
-    return operationsStaff;
 }
 
 /** Asserts a refused result whose message contains `fragment`. */
@@ -298,7 +289,7 @@ const checks: NamedCheck[] = [
         RequiresMutation: true,
         Fn: async (ctx: IntegrationCheckContext) => {
             const world = await GetOrLoadWorld(ctx);
-            const staff = await OperationsStaff(ctx);
+            const staff = world.StaffA;
             const input = programInput(world, '2027');
             const output = ExpectOutput(await new CreateProgramOperation().Execute(input, { provider: ctx.Provider, user: staff }), 'CreateProgram');
             const versions = await FindRows<{ ID: string; Label: string; Status: string }>(
@@ -325,7 +316,7 @@ const checks: NamedCheck[] = [
         RequiresMutation: true,
         Fn: async (ctx: IntegrationCheckContext) => {
             const world = await GetOrLoadWorld(ctx);
-            const staff = await OperationsStaff(ctx);
+            const staff = world.StaffA;
             const input = programInput(world, '   ');
             const result = await new CreateProgramOperation().Execute(input, { provider: ctx.Provider, user: staff });
             ExpectRefused(result, BLANK_LABEL_SENTENCE, 'CreateProgram with a blank label');
@@ -340,7 +331,7 @@ const checks: NamedCheck[] = [
         RequiresMutation: true,
         Fn: async (ctx: IntegrationCheckContext) => {
             const world = await GetOrLoadWorld(ctx);
-            const staff = await OperationsStaff(ctx);
+            const staff = world.StaffA;
             const source = await activatedScratch(ctx, world, { Sections: 2, StandardsPerSection: 3, DocumentRequirements: 2 });
             const assisted = source.Sections[1].Standards[1];
             await setEvaluationModeBySQL(ctx, assisted.ID, 'AI Assisted');
@@ -396,7 +387,7 @@ const checks: NamedCheck[] = [
         RequiresMutation: true,
         Fn: async (ctx: IntegrationCheckContext) => {
             const world = await GetOrLoadWorld(ctx);
-            const staff = await OperationsStaff(ctx);
+            const staff = world.StaffA;
             const tree = await activatedScratch(ctx, world, { Sections: 1, StandardsPerSection: 2 });
             const draft = await ctx.Provider.GetEntityObject<ProgramTree['Version']>(CredentialingEntity.ProgramVersion, ctx.User);
             draft.NewRecord();
@@ -418,7 +409,7 @@ const checks: NamedCheck[] = [
         RequiresMutation: true,
         Fn: async (ctx: IntegrationCheckContext) => {
             const world = await GetOrLoadWorld(ctx);
-            const staff = await OperationsStaff(ctx);
+            const staff = world.StaffA;
             const tree = await activatedScratch(ctx, world, { Sections: 1, StandardsPerSection: 2 });
             const before = await programCounts(ctx, tree.Program.ID);
             const result = await new CloneVersionToDraftOperation().Execute({ SourceVersionID: tree.Version.ID, NewLabel: '2027' }, { provider: ctx.Provider, user: staff });
@@ -433,7 +424,7 @@ const checks: NamedCheck[] = [
         RequiresMutation: true,
         Fn: async (ctx: IntegrationCheckContext) => {
             const world = await GetOrLoadWorld(ctx);
-            const staff = await OperationsStaff(ctx);
+            const staff = world.StaffA;
             const tree = await activatedScratch(ctx, world, { Sections: 2, StandardsPerSection: 3 });
             const before = await programCounts(ctx, tree.Program.ID);
             const seam = CloneFailSeam();
@@ -455,7 +446,7 @@ const checks: NamedCheck[] = [
         RequiresMutation: true,
         Fn: async (ctx: IntegrationCheckContext) => {
             const world = await GetOrLoadWorld(ctx);
-            const staff = await OperationsStaff(ctx);
+            const staff = world.StaffA;
 
             const draft = await MakeScratchProgram(ctx, world, { Sections: 1, StandardsPerSection: 3 }, ctx.User);
             const draftStandards = treeStandards(draft);

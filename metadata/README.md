@@ -10,8 +10,11 @@ the one `V*__Metadata_Sync.sql` migration generated each release (see
 | Folder | Entity | What it holds |
 |---|---|---|
 | `schema-info/` | `MJ: Schema Info` | Registers `__mj_BizAppsCredentialing`: entity-name prefix `MJ_BizApps_Credentialing: `, entity ID range, pinned UUID. Pushed first. |
+| `roles/` | `MJ: Roles` | The five credentialing roles: `Credentialing Admin`, `Credentialing Staff` (internal) and `Credentialing Committee`, `Credentialing Reviewer`, `Credentialing Applicant` (external). |
 | `applications/` | `MJ: Applications` | The `Credentialing` application and its nav items (Explorer app switcher). |
-| `application-roles/` | `MJ: Application Roles` | Which MJ roles can access the application (`UI`: access; `Developer`: access + admin). |
+| `application-roles/` | `MJ: Application Roles` | Which MJ roles can access the application: the five credentialing roles (access) and `Developer` (access + admin). `UI` has no grant. |
+| `row-level-security-filters/` | `MJ: Row Level Security Filters` | The organization-membership filters (`Credentialing: Staff …`) and the own-workspace-items filter of the shell baseline. |
+| `entity-permissions/` | `MJ: Entity Permissions` | `.entity-permissions.json`: staff and admin grants on this app's entities and on `Committees: Committees`. `.core-entity-permissions.json`: the Explorer shell baseline every credentialing role holds, each row bound to an own-rows filter. No credentialing role holds `UI`. |
 
 Folders push in the order listed in `.mj-sync.json` `directoryOrder`. Only
 dot-prefixed `.json` files inside listed folders are records — do not park

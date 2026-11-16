@@ -38,6 +38,7 @@ const SERVER_ONLY_BUNDLES = {
     'cred-version-rules': 'CRD-02 - Version rules',
     'cred-standard-rules': 'CRD-03 - Standard rules',
     'cred-operations': 'CRD-04 - Operations',
+    'cred-isolation': 'CRD-05 - Isolation',
 };
 
 const args = process.argv.slice(2);

@@ -16,18 +16,24 @@ export interface WorldCommittee {
 }
 
 /**
- * The users every credentialing check can act as. Until the role grants of the permissions task,
- * only `StaffA` (`Credentialing Staff`) and `Admin` (`Credentialing Admin`) hold a credentialing role.
+ * The users every credentialing check can act as. Each holds exactly the roles named here: no world
+ * user holds `Developer` or `UI` beside a credentialing role, because a role with an unfiltered grant
+ * exempts its holder from every other role's row filter on that entity
+ * (`EntityInfo.UserExemptFromRowLevelSecurity`), which would hide an isolation defect.
  */
 export interface WorldUsers {
-    /** Staff member of OrgA (`staff.a@example.test`). */
+    /** Staff member of OrgA (`staff.a@example.test`, `Credentialing Staff`). */
     StaffA: UserInfo;
-    /** Staff member of OrgB (`staff.b@example.test`). */
+    /** Staff member of OrgB (`staff.b@example.test`, `Credentialing Staff`). */
     StaffB: UserInfo;
-    /** A user with no organization membership (`staff.none@example.test`). */
+    /** Holds `Credentialing Staff` and no organization membership (`staff.none@example.test`). */
     StaffNoMembership: UserInfo;
-    /** The credentialing administrator who sets up organizations (`admin@example.test`). */
+    /** The credentialing administrator who sets up organizations (`admin@example.test`, `Credentialing Admin`). */
     Admin: UserInfo;
+    /** Holds only the platform `UI` role (`ui.only@example.test`). */
+    UIOnly: UserInfo;
+    /** Holds only `Credentialing Applicant` (`applicant.a@example.test`). */
+    ApplicantA: UserInfo;
 }
 
 /** The organizations, committee and sample program the checks read. */
@@ -41,6 +47,8 @@ export interface WorldData {
      * a check that changes a program makes its own with `MakeScratchProgram`.
      */
     SampleProgram: ProgramTree;
+    /** `Sample Program B` in OrgB, StaffB's organization, with its Draft version `2027`. Read-only to checks. */
+    ProgramB: ProgramTree;
 }
 
 /** Everything a credentialing check can rely on existing. */
