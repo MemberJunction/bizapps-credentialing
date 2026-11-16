@@ -336,6 +336,63 @@ as the `x-mj-api-key` header, which MJAPI accepts only when it equals its own sy
 (`mj/packages/MJServer/src/context.ts`, `GetUserPayload`) and then runs as the `System` user.
 A user API key (`mj_sk_…`, `x-api-key` header) is not used by this harness.
 
+### Which bundles run on which transport
+
+| Bundle | Test row | Transport |
+|---|---|---|
+| `cred-smoke` | `CRD-00 - Smoke` | server and client |
+| `cred-schema` | `CRD-01 - Schema` | server and client |
+| `cred-version-rules` | `CRD-02 - Version rules` | server only |
+| `cred-standard-rules` | `CRD-03 - Standard rules` | server only |
+
+```sh
+MJ_INTEGRATION_TEST=1 RUN_MUTATION_TESTS=1 corepack pnpm mj test run --name "CRD-02 - Version rules"   # 11 checks
+MJ_INTEGRATION_TEST=1 RUN_MUTATION_TESTS=1 corepack pnpm mj test run --name "CRD-03 - Standard rules"  # 8 checks
+```
+
+Build `packages/IntegrationTests` (or `build:packages`) and push `metadata-tests` first. A
+change to `packages/CoreEntitiesServer` needs a build and an MJAPI restart before anything that
+goes through MJAPI sees it. The `mj test` process loads the built package itself, so it needs no
+restart.
+
+**The client harness never imports the package barrel.** `packages/IntegrationTests/dist/index.js`
+registers the server entity subclasses (`LoadBizAppsCredentialingEntitiesServer()`, which also
+loads `@memberjunction/sqlserver-dataprovider` through the authoring lock). Imported into the
+GraphQL client process, those subclasses replace the classes a browser gets. Measured:
+`GetEntityObject('MJ_BizApps_Credentialing: Standards')` returned `StandardEntityServer` through
+the barrel, and the client class through a bundle module. MJ's rule for client dispatchers
+(`mj/packages/TestingFramework/testing-integration/src/registry.ts`, B32) is to pair the
+server-free `@memberjunction/testing-integration/client` bootstrap with a direct import of each
+bundle's own module through the package's `./checks/*` subpath. `test-harnesses/integration.mjs`
+does exactly that: it imports the client entity classes
+(`packages/Entities/dist/index.js`) and then `dist/checks/<bundle>.checks.js` for each requested
+bundle. Check modules therefore import nothing from
+`@mj-biz-apps/credentialing-core-entities-server` except `import type`. Asking the client harness
+for a server-only bundle fails with the `mj test run` command to use instead.
+
+**Concurrency checks use separate provider instances, on the server transport.** Two saves begun
+on one provider instance join one transaction, where a transaction-owned application lock is
+re-entrant and proves nothing. `cred-version-rules.7`, `.8`, `.10`, `.11` and
+`cred-standard-rules.7`, `.8` give each actor its own `ctx.Provider.CreateIndependentInstance()`
+(`IntegrationTests/src/actors.ts`, `WithActors`). Each instance shares the pool and metadata but
+has its own transaction stack, like MJAPI's per-request providers. `SQLServerDataProvider` implements it at
+v6.2.2 (`mj/packages/SQLServerDataProvider/src/SQLServerDataProvider.ts:748`), so the client
+transport was not needed for these checks.
+
+- Started in the same tick (in either order), the activation in `.7` reached the version lock
+  first in 29 of 30 rounds over three runs. Instrumented, both lock requests arrived within a millisecond and
+  the second was granted only after waiting (`sp_getapplock` returned `1`), so the race was real
+  but lopsided. `.7` therefore alternates which write leads and starts the other 5 ms later, while
+  the leader's transaction is still open (a write here takes 30–40 ms). Every round still showed
+  a grant after waiting, and the rounds split 5/5.
+- Negative control (lock turned into a no-op, then restored): `.7` failed (both writes succeeded,
+  leaving an Active version with an empty section), `cred-standard-rules.7` failed (the loser got
+  SQL Server's duplicate-key text, not the rule's sentence) and `.8` failed once it ran five
+  rounds. A single round of `.8` passed without the lock when row locks on the first insert
+  happened to serialize the second request's read. That is why `.8` runs five rounds. Three
+  Active-with-an-empty-section scratch versions from that control run remain in the dev database
+  (scratch residue nothing reads).
+
 ## Role grants and the user cache
 
 MJAPI builds each request's user from an in-memory cache populated at startup

@@ -1,4 +1,45 @@
-export interface CredentialingWorld {
+import type { UserInfo } from '@memberjunction/core';
+import type { ProgramTree } from './program-tree.js';
+
+/** An accrediting organization of the world, with the BizApps Common organization it stands for. */
+export interface WorldOrganization {
+    ID: string;
+    Name: string;
+    /** The BizApps Common `Organization` row behind this accrediting organization. */
+    OrganizationID: string;
+}
+
+/** A BizApps Committees committee of the world. */
+export interface WorldCommittee {
+    ID: string;
+    Name: string;
+}
+
+/** The users every credentialing check can act as. They hold no credentialing role yet. */
+export interface WorldUsers {
+    /** Staff member of OrgA (`staff.a@example.test`). */
+    StaffA: UserInfo;
+    /** Staff member of OrgB (`staff.b@example.test`). */
+    StaffB: UserInfo;
+    /** A user with no organization membership (`staff.none@example.test`). */
+    StaffNoMembership: UserInfo;
+}
+
+/** The organizations, committee and sample program the checks read. */
+export interface WorldData {
+    OrgA: WorldOrganization;
+    OrgB: WorldOrganization;
+    /** A committee owned by OrgA's Common organization. */
+    CommitteeA: WorldCommittee;
+    /**
+     * `Sample Certified Practitioner` in OrgA, with its Draft version `2027`. Read-only to checks:
+     * a check that changes a program makes its own with `MakeScratchProgram`.
+     */
+    SampleProgram: ProgramTree;
+}
+
+/** Everything a credentialing check can rely on existing. */
+export interface CredentialingWorld extends WorldUsers, WorldData {
     Loaded: boolean;
 }
 

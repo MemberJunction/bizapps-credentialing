@@ -4,6 +4,13 @@
  *
  *   node test-harnesses/integration.mjs
  *   node test-harnesses/integration.mjs cred-smoke
+ *
+ * Browser fidelity: this process loads only what a browser client loads. It imports the
+ * server-free client bootstrap and the CLIENT entity classes, then each requested bundle's own
+ * module through the package's `./checks/*` subpath — never the package barrel, which registers
+ * the server entity subclasses (`@mj-biz-apps/credentialing-core-entities-server`) and would make
+ * every "client" check exercise server code a browser never has
+ * (mj/packages/TestingFramework/testing-integration/src/registry.ts, B32).
  */
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -16,9 +23,20 @@ dotenv.config({ path: path.resolve(here, '../../mj/.env'), quiet: true });
 process.env.MJ_INTEGRATION_TEST = '1';
 process.env.RUN_MUTATION_TESTS = process.env.RUN_MUTATION_TESTS ?? '1';
 
+/** Bundles that run on this transport. */
 const ALL_BUNDLES = [
     'cred-smoke',
+    'cred-schema',
 ];
+
+/**
+ * Bundles that need the server transport (`mj test run`): they use the server entity subclasses'
+ * own seams and separate provider instances (CreateIndependentInstance) for their concurrency checks.
+ */
+const SERVER_ONLY_BUNDLES = {
+    'cred-version-rules': 'CRD-02 - Version rules',
+    'cred-standard-rules': 'CRD-03 - Standard rules',
+};
 
 const args = process.argv.slice(2);
 const only = args.filter((a) => !a.startsWith('-'));
@@ -28,7 +46,16 @@ const { Metadata } = await import('@memberjunction/core');
 const { IntegrationCheckRegistry } = await import('@memberjunction/testing-integration/registry');
 
 await bootstrapIntegrationClient();
-await import('../packages/IntegrationTests/dist/index.js');
+// The client entity classes, as Explorer loads them (by path: the repo root does not depend on the package).
+await import('../packages/Entities/dist/index.js');
+
+const requested = only.length ? only : ALL_BUNDLES;
+const bundleNames = [...new Set(requested.map((r) => r.split('.')[0]))];
+for (const bundle of bundleNames) {
+    if (bundle in SERVER_ONLY_BUNDLES) continue;
+    if (!ALL_BUNDLES.includes(bundle)) continue;
+    await import(`../packages/IntegrationTests/dist/checks/${bundle}.checks.js`);
+}
 
 const provider = Metadata.Provider;
 const user = provider.CurrentUser;
@@ -36,7 +63,6 @@ if (!user) throw new Error('GraphQL provider has no CurrentUser — check MJ_API
 
 const ctx = { User: user, Provider: provider, Schema: process.env.MJ_CORE_SCHEMA || '__mj', Storage: undefined };
 const registry = IntegrationCheckRegistry.Instance;
-const requested = only.length ? only : ALL_BUNDLES;
 let pass = 0;
 let fail = 0;
 
@@ -44,6 +70,11 @@ console.log(`\n  Credentialing integration (GraphQL → ${process.env.MJAPI_URL 
 
 for (const request of requested) {
     const [bundle, localId] = request.includes('.') ? request.split('.') : [request, null];
+    if (bundle in SERVER_ONLY_BUNDLES) {
+        console.error(`  server-only: ${request} — run it with: mj test run --name "${SERVER_ONLY_BUNDLES[bundle]}"`);
+        fail += 1;
+        continue;
+    }
     const checks = registry.GetBundle(bundle).filter((c) => !localId || c.Id === request);
     if (checks.length === 0) {
         console.error(`  unknown: ${request}`);

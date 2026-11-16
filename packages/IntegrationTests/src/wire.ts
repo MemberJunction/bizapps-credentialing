@@ -1,4 +1,4 @@
-import { BaseEntity, RunView, UserInfo, UserRoleInfo } from '@memberjunction/core';
+import { BaseEntity, CompositeKey, RunView, UserInfo, UserRoleInfo, type IMetadataProvider } from '@memberjunction/core';
 import {
     Assert,
     type IntegrationCheckContext,
@@ -51,6 +51,46 @@ export async function ExpectSaveRefused(entity: BaseEntity, expectedMessageFragm
         msg.includes(expectedMessageFragment),
         `Expected refusal message to include "${expectedMessageFragment}", got "${msg}"`,
     );
+}
+
+/** Deletes the entity and throws, with the delete's complete message, when the delete fails. */
+export async function RequireDelete(entity: BaseEntity, label: string): Promise<void> {
+    const deleted = await entity.Delete();
+    Assert(deleted, `${label} delete failed: ${entity.LatestResult?.CompleteMessage ?? 'unknown'}`);
+}
+
+/** Deletes the entity and throws unless the delete is refused with a message containing the fragment. */
+export async function ExpectDeleteRefused(entity: BaseEntity, expectedMessageFragment: string): Promise<void> {
+    const deleted = await entity.Delete();
+    Assert(!deleted, `Expected delete to be refused with "${expectedMessageFragment}", but it succeeded.`);
+    const msg = entity.LatestResult?.CompleteMessage ?? '';
+    Assert(
+        msg.includes(expectedMessageFragment),
+        `Expected refusal message to include "${expectedMessageFragment}", got "${msg}"`,
+    );
+}
+
+/**
+ * Loads one record by ID as an entity object of `asUser` (default: the context user) from `provider`
+ * (default: the context provider), and throws when it does not load.
+ */
+export async function LoadEntity<T extends BaseEntity>(
+    ctx: IntegrationCheckContext,
+    entityName: string,
+    id: string,
+    asUser?: UserInfo,
+    provider?: IMetadataProvider,
+): Promise<T> {
+    const entity = await (provider ?? ctx.Provider).GetEntityObject<T>(entityName, asUser ?? ctx.User);
+    const loaded = await entity.InnerLoad(CompositeKey.FromID(id));
+    Assert(loaded, `${entityName} ${id} did not load`);
+    return entity;
+}
+
+/** Counts the rows of `entityName` matching `filter`, read as the context user. */
+export async function CountRows(ctx: IntegrationCheckContext, entityName: string, filter: string): Promise<number> {
+    const rows = await FindRows<{ ID: string }>(ctx, entityName, filter, ['ID']);
+    return rows.length;
 }
 
 /** Runs a simple RunView as `asUser` (default: the context user) and throws when it fails. */
