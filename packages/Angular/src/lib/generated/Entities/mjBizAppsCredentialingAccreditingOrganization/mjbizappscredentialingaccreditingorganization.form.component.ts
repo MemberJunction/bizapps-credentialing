@@ -17,8 +17,8 @@ export class mjBizAppsCredentialingAccreditingOrganizationFormComponent extends 
         await super.ngOnInit();
         this.initSections([
             { sectionKey: 'details', sectionName: 'Details', isExpanded: true },
-            { sectionKey: 'mJBizAppsCredentialingPrograms', sectionName: 'Programs', isExpanded: false },
-            { sectionKey: 'mJBizAppsCredentialingOrganizationMemberships', sectionName: 'Organization Memberships', isExpanded: false }
+            { sectionKey: 'mJBizAppsCredentialingOrganizationMemberships', sectionName: 'Organization Memberships', isExpanded: false },
+            { sectionKey: 'mJBizAppsCredentialingPrograms', sectionName: 'Programs', isExpanded: false }
         ]);
     }
 }

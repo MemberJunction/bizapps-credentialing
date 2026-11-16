@@ -60,10 +60,30 @@ module.exports = {
   // because __mj.SchemaInfo.EntityNamePrefix holds at most 25 characters, while
   // 'MJ_BizApps_Credentialing: ' is 26 characters.
   newEntityDefaults: {
+    PermissionDefaults: {
+      AutoAddPermissionsForNewEntities: true,
+      Permissions: [
+        { RoleName: 'Developer', CanRead: true, CanCreate: true, CanUpdate: true, CanDelete: true },
+        { RoleName: 'Integration', CanRead: true, CanCreate: true, CanUpdate: true, CanDelete: true },
+      ],
+    },
     NameRulesBySchema: [
       { SchemaName: '${mj_core_schema}', EntityNamePrefix: 'MJ: ' },
       { SchemaName: '__mj_BizAppsCredentialing', EntityNamePrefix: 'MJ_BizApps_Credentialing: ', EntityNameSuffix: '' },
     ],
+  },
+
+  // Generate the schema application without a UI-role grant (Developer and Integration only).
+  // Organization isolation relies on row filters, so unfiltered UI grants are never emitted.
+  newSchemaDefaults: {
+    CreateNewApplicationWithSchemaName: true,
+    ApplicationRoleDefaults: {
+      AutoAddRolesForNewApplications: true,
+      Roles: [
+        { RoleName: 'Developer', CanAccess: true, CanAdmin: true },
+        { RoleName: 'Integration', CanAccess: true, CanAdmin: false },
+      ],
+    },
   },
 
   // ==========================================================================

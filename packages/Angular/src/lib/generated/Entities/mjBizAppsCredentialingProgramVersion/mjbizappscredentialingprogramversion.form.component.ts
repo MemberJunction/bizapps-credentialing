@@ -17,10 +17,10 @@ export class mjBizAppsCredentialingProgramVersionFormComponent extends BaseFormC
         await super.ngOnInit();
         this.initSections([
             { sectionKey: 'details', sectionName: 'Details', isExpanded: true },
-            { sectionKey: 'mJBizAppsCredentialingSections', sectionName: 'Sections', isExpanded: false },
+            { sectionKey: 'mJBizAppsCredentialingStandards', sectionName: 'Standards', isExpanded: false },
             { sectionKey: 'mJBizAppsCredentialingDocumentRequirements', sectionName: 'Document Requirements', isExpanded: false },
-            { sectionKey: 'mJBizAppsCredentialingProgramVersions', sectionName: 'Program Versions', isExpanded: false },
-            { sectionKey: 'mJBizAppsCredentialingStandards', sectionName: 'Standards', isExpanded: false }
+            { sectionKey: 'mJBizAppsCredentialingSections', sectionName: 'Sections', isExpanded: false },
+            { sectionKey: 'mJBizAppsCredentialingProgramVersions', sectionName: 'Program Versions', isExpanded: false }
         ]);
     }
 }

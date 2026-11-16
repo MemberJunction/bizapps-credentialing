@@ -198,6 +198,21 @@ Available Applications → Add Credentialing → Save Changes** (creating an
 `MJ: User Applications` row, `IsActive = 1`), after which opening `Credentialing`
 loads `CredentialingOverviewResource` at `/app/credentialing/Overview`.
 
+### Default CodeGen Role Grants (`mj.config.cjs`)
+
+Because this app isolates organizations with row-level security filters, an
+unfiltered `UI` grant would defeat organization isolation. Therefore
+`mj.config.cjs` overrides CodeGen's defaults in two places so CodeGen emits
+grants for `Developer` and `Integration` only (and never `UI`):
+
+- `newEntityDefaults.PermissionDefaults`: sets `AutoAddPermissionsForNewEntities: true`
+  with `Permissions` containing only `Developer` (full CRUD) and `Integration`
+  (full CRUD).
+- `newSchemaDefaults.ApplicationRoleDefaults`: sets
+  `AutoAddRolesForNewApplications: true` with `Roles` containing only
+  `Developer` (`CanAccess: true, CanAdmin: true`) and `Integration`
+  (`CanAccess: true, CanAdmin: false`) for the generated schema application.
+
 ## Signing in to Explorer as a chosen user
 
 By default, MJExplorer's local dev auth provider (`MJLocalDevProvider`,
