@@ -21,28 +21,35 @@
   },
   "license": "BUSL-1.1",
   "dependencies": {
+    "@mj-biz-apps/credentialing-core": "0.0.0",
     "@mj-biz-apps/credentialing-entities": "0.0.0"
   },
   "peerDependencies": {
-    "@angular/common": "^21.1.3",
-    "@angular/core": "^21.1.3",
-    "@angular/forms": "^21.1.3",
-    "@memberjunction/core-entities": "^6.1.0-edge.5",
-    "@memberjunction/global": "^6.1.0-edge.5",
-    "@memberjunction/ng-base-forms": "^6.1.0-edge.5",
-    "@memberjunction/ng-entity-viewer": "^6.1.0-edge.5",
-    "@memberjunction/ng-link-directives": "^6.1.0-edge.5",
-    "@memberjunction/ng-shared": "^6.1.0-edge.5"
+    "@angular/common": "^21.2.22",
+    "@angular/core": "^21.2.22",
+    "@angular/forms": "^21.2.22",
+    "@memberjunction/core": "^6.2.1",
+    "@memberjunction/core-entities": "^6.2.1",
+    "@memberjunction/global": "^6.2.1",
+    "@memberjunction/ng-base-application": "^6.2.1",
+    "@memberjunction/ng-base-forms": "^6.2.1",
+    "@memberjunction/ng-entity-viewer": "^6.2.1",
+    "@memberjunction/ng-link-directives": "^6.2.1",
+    "@memberjunction/ng-shared": "^6.2.1",
+    "@mj-biz-apps/committees-entities": "^1.5.0"
   },
   "devDependencies": {
-    "@angular/compiler": "21.1.3",
-    "@angular/compiler-cli": "21.1.3",
-    "@memberjunction/core-entities": "6.1.0-edge.5",
-    "@memberjunction/global": "6.1.0-edge.5",
-    "@memberjunction/ng-base-forms": "6.1.0-edge.5",
-    "@memberjunction/ng-entity-viewer": "6.1.0-edge.5",
-    "@memberjunction/ng-link-directives": "6.1.0-edge.5",
-    "@memberjunction/ng-shared": "6.1.0-edge.5",
+    "@angular/compiler": "21.2.22",
+    "@angular/compiler-cli": "21.2.22",
+    "@memberjunction/core": "6.2.2",
+    "@memberjunction/core-entities": "6.2.2",
+    "@memberjunction/global": "6.2.2",
+    "@memberjunction/ng-base-application": "6.2.2",
+    "@memberjunction/ng-base-forms": "6.2.2",
+    "@memberjunction/ng-entity-viewer": "6.2.2",
+    "@memberjunction/ng-link-directives": "6.2.2",
+    "@memberjunction/ng-shared": "6.2.2",
+    "@mj-biz-apps/committees-entities": "1.5.0",
     "typescript": "^5.9.3"
   }
 }

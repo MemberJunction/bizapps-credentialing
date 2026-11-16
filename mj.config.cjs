@@ -79,7 +79,7 @@ module.exports = {
   // you consume one — its entities ship in ITS published packages, so regenerating
   // them locally would produce a duplicate set. See
   // docs/template-docs/codegen-and-metadata-migrations.md.
-  excludeSchemas: ['sys', 'staging', 'dbo', '__mj', '__mj_BizAppsCommon', '__mj_BizAppsTasks'],
+  excludeSchemas: ['sys', 'staging', 'dbo', '__mj', '__mj_BizAppsCommon', '__mj_BizAppsTasks', '__mj_BizAppsCommittees'],
 
   // Schema → npm package for peer entity classes this app's CodeGen does NOT
   // generate (embeds + related-record collections). Distinct from:
@@ -90,6 +90,7 @@ module.exports = {
   entityImportPackages: {
     '__mj_BizAppsCommon': '@mj-biz-apps/common-entities',
     '__mj_BizAppsTasks': '@mj-biz-apps/tasks-entities',
+    '__mj_BizAppsCommittees': '@mj-biz-apps/committees-entities',
   },
 
   // ==========================================================================

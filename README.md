@@ -43,6 +43,8 @@ bizapps-common          People, Organizations, Addresses               __mj_BizA
       ▲
 bizapps-tasks           Tasks, Task Types (action hooks), Task Links   __mj_BizAppsTasks
       ▲
+bizapps-committees      Committees, Memberships, Meetings              __mj_BizAppsCommittees
+      ▲
 bizapps-credentialing   Credential Types, Requirements, Credentials,   __mj_BizAppsCredentialing   ◄── this app
                         Evidence, Verifications, Activity, hooks
       ▲
@@ -60,7 +62,7 @@ mj app install https://github.com/MemberJunction/bizapps-credentialing
 The installation process performs the following steps:
 1. Fetches `mj-app.json`;
 2. Validates MJ compatibility (`>=6.1.0-edge.5 <7.0.0`);
-3. Installs [BizApps Common](https://github.com/MemberJunction/bizapps-common) and [BizApps Tasks](https://github.com/MemberJunction/bizapps-tasks) if not present;
+3. Installs [BizApps Common](https://github.com/MemberJunction/bizapps-common), [BizApps Tasks](https://github.com/MemberJunction/bizapps-tasks) and [BizApps Committees](https://github.com/MemberJunction/bizapps-committees) if not present;
 4. Creates the `__mj_BizAppsCredentialing` schema;
 5. Runs Skyway migrations from `migrations/` (none yet);
 6. Installs the npm packages into the MJAPI and MJExplorer workspaces;

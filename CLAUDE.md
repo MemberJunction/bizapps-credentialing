@@ -111,7 +111,7 @@ written for people, a `primaryKey` on every metadata record) are in MJ's
    Explorer bootstrap import) are local-only — never commit them to MJ. The
    *linking* files are generated at the workspace parent, outside both repos, and
    are never committed anywhere.
-7. **Dependency schemas are read-only** — __mj_BizAppsCommon and __mj_BizAppsTasks belong to their apps; this repo never generates, migrates, or alters them (mj.config.cjs excludeSchemas + entityImportPackages).
+7. **Dependency schemas are read-only** — __mj_BizAppsCommon, __mj_BizAppsTasks and __mj_BizAppsCommittees belong to their apps; this repo never generates, migrates, or alters them (mj.config.cjs excludeSchemas + entityImportPackages).
 
 ## Build & dev commands
 
