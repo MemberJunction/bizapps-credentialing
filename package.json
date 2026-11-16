@@ -15,6 +15,7 @@
     "build:packages": "turbo --log-order=stream build --filter=\"@mj-biz-apps/credentialing-*\"",
     "dev:owner": "node scripts/dev/ensure-dev-owner.mjs",
     "test": "turbo --log-order=stream test --filter=\"@mj-biz-apps/credentialing-*\"",
+    "test:integration": "node test-harnesses/integration.mjs",
     "mj": "mj",
     "mj:migrate": "mj migrate --schema __mj_BizAppsCredentialing --dir ./migrations",
     "mj:codegen": "mj codegen",
@@ -47,11 +48,15 @@
     "@memberjunction/ng-link-directives": "6.2.2",
     "@memberjunction/ng-shared": "6.2.2",
     "@memberjunction/server": "6.2.2",
+    "@memberjunction/testing-integration": "6.2.2",
     "@types/node": "^22.10.0",
+    "@vitest/coverage-v8": "^4.0.18",
+    "dotenv": "^17.2.4",
     "simple-git": "^3.31.1",
     "tsc-alias": "^1.8.16",
     "turbo": "^2.7.3",
     "typescript": "^5.9.3",
+    "vitest": "^4.0.18",
     "zod": "^3.25.76"
   },
   "pnpm": {

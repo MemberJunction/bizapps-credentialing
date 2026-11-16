@@ -70,6 +70,16 @@ Workspace linking & build notes:
   run, re-apply both override sets (`@typespec/ts-http-runtime` + `@azure/*` pins and
   the 12 Angular `21.2.22` overrides) to parent `pnpm-workspace.yaml` and run
   `corepack pnpm install && corepack pnpm prune` at the workspace parent.
+- **Updating this repo's own `pnpm-lock.yaml` while linked:** the parent lockfile is the
+  workspace's and never replaces a member's (`mj/guides/OPEN_APP_WORKSPACE_LINKING_SPEC.md`
+  §2). After changing any `package.json` here, run `corepack pnpm install` at the workspace
+  parent (that is the install), then, from `bizapps-credentialing/`,
+  `corepack pnpm install --lockfile-only` — the same command `ci/merge_main_and_update_lock.mjs`
+  and `version:ci` use. It resolves against this repo's own `pnpm-workspace.yaml` and writes
+  only `pnpm-lock.yaml`: no entry under `bizapps-credentialing/node_modules` or
+  `packages/*/node_modules` changed (mtimes checked), and `dev workspace doctor` still passes.
+  `corepack pnpm install --lockfile-only --frozen-lockfile` exits 0 when the lockfile matches
+  the manifests, which is what CI's `pnpm install --frozen-lockfile` requires.
 - `node mj/packages/MJCLI/bin/run.js dev workspace doctor` verifies 0 failures and
   single-copy `@angular/core@21.2.22`, `@angular/common@21.2.22`, `@angular/compiler@21.2.22`,
   `rxjs@7.8.2`, `zone.js@0.16.0`.
@@ -257,6 +267,59 @@ before `corepack pnpm run build`.
    corepack pnpm run dev:owner
    ```
 7. From `mj/`, start MJAPI (`corepack pnpm run start:api`, port `4050`) and MJExplorer (`corepack pnpm run start:explorer`, port `4251`).
+8. From `bizapps-credentialing/`, build this app's packages (the `mj test` check module is
+   `packages/IntegrationTests/dist/index.js`) and push the integration test rows (`MJ: Tests`):
+   ```sh
+   corepack pnpm run build:packages
+   corepack pnpm exec mj sync push --dir=metadata-tests --ci
+   ```
+9. Set `MJ_API_KEY` in `bizapps-credentialing/.env` for the client-transport harness. It is
+   MJAPI's **system** API key — the same value as `MJ_API_KEY` in `mj/.env` — not a user
+   `mj_sk_…` key (see "Running tests" below). No key is created in Explorer or in the database.
+
+## Running tests
+
+All commands run from `bizapps-credentialing/` (verified against this instance).
+
+**Unit tests** (vitest, every `packages/*` package; packages with no tests pass via
+`passWithNoTests`):
+
+```sh
+corepack pnpm test                                                   # all packages, via turbo
+corepack pnpm --filter @mj-biz-apps/credentialing-core run test      # one package
+corepack pnpm --filter @mj-biz-apps/credentialing-core exec vitest run src/__tests__/smoke.test.ts   # one file
+```
+
+**Integration tests, server transport** (`mj test`, direct SQL provider; needed for
+multi-user checks). Reads `bizapps-credentialing/.env` and `bizapps-credentialing/mj.config.cjs`
+(`dbHost`/`dbDatabase`/`dbUsername`/`dbPassword` and `testing.checkModules`). Requires
+`corepack pnpm run build:packages` first and the `metadata-tests` rows pushed:
+
+```sh
+corepack pnpm exec mj sync push --dir=metadata-tests --ci
+MJ_INTEGRATION_TEST=1 RUN_MUTATION_TESTS=1 corepack pnpm mj test run --name "CRD-00 - Smoke"
+```
+
+`testing.checkModules` holds `path.join(__dirname, 'packages/IntegrationTests/dist/index.js')`,
+not the package name: `mj test` imports a bare specifier from its own location
+(`mj/packages/TestingFramework/CLI/src/utils/check-module-loader.ts`), where
+`@mj-biz-apps/credentialing-integration-tests` does not resolve (`MODULE_NOT_FOUND`), and a
+failed load only surfaces later as `Unknown integration check bundle`. A successful run prints
+`Loaded check modules: …/packages/IntegrationTests/dist/index.js (bundles added: 1)`.
+
+**Integration tests, client transport** (GraphQL against the running MJAPI on `4050`):
+
+```sh
+corepack pnpm run test:integration              # every bundle in ALL_BUNDLES
+corepack pnpm run test:integration cred-smoke   # one bundle (or one check: cred-smoke.1)
+```
+
+`test-harnesses/integration.mjs` loads `bizapps-credentialing/.env`, then `../mj/.env` (for
+`GRAPHQL_PORT=4050`; dotenv never overrides a value already set). `BootstrapIntegrationClient`
+(`mj/packages/TestingFramework/testing-integration/src/bootstrap-client.ts`) sends `MJ_API_KEY`
+as the `x-mj-api-key` header, which MJAPI accepts only when it equals its own system key
+(`mj/packages/MJServer/src/context.ts`, `GetUserPayload`) and then runs as the `System` user.
+A user API key (`mj_sk_…`, `x-api-key` header) is not used by this harness.
 
 ## Role grants and the user cache
 

@@ -1,3 +1,5 @@
+const path = require('node:path');
+
 /** @type {import('@memberjunction/config').MJConfig} */
 //
 // mj.config.cjs — MemberJunction configuration for the BizApps Credentialing repository.
@@ -14,6 +16,13 @@ module.exports = {
   // The npm package that receives generated entity subclasses. Must match
   // packages/Entities/package.json "name".
   entityPackageName: '@mj-biz-apps/credentialing-entities',
+
+  // `mj test` side-effect-imports these so the cred-* check bundles register before it runs.
+  // A path, not the package name: the CLI imports a bare specifier from its own location, where
+  // @mj-biz-apps/credentialing-integration-tests does not resolve (see docs/dev-instance.md).
+  testing: {
+    checkModules: [path.join(__dirname, 'packages/IntegrationTests/dist/index.js')],
+  },
 
   // Where each kind of generated artifact is written. These paths match this
   // template's packages/ layout — keep them in sync if you rename packages.
@@ -119,9 +128,21 @@ module.exports = {
   },
 
   // ==========================================================================
+  // Database connection, from .env (never hardcode). `mj test` reads these keys from the raw
+  // config without applying defaults, so they must be present here; the other commands
+  // resolve the same values from the environment.
+  // ==========================================================================
+  dbHost: process.env.DB_HOST ?? 'localhost',
+  dbPort: process.env.DB_PORT ? parseInt(process.env.DB_PORT, 10) : 1433,
+  dbDatabase: process.env.DB_DATABASE,
+  dbUsername: process.env.DB_USERNAME,
+  dbPassword: process.env.DB_PASSWORD,
+  coreSchema: process.env.MJ_CORE_SCHEMA || '__mj',
+
+  // ==========================================================================
   // Everything else is OPTIONAL and defaults sensibly:
   //   - settings / logging / advancedGeneration / forceRegeneration
-  //   - dbHost/dbPort/dbDatabase/... come from environment variables
+  //   - other connection settings (trust-certificate, codegen login) come from environment variables
   //   - graphqlPort etc. come from DEFAULT_SERVER_CONFIG
   // See the fully-commented example in the bizapps-common repository, or the
   // @memberjunction/config package, for the complete list.
