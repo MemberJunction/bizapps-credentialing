@@ -18,16 +18,61 @@ All repositories live as siblings inside a single workspace parent directory
 | `bizapps-credentialing/` | `MemberJunction/bizapps-credentialing` | branch `feature/b1-foundation` | `0.0.0` | Product app (`__mj_BizAppsCredentialing`) |
 
 Workspace linking & build notes:
-- `node mj/packages/MJCLI/bin/run.js dev workspace` generates `pnpm-workspace.yaml`
-  and `package.json` at the workspace parent and removes members' standalone
-  `node_modules`. Installs run **only at the workspace parent** (`corepack pnpm install`).
-- Parent `pnpm-workspace.yaml` pins transitive `@memberjunction/*` packages to
-  `6.2.2` and `@angular/{common,compiler,compiler-cli,core,forms}` to `21.2.22`.
-- On a cold checkout, `bizapps-tasks/packages/Angular/package.json` pins
-  `@mj-biz-apps/common-entities` at `5.63.0` while the linked sibling is `5.66.0`;
-  building `bizapps-common` first (`corepack pnpm --filter "@mj-biz-apps/common-*" run build`)
-  before running the full parent build resolves the ordering cleanly.
-- `node mj/packages/MJCLI/bin/run.js dev workspace doctor` verifies 0 workspace resolution failures.
+- `node mj/packages/MJCLI/bin/run.js dev workspace` generates `pnpm-workspace.yaml`,
+  `.npmrc`, `package.json`, and `.mj-dev-workspace.json` at the workspace parent and
+  removes members' standalone `node_modules`. Installs run **only at the workspace
+  parent** (`corepack pnpm install`).
+- **Step 2 failure 1 — `ERR_INTERNAL_ASSERTION` on `https-proxy-agent` (`parent build rc=1` and `doctor rc=1`):**
+  `mj dev workspace`'s `DeriveLockfilePins` (`mj/packages/MJCLI/src/lib/dev-workspace/lockfile.ts`)
+  pins direct importer dependencies and `@types/*`, leaving transitive-only packages
+  unpinned. Under Node `v24.15.0`, pnpm floated transitive `@typespec/ts-http-runtime`
+  to `0.3.10`, which pulled ESM-only `https-proxy-agent@9.1.0`; `@oclif/core@3.27.0`
+  (invoked by `@memberjunction/cli#build` `oclif manifest` in `ws-build.log` and by
+  `dev workspace doctor` `findCommand` in `ws-doctor.log`) triggered CJS `proxyPolicy.js`
+  to `require()` `https-proxy-agent@9.1.0` and threw
+  `ERR_INTERNAL_ASSERTION: Unexpected module status 0. Cannot require() ES Module .../https-proxy-agent@9.1.0/.../index.js`.
+  **Fix:** in parent `pnpm-workspace.yaml` `overrides:`, pin `@typespec/ts-http-runtime`
+  and its `@azure/*` siblings to `mj/pnpm-lock.yaml`'s versions:
+  `'@typespec/ts-http-runtime': '0.3.3'` (which keeps `https-proxy-agent` on `7.0.6`),
+  `'@azure-rest/ai-inference': '1.0.0-beta.6'`, `'@azure-rest/core-client': '2.5.1'`,
+  `'@azure/abort-controller': '2.1.2'`, `'@azure/communication-call-automation': '1.6.0'`,
+  `'@azure/core-auth': '1.10.1'`, `'@azure/core-client': '1.10.1'`,
+  `'@azure/core-http-compat': '2.3.2'`, `'@azure/core-rest-pipeline': '1.22.2'`,
+  `'@azure/core-tracing': '1.3.1'`, `'@azure/core-util': '1.13.1'`,
+  `'@azure/identity': '4.13.1'`, `'@azure/keyvault-secrets': '4.10.0'`,
+  `'@azure/logger': '1.3.0'`.
+- **Step 2 failure 2 — `@mj-biz-apps/tasks-ng` build ordering (`ws-build2.log`):**
+  `bizapps-tasks/packages/Angular/package.json` declares `"@mj-biz-apps/common-entities": "5.63.0"`
+  instead of `workspace:*` (`bizapps-common/` provides `5.66.0`), so `pnpm -r` does
+  not guarantee `bizapps-common` builds before `bizapps-tasks` on an unbuilt tree,
+  failing `tasks-ng` with `TS2307: Cannot find module '@mj-biz-apps/common-entities'`.
+  **Fix:** build `bizapps-common` first (`corepack pnpm --filter "@mj-biz-apps/common-*" run build`)
+  before running `corepack pnpm run build` at the workspace parent.
+- **Angular version in `MJExplorer` (`21.1.3` -> fixed to `21.2.22`):**
+  `AssembleParentOverrides` (`mj/packages/MJCLI/src/lib/dev-workspace/build.ts`) layers
+  `lockfilePins < memberOverrides`. Although lockfile pin derivation selected `21.2.22`,
+  `bizapps-committees/package.json` `pnpm.overrides` pinned 12 Angular packages
+  (`@angular/{animations,cli,common,compiler,compiler-cli,core,forms,localize,platform-browser,platform-browser-dynamic,router,service-worker}`)
+  to `21.1.3`, and `mj/package.json` `pnpm.overrides` did not declare those 12 keys —
+  so `bizapps-committees` superseded the `21.2.22` pins in parent `pnpm-workspace.yaml`
+  and `pnpm-lock.yaml`, causing `MJExplorer/node_modules/@angular/core` to install and
+  build at `21.1.3` alongside `@angular/elements@21.2.22` and `@angular/build@21.2.23`.
+  That is **wrong** for MJ 6.2.2: `mj/packages/MJExplorer/package.json` pins
+  `@angular/core: 21.2.22` and MJ 6.2.2 Angular packages (`@memberjunction/ng-*`)
+  require `^21.2.22`.
+  **Fix:** change those 12 `'21.1.3'` overrides in parent `pnpm-workspace.yaml` to
+  `'21.2.22'`, run `corepack pnpm install && corepack pnpm prune` at the workspace
+  parent, verify `dev workspace doctor` reports `@angular/core@21.2.22`,
+  `@angular/common@21.2.22`, `@angular/compiler@21.2.22` as single-copy, and rebuild.
+- **Durability across `mj dev workspace --force`:** **Neither override fix survives
+  `mj dev workspace --force`**, because `--force` overwrites parent `pnpm-workspace.yaml`
+  from member manifests/lockfiles (keeping a `.bak`). After any `dev workspace --force`
+  run, re-apply both override sets (`@typespec/ts-http-runtime` + `@azure/*` pins and
+  the 12 Angular `21.2.22` overrides) to parent `pnpm-workspace.yaml` and run
+  `corepack pnpm install && corepack pnpm prune` at the workspace parent.
+- `node mj/packages/MJCLI/bin/run.js dev workspace doctor` verifies 0 failures and
+  single-copy `@angular/core@21.2.22`, `@angular/common@21.2.22`, `@angular/compiler@21.2.22`,
+  `rxjs@7.8.2`, `zone.js@0.16.0`.
 
 ## Database, Ports & Routes
 
@@ -50,9 +95,18 @@ the user matching (1) requested `email` in the `POST /auth/dev-login` body,
 
 A clean database migrated with `mj migrate` + `mj sync push` contains only
 `System` (`not.set@nowhere.com`) and `Anonymous` (`anonymous@magic-link.local`).
-Create the local dev `Owner` user (`admin@memberjunction.org`, `Type = 'Owner'`,
-with roles `Developer`, `Integration`, and `UI`) using MJ entity objects
-(`Metadata.GetEntityObject('MJ: Users' / 'MJ: User Roles')`) before signing in.
+Provision the local dev `Owner` user (`admin@memberjunction.org`, `Type = 'Owner'`,
+roles `Developer`, `Integration`, and `UI`) via MJ entity objects using the
+idempotent repo script before signing in:
+
+```sh
+corepack pnpm run dev:owner
+```
+
+(`scripts/dev/ensure-dev-owner.mjs` reads `.env` in `bizapps-credentialing/` and
+uses `Metadata.GetEntityObject('MJ: Users' / 'MJ: User Roles' / 'MJ: User Applications')`;
+when `Credentialing` exists in `__mj.Application`, it also ensures the
+`MJ: User Applications` row.)
 
 ### Magic-Link & Dynamic Package Wiring (`mj/` local only — never commit)
 
@@ -134,7 +188,42 @@ Available Applications → Add Credentialing → Save Changes** (creating an
 `MJ: User Applications` row, `IsActive = 1`), after which opening `Credentialing`
 loads `CredentialingOverviewResource` at `/app/credentialing/Overview`.
 
+## Signing in to Explorer as a chosen user
+
+By default, MJExplorer's local dev auth provider (`MJLocalDevProvider`,
+`mj/packages/Angular/Explorer/auth-services/src/lib/providers/mjexplorer-local-dev-provider.service.ts`)
+reads `environment.LOCAL_DEV_EMAIL` (`mj/packages/MJExplorer/src/environments/environment.ts`);
+when unset, `acquireDevToken()` posts an empty body (`{}`) to
+`POST /auth/dev-login` on every `initialize()` call. On MJAPI,
+`ResolveLocalDevUser` (`mj/packages/MJServer/src/auth/localDevAuth.ts`) checks
+`MJ_DEV_AUTH_DEFAULT_EMAIL` (and `configInfo.devAuth.defaultEmail` in
+`mj/mj.config.cjs`) before falling back to `admin@memberjunction.org`.
+
+To open `http://localhost:4251` as any chosen existing user without editing
+Explorer source or restarting MJExplorer:
+
+1. Set `MJ_DEV_AUTH_DEFAULT_EMAIL=<user-email>` in `mj/.env` (which
+   `mj/packages/MJAPI/.env` symlinks to).
+2. **Restart MJAPI** so `dotenv/config` reloads `.env` and `UserCache.Instance.Users`
+   includes the user (and any newly added roles or applications).
+3. Reload `http://localhost:4251` in the browser; `MJLocalDevProvider` acquires a
+   fresh JWT for that user automatically (no MJExplorer restart needed).
+4. To return to `admin@memberjunction.org`, remove `MJ_DEV_AUTH_DEFAULT_EMAIL`
+   from `mj/.env`, restart MJAPI, and reload `http://localhost:4251`.
+
+(Alternatively, setting `LOCAL_DEV_EMAIL` in
+`mj/packages/MJExplorer/src/environments/environment.ts` causes Explorer to send
+`{ email }` in `POST /auth/dev-login`, which avoids editing `mj/.env` or restarting
+MJAPI after initial user creation, at the cost of recompiling MJExplorer.)
+
 ## Rebuild from nothing
+
+If `node mj/packages/MJCLI/bin/run.js dev workspace --force` is run at the
+workspace parent during recovery, re-apply the `@typespec/ts-http-runtime` /
+`@azure/*` pins and the 12 Angular `21.2.22` overrides to parent
+`pnpm-workspace.yaml`, then run `corepack pnpm install && corepack pnpm prune`
+at the workspace parent and `corepack pnpm --filter "@mj-biz-apps/common-*" run build`
+before `corepack pnpm run build`.
 
 1. Stop MJAPI (`4050`) and MJExplorer (`4251`) so no open connections hold the database.
 2. Drop (if present) and recreate the database:
@@ -151,18 +240,22 @@ loads `CredentialingOverviewResource` at `/app/credentialing/Overview`.
    corepack pnpm mj codegen --skipdb
    corepack pnpm run build
    ```
-4. Migrate dependency apps leaf-first (with `.env` in each sibling root), and create the local dev Owner user (`admin@memberjunction.org` with roles `Developer`, `Integration`, `UI`) via `Metadata.GetEntityObject('MJ: Users' / 'MJ: User Roles')`:
+4. Migrate dependency apps leaf-first (with `.env` in each sibling root), and provision the local dev Owner user (`admin@memberjunction.org` with roles `Developer`, `Integration`, `UI`) from `bizapps-credentialing/`:
    ```sh
    (cd ../bizapps-common && corepack pnpm run mj:migrate)
    (cd ../bizapps-tasks && corepack pnpm run mj:migrate)
    (cd ../bizapps-committees && corepack pnpm run mj:migrate)
+   corepack pnpm run dev:owner
    ```
 5. From `bizapps-credentialing/` (using `bizapps-credentialing/.env`), migrate and push app metadata (strip any `sync` blocks if keeping working tree clean):
    ```sh
    corepack pnpm run mj:migrate
    corepack pnpm exec mj sync push --dir=metadata --ci
    ```
-6. Grant `admin@memberjunction.org` an `MJ: User Applications` row for `Credentialing` via Explorer's **Application launcher → Configure…** UI (or an `md.GetEntityObject('MJ: User Applications', sysUser)` script, never raw SQL DML).
+6. Ensure `admin@memberjunction.org` has the `MJ: User Applications` row for `Credentialing` (either via `corepack pnpm run dev:owner` in `bizapps-credentialing/` when no browser is needed — idempotent via entity objects — or in Explorer via **Application launcher → Configure… → Available Applications → Add Credentialing → Save Changes**):
+   ```sh
+   corepack pnpm run dev:owner
+   ```
 7. From `mj/`, start MJAPI (`corepack pnpm run start:api`, port `4050`) and MJExplorer (`corepack pnpm run start:explorer`, port `4251`).
 
 ## Role grants and the user cache
