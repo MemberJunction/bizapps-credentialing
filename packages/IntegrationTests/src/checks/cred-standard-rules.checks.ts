@@ -14,7 +14,7 @@ import type {
     mjBizAppsCredentialingStandardEntity,
 } from '@mj-biz-apps/credentialing-entities';
 import { Outcome, WithActors } from '../actors.js';
-import { ExpectDeleteRefused, ExpectSaveRefused, LoadEntity, RequireDelete, RequireSave } from '../wire.js';
+import { CountRows, ExpectDeleteRefused, ExpectSaveRefused, LoadEntity, Quote, RequireDelete, RequireSave } from '../wire.js';
 import { GetOrLoadWorld } from '../world/load-world.js';
 import { MakeScratchProgram, type ProgramTree } from '../world/program-tree.js';
 
@@ -41,9 +41,13 @@ async function newStandard(ctx: IntegrationCheckContext, sectionID: string, code
     return standard;
 }
 
-/** A new section of `versionID` as the context user. */
-async function newSection(ctx: IntegrationCheckContext, versionID: string, number: string): Promise<SectionEntity> {
-    const section = await ctx.Provider.GetEntityObject<SectionEntity>(CredentialingEntity.Section, ctx.User);
+function duplicateSectionSentence(number: string): string {
+    return `Section number ${number} is already used in this version.`;
+}
+
+/** A new section of `versionID` as the context user, from `provider` when given. */
+async function newSection(ctx: IntegrationCheckContext, versionID: string, number: string, provider?: IMetadataProvider): Promise<SectionEntity> {
+    const section = await (provider ?? ctx.Provider).GetEntityObject<SectionEntity>(CredentialingEntity.Section, ctx.User);
     section.NewRecord();
     section.ProgramVersionID = versionID;
     section.Number = number;
@@ -233,6 +237,50 @@ const checks: NamedCheck[] = [
             const stored = await loadStandard(ctx, standardID);
             AssertEqual(stored.Statement, 'Statement from instance 1.', 'stored statement');
             AssertEqual(stored.Guidance, originalGuidance, 'stored guidance');
+        },
+    },
+    {
+        Id: 'cred-standard-rules.9',
+        Name: 'a section number already used in the version, also by case or spaces, is refused with a sentence; numbers are stored trimmed',
+        RequiresMutation: true,
+        Fn: async (ctx: IntegrationCheckContext) => {
+            const world = await GetOrLoadWorld(ctx);
+            const tree = await MakeScratchProgram(ctx, world, { Sections: 1, StandardsPerSection: 1 }, ctx.User);
+            const versionID = tree.Version.ID;
+            const lettered = await newSection(ctx, versionID, ' 9a ');
+            await RequireSave(lettered, 'adding section 9a');
+            AssertEqual(lettered.Number, '9a', 'the number is stored trimmed');
+            const existing = tree.Sections[0].Section.Number;
+            await ExpectSaveRefused(await newSection(ctx, versionID, existing), duplicateSectionSentence(existing));
+            await ExpectSaveRefused(await newSection(ctx, versionID, ` ${existing} `), duplicateSectionSentence(existing));
+            await ExpectSaveRefused(await newSection(ctx, versionID, '9A'), duplicateSectionSentence('9A'));
+            const renamed = await loadSection(ctx, lettered.ID);
+            renamed.Number = existing;
+            await ExpectSaveRefused(renamed, duplicateSectionSentence(existing));
+            AssertEqual(await CountRows(ctx, CredentialingEntity.Section, `ProgramVersionID = '${Quote(versionID)}'`), 2, 'sections of the version');
+        },
+    },
+    {
+        Id: 'cred-standard-rules.10',
+        Name: 'two concurrent creates of one section number leave one section and a sentence',
+        RequiresMutation: true,
+        Fn: async (ctx: IntegrationCheckContext) => {
+            const world = await GetOrLoadWorld(ctx);
+            const tree = await MakeScratchProgram(ctx, world, { Sections: 1, StandardsPerSection: 1 }, ctx.User);
+            const versionID = tree.Version.ID;
+            await WithActors(ctx, 2, async (actors) => {
+                const first = await newSection(ctx, versionID, '7', actors[0]);
+                const second = await newSection(ctx, versionID, '7', actors[1]);
+                const settled = await Promise.allSettled([first.Save(), second.Save()]);
+                const outcomes = [
+                    Outcome(settled[0], () => first.LatestResult?.CompleteMessage ?? ''),
+                    Outcome(settled[1], () => second.LatestResult?.CompleteMessage ?? ''),
+                ];
+                AssertEqual(outcomes.filter((o) => o.Succeeded).length, 1, `exactly one create succeeds (${outcomes.map((o) => o.Message).join(' | ')})`);
+                const loser = outcomes[0].Succeeded ? outcomes[1] : outcomes[0];
+                Assert(loser.Message.includes(duplicateSectionSentence('7')), `loser gives the duplicate-number sentence, got "${loser.Message}"`);
+            });
+            AssertEqual(await CountRows(ctx, CredentialingEntity.Section, `ProgramVersionID = '${Quote(versionID)}' AND Number = '7'`), 1, 'sections numbered 7');
         },
     },
 ];

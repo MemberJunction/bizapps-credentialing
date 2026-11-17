@@ -54,7 +54,7 @@ describe('ProgramWizardComponent', () => {
     });
 
     it('a refusal leaves the wizard open with the sentence beside the field it names, and emits nothing', async () => {
-        const message = "Violation of UNIQUE KEY constraint 'UQ_Program_AccreditingOrganizationID_Name'. Cannot insert duplicate key.";
+        const message = 'A program named Field Technician already exists in this organization.';
         vi.spyOn(CreateProgramOperation.prototype, 'Execute').mockResolvedValue({ Success: false, ResultCode: 'REFUSED', ErrorMessage: message });
         const c = createComponent();
         c.Organizations = [ORG_A];
@@ -71,6 +71,8 @@ describe('ProgramWizardComponent', () => {
     it('places refusals by the field they name', () => {
         expect(ProgramWizardComponent.FieldFor("Violation of UNIQUE KEY constraint 'UQ_Program_AccreditingOrganizationID_CredentialPrefix'.")).toBe('CredentialPrefix');
         expect(ProgramWizardComponent.FieldFor('Enter a label for this version.')).toBe('FirstVersionLabel');
+        expect(ProgramWizardComponent.FieldFor('A program named Field Technician already exists in this organization.')).toBe('Name');
+        expect(ProgramWizardComponent.FieldFor('Credential prefix SFT is already used in this organization.')).toBe('CredentialPrefix');
         expect(ProgramWizardComponent.FieldFor('Record not found.')).toBe('Form');
     });
 });

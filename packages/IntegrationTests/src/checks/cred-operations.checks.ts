@@ -60,6 +60,19 @@ function oneDraftSentence(label: string): string {
     return `This program already has a draft version (${label}). Finish or delete it before starting another.`;
 }
 
+function duplicateNameSentence(name: string): string {
+    return `A program named ${name} already exists in this organization.`;
+}
+
+function duplicatePrefixSentence(prefix: string): string {
+    return `Credential prefix ${prefix} is already used in this organization.`;
+}
+
+/** Programs of OrgA whose trimmed name or prefix matches, ignoring case — what a duplicate would add to. */
+async function programsLike(ctx: IntegrationCheckContext, world: CredentialingWorld, column: 'Name' | 'CredentialPrefix', value: string): Promise<number> {
+    return CountRows(ctx, CredentialingEntity.Program, `AccreditingOrganizationID = '${Quote(world.OrgA.ID)}' AND LOWER(LTRIM(RTRIM(${column}))) = '${Quote(value.trim().toLowerCase())}'`);
+}
+
 function noUserSentence(email: string): string {
     return `No user has the email address ${email}. Create the user first, then set up the organization.`;
 }
@@ -542,6 +555,54 @@ const checks: NamedCheck[] = [
             ExpectRefused(unknown, noUserSentence(unknownEmail), 'setup for an email no user has');
             AssertEqual(await CountRows(ctx, COMMON_ORGANIZATIONS_ENTITY, `Name = '${Quote(name)}'`), 0, 'Common organizations with the name');
             AssertEqual(await CountRows(ctx, CredentialingEntity.AccreditingOrganization, `Name = '${Quote(name)}'`), 0, 'accrediting organizations with the name');
+        },
+    },
+    {
+        Id: 'cred-operations.11',
+        Name: 'CreateProgram with a duplicate name or prefix, also by case or spaces, is refused with a sentence and creates nothing',
+        RequiresMutation: true,
+        Fn: async (ctx: IntegrationCheckContext) => {
+            const world = await GetOrLoadWorld(ctx);
+            const staff = world.StaffA;
+            const input = programInput(world, '2027');
+            ExpectOutput(await new CreateProgramOperation().Execute(input, { provider: ctx.Provider, user: staff }), 'CreateProgram');
+            const fresh = programInput(world, '2027');
+            const attempts: { Input: CreateProgramInput; Sentence: string; Label: string }[] = [
+                { Input: { ...fresh, Name: input.Name }, Sentence: duplicateNameSentence(input.Name), Label: 'the same name' },
+                { Input: { ...fresh, Name: `  ${input.Name.toUpperCase()} ` }, Sentence: duplicateNameSentence(input.Name.toUpperCase()), Label: 'the name in other case with spaces' },
+                { Input: { ...fresh, CredentialPrefix: input.CredentialPrefix }, Sentence: duplicatePrefixSentence(input.CredentialPrefix), Label: 'the same prefix' },
+                { Input: { ...fresh, CredentialPrefix: ` ${input.CredentialPrefix.toLowerCase()}  ` }, Sentence: duplicatePrefixSentence(input.CredentialPrefix.toLowerCase()), Label: 'the prefix in other case with spaces' },
+            ];
+            for (const attempt of attempts) {
+                const result = await new CreateProgramOperation().Execute(attempt.Input, { provider: ctx.Provider, user: staff });
+                ExpectRefused(result, attempt.Sentence, `CreateProgram with ${attempt.Label}`);
+                AssertEqual(result.ErrorMessage, attempt.Sentence, `the refusal is the sentence alone (${attempt.Label})`);
+            }
+            AssertEqual(await programsLike(ctx, world, 'Name', input.Name), 1, 'programs with the name');
+            AssertEqual(await programsLike(ctx, world, 'CredentialPrefix', input.CredentialPrefix), 1, 'programs with the prefix');
+            AssertEqual(await programsLike(ctx, world, 'Name', fresh.Name), 0, 'programs with the refused attempts\' own name');
+        },
+    },
+    {
+        Id: 'cred-operations.12',
+        Name: 'two simultaneous CreateProgram calls with one name give one program and one refusal with the sentence',
+        RequiresMutation: true,
+        Fn: async (ctx: IntegrationCheckContext) => {
+            const world = await GetOrLoadWorld(ctx);
+            const first = programInput(world, '2027');
+            const second = { ...programInput(world, '2027'), Name: first.Name };
+            const results = await WithActors(ctx, 2, (actors: IMetadataProvider[]) =>
+                Promise.all([
+                    new CreateProgramOperation().Execute(first, { provider: actors[0], user: world.StaffA }),
+                    new CreateProgramOperation().Execute(second, { provider: actors[1], user: world.StaffA }),
+                ]),
+            );
+            const messages = results.map((r) => `${r.Success ? 'ok' : r.ErrorMessage}`).join(' | ');
+            AssertEqual(results.filter((r) => r.Success).length, 1, `exactly one CreateProgram succeeds (${messages})`);
+            const loser = results.find((r) => !r.Success);
+            AssertEqual(loser?.ErrorMessage, duplicateNameSentence(first.Name), 'the loser gives the duplicate-name sentence');
+            AssertEqual(await programsLike(ctx, world, 'Name', first.Name), 1, 'programs with the name');
+            AssertEqual(await programsLike(ctx, world, 'CredentialPrefix', second.CredentialPrefix) + await programsLike(ctx, world, 'CredentialPrefix', first.CredentialPrefix), 1, 'programs with either prefix');
         },
     },
 ];

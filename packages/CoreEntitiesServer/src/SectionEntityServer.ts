@@ -1,7 +1,9 @@
 /**
  * Server-side subclass of Section — a section is edited only on a Draft version the caller can read,
- * stays in its version, and is deleted only once it holds no standards. Writes run under the
- * version's authoring lock (guards/AuthoringLock.ts).
+ * stays in its version, has a number unique within its version (trimmed, ignoring case; stored
+ * trimmed), and is deleted only once it holds no standards. Writes run under the version's authoring
+ * lock (guards/AuthoringLock.ts), so the number check and the write it guards are one step and two
+ * simultaneous saves of the same number give one row and one refusal with the sentence.
  */
 import {
     BaseEntity,
@@ -12,7 +14,7 @@ import {
     type EntitySaveOptions,
     type IMetadataProvider,
 } from '@memberjunction/core';
-import { RegisterClass } from '@memberjunction/global';
+import { RegisterClass, UUIDsEqual } from '@memberjunction/global';
 import { CredentialingEntity } from '@mj-biz-apps/credentialing-core';
 import { mjBizAppsCredentialingSectionEntity } from '@mj-biz-apps/credentialing-entities';
 import { LockedWrite } from './guards/LockedWrite.js';
@@ -28,6 +30,9 @@ export class SectionEntityServer extends mjBizAppsCredentialingSectionEntity {
     }
 
     public override async Save(options?: EntitySaveOptions): Promise<boolean> {
+        if (this.Number != null && this.Number !== this.Number.trim()) {
+            this.Number = this.Number.trim();
+        }
         return LockedWrite.Run(this, this.IsSaved ? 'update' : 'create', async () => {
             await this.AcquireAuthoringLocks();
             return super.Save(options);
@@ -77,7 +82,28 @@ export class SectionEntityServer extends mjBizAppsCredentialingSectionEntity {
             if (stale != null) return stale;
             if (LockedWrite.AnyChanged(this, ['ProgramVersionID'])) return 'A section cannot be moved to another version.';
         }
-        return VersionTree.EditRefusal(this.ProgramVersionID, this.ActiveUser, this.provider);
+        const edit = await VersionTree.EditRefusal(this.ProgramVersionID, this.ActiveUser, this.provider);
+        if (edit != null) {
+            return edit;
+        }
+        return !this.IsSaved || LockedWrite.AnyChanged(this, ['Number']) ? this.numberRefusal() : null;
+    }
+
+    /** Another section of this version with the same number (trimmed, ignoring case), read as the caller in one RunView. */
+    private async numberRefusal(): Promise<string | null> {
+        const number = (this.Number ?? '').trim();
+        if (number.length === 0) {
+            return null;
+        }
+        const res = await RunView.FromMetadataProvider(this.provider).RunView<{ ID: string; Number: string }>(
+            { EntityName: CredentialingEntity.Section, ExtraFilter: `ProgramVersionID = '${this.ProgramVersionID}'`, Fields: ['ID', 'Number'], ResultType: 'simple' },
+            this.ActiveUser,
+        );
+        if (!res.Success) {
+            throw new Error(`reading the version's sections failed: ${res.ErrorMessage}`);
+        }
+        const taken = res.Results.some((s) => !(this.IsSaved && UUIDsEqual(s.ID, this.ID)) && (s.Number ?? '').trim().toLowerCase() === number.toLowerCase());
+        return taken ? `Section number ${number} is already used in this version.` : null;
     }
 
     private async deleteRefusal(): Promise<string | null> {

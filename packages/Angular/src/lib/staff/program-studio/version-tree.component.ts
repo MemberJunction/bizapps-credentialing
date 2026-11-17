@@ -26,7 +26,7 @@ import type { mjBizAppsCredentialingProgramVersionEntity, mjBizAppsCredentialing
 import type { mjBizAppsCredentialingStandardEntity } from '@mj-biz-apps/credentialing-entities';
 import type { ProgramBundle, SectionRow, StandardRow } from './studio-data';
 import type { NewStandardTarget } from './standard-editor.component';
-import { StudioTree, type SequenceChange, type TreeSection } from './studio-tree';
+import { StudioTree, type SectionErrorField, type SequenceChange, type TreeSection } from './studio-tree';
 import { StudioViewModel, type StudioVersionView } from './studio-view-model';
 
 type VersionEntity = mjBizAppsCredentialingProgramVersionEntity;
@@ -99,6 +99,12 @@ export class VersionTreeComponent extends BaseAngularComponent {
 
     public ErrorFor(target: TreeErrorTarget): string {
         return this.ErrorTarget != null && this.ErrorTarget.toLowerCase() === target.toLowerCase() ? this.ErrorMessage : '';
+    }
+
+    /** The refusal for a section form's field (`target` is `new-section` or the section's ID), or ''. */
+    public SectionErrorFor(target: TreeErrorTarget, field: SectionErrorField): string {
+        const message = this.ErrorFor(target);
+        return message && StudioTree.SectionFieldFor(message) === field ? message : '';
     }
 
     public SelectStandard(standard: StandardRow): void {

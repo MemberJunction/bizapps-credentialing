@@ -22,6 +22,9 @@ interface Ordered {
     Sequence: number;
 }
 
+/** Which field of the section form a refusal concerns. */
+export type SectionErrorField = 'Number' | 'Form';
+
 /** Which field of the standard editor a refusal concerns. */
 export type StandardErrorField = 'Code' | 'Statement' | 'IsInterpretive' | 'Form';
 
@@ -73,6 +76,11 @@ export class StudioTree {
     /** The `Sequence` for a row added after its siblings. */
     public static NextSequence(siblings: readonly Ordered[]): number {
         return siblings.reduce((max, s) => Math.max(max, s.Sequence), 0) + 1;
+    }
+
+    /** The section field a server refusal names (`Section number 1 is already used in this version.`). */
+    public static SectionFieldFor(message: string): SectionErrorField {
+        return /\bsection number\b/i.test(message) ? 'Number' : 'Form';
     }
 
     /** The standard field a server refusal names, so it renders beside that field. */

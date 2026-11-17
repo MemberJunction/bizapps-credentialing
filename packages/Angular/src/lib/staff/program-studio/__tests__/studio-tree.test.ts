@@ -60,6 +60,11 @@ describe('StudioTree helpers', () => {
         expect(StudioTree.StandardFieldFor('Sections and standards can only be edited on a Draft version. Use "Edit in draft" to create one.')).toBe('Form');
         expect(StudioTree.StandardFieldFor('Record not found.')).toBe('Form');
     });
+
+    it('places a duplicate section number beside the Number field and anything else on the form', () => {
+        expect(StudioTree.SectionFieldFor('Section number 1 is already used in this version.')).toBe('Number');
+        expect(StudioTree.SectionFieldFor("Remove this section's standards before deleting it.")).toBe('Form');
+    });
 });
 
 describe('StudioViewModel.PickVersion', () => {

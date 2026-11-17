@@ -132,8 +132,8 @@ export class ProgramWizardComponent extends BaseAngularComponent {
     }
 
     /**
-     * The field a server refusal names — in its sentence, or in the unique constraint a duplicate
-     * name or prefix runs into (`UQ_Program_AccreditingOrganizationID_Name` / `_CredentialPrefix`).
+     * The field a server refusal names: `A program named … already exists in this organization.`
+     * beside Name, `Credential prefix … is already used in this organization.` beside Prefix.
      */
     public static FieldFor(message: string): WizardErrorField {
         if (/prefix/i.test(message)) {
