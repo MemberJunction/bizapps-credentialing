@@ -12,6 +12,7 @@ export * from './wire.js';
 export * from './actors.js';
 export * from './world/world.js';
 export * from './world/program-tree.js';
+export * from './world/placeholder-organization-program.js';
 export * from './world/load-world.js';
 export * from './checks/cred-smoke.checks.js';
 export * from './checks/cred-schema.checks.js';
@@ -19,5 +20,6 @@ export * from './checks/cred-version-rules.checks.js';
 export * from './checks/cred-standard-rules.checks.js';
 export * from './checks/cred-operations.checks.js';
 export * from './checks/cred-isolation.checks.js';
+export * from './checks/cred-world.checks.js';
 
 export function LoadCredentialingIntegrationTests(): void {}

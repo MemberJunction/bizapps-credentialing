@@ -106,6 +106,7 @@ export async function FindRows<T extends object>(
             EntityName: entityName,
             ExtraFilter: filter,
             Fields: fields,
+            IgnoreMaxRows: true,
             ResultType: 'simple',
         },
         asUser ?? ctx.User,

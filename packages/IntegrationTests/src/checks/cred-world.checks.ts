@@ -1,0 +1,297 @@
+/**
+ * `cred-world` and `cred-users` — world seeding and self-repairing tree verification.
+ *
+ * `cred-world` runs on both transports: `pnpm run seed:dev` executes it over GraphQL as the
+ * System user, and `mj test run --name "CRD-06 - World"` runs it on the server transport.
+ * `cred-users` runs `EnsureWorldUsers` only (users, roles, and app access — no organization),
+ * used by `pnpm run seed:users` for first-run setup verification.
+ *
+ * This module imports nothing from `@mj-biz-apps/credentialing-core-entities-server`.
+ */
+import { randomUUID } from 'node:crypto';
+import type { UserInfo } from '@memberjunction/core';
+import { UUIDsEqual } from '@memberjunction/global';
+import {
+    Assert,
+    AssertEqual,
+    IntegrationCheckRegistry,
+    type IntegrationCheckContext,
+    type NamedCheck,
+} from '@memberjunction/testing-integration/registry';
+import { CredentialingEntity } from '@mj-biz-apps/credentialing-core';
+import { CountRows, FindRows, Quote, RequireDelete } from '../wire.js';
+import { ADMIN_ROLE, APPLICANT_ROLE, EnsureWorldUsers, GetOrLoadWorld, LoadWorld, STAFF_ROLE, UI_ROLE } from '../world/load-world.js';
+import { PLACEHOLDER_PROGRAM_NAME } from '../world/placeholder-organization-program.js';
+import { EnsureProgramTree, type ProgramTreeSpec, type SectionSpec, type StandardSpec } from '../world/program-tree.js';
+import type { CredentialingWorld } from '../world/world.js';
+
+interface StandardSummaryRow {
+    ID: string;
+    Code: string;
+    ResponseType: string;
+    IntakeMode: string;
+    EvidenceHint: string | null;
+    IsInterpretive: boolean;
+    IsNewForVersion: boolean;
+}
+
+interface VersionSummaryRow {
+    ID: string;
+    Status: string;
+}
+
+interface RequirementSummaryRow {
+    ID: string;
+    Name: string;
+    IsRequired: boolean;
+    SensitivityPolicy: string;
+}
+
+function hasRole(user: UserInfo, roleName: string): boolean {
+    return user.UserRoles.some((r) => r.Role === roleName);
+}
+
+function buildRepairSpec(organizationID: string): ProgramTreeSpec {
+    const hex = randomUUID().replace(/-/g, '').slice(0, 8);
+    const sections: SectionSpec[] = [];
+    for (let s = 1; s <= 3; s++) {
+        const standards: StandardSpec[] = [];
+        for (let n = 1; n <= 2; n++) {
+            standards.push({
+                Code: `${s}.${n}`,
+                Statement: `Repair check standard ${s}.${n}.`,
+                ResponseType: 'Attestation',
+                Sequence: n,
+            });
+        }
+        sections.push({ Number: `${s}`, Name: `Repair section ${s}`, Sequence: s, Standards: standards });
+    }
+    return {
+        AccreditingOrganizationID: organizationID,
+        Program: {
+            Name: `Repair ${hex}`,
+            ProgramType: 'Certification',
+            SubjectType: 'Person',
+            SubjectNoun: 'professional',
+            CredentialPrefix: `R${hex.toUpperCase()}`,
+        },
+        Version: { Label: '2027', CommitteeID: null },
+        Sections: sections,
+        DocumentRequirements: [],
+    };
+}
+
+async function verifyPlaceholderProgram(ctx: IntegrationCheckContext, world: CredentialingWorld): Promise<string> {
+    AssertEqual(world.PlaceholderProgram.Program.Name, PLACEHOLDER_PROGRAM_NAME, 'world placeholder program name');
+    AssertEqual(world.PlaceholderProgram.Sections.length, 12, 'world placeholder sections');
+    AssertEqual(
+        world.PlaceholderProgram.Sections.reduce((sum, s) => sum + s.Standards.length, 0),
+        36,
+        'world placeholder standards',
+    );
+    AssertEqual(world.PlaceholderProgram.DocumentRequirements.length, 5, 'world placeholder document requirements');
+
+    const programs = await FindRows<{ ID: string }>(
+        ctx,
+        CredentialingEntity.Program,
+        `AccreditingOrganizationID = '${Quote(world.OrgA.ID)}' AND Name = '${Quote(PLACEHOLDER_PROGRAM_NAME)}'`,
+        ['ID'],
+    );
+    AssertEqual(programs.length, 1, 'placeholder program count in OrgA');
+    Assert(UUIDsEqual(world.PlaceholderProgram.Program.ID, programs[0].ID), 'placeholder program ID matches stored row');
+
+    const versions = await FindRows<VersionSummaryRow>(
+        ctx,
+        CredentialingEntity.ProgramVersion,
+        `ProgramID = '${Quote(programs[0].ID)}' AND Label = '2027'`,
+        ['ID', 'Status'],
+    );
+    AssertEqual(versions.length, 1, 'placeholder version count');
+    AssertEqual(versions[0].Status, 'Draft', 'placeholder version status');
+    const versionID = versions[0].ID;
+
+    AssertEqual(await CountRows(ctx, CredentialingEntity.Section, `ProgramVersionID = '${Quote(versionID)}'`), 12, 'placeholder sections');
+    await verifyPlaceholderStandards(ctx, versionID);
+    await verifyPlaceholderRequirements(ctx, versionID);
+    return versionID;
+}
+
+async function verifyPlaceholderStandards(ctx: IntegrationCheckContext, versionID: string): Promise<void> {
+    const standards = await FindRows<StandardSummaryRow>(
+        ctx,
+        CredentialingEntity.Standard,
+        `ProgramVersionID = '${Quote(versionID)}'`,
+        ['ID', 'Code', 'ResponseType', 'IntakeMode', 'EvidenceHint', 'IsInterpretive', 'IsNewForVersion'],
+    );
+    AssertEqual(standards.length, 36, 'placeholder standards');
+    AssertEqual(standards.filter((s) => s.IsInterpretive).length, 1, 'interpretive standards in placeholder program');
+
+    const s41 = standards.find((s) => s.Code === '4.1');
+    Assert(s41 != null, 'standard 4.1 exists');
+    AssertEqual(s41.ResponseType, 'Evidence', '4.1 response type');
+    AssertEqual(s41.IntakeMode, 'Prefill', '4.1 intake mode');
+    AssertEqual(s41.EvidenceHint, 'Audited financial statements, notes to the financial statements', '4.1 evidence hint');
+
+    const s123 = standards.find((s) => s.Code === '12.3');
+    Assert(s123 != null && s123.IsInterpretive, 'standard 12.3 is interpretive');
+    AssertEqual(s123.ResponseType, 'Narrative', '12.3 response type');
+
+    const section12 = standards.filter((s) => s.Code.startsWith('12.'));
+    AssertEqual(section12.length, 3, 'section 12 standards');
+    Assert(section12.every((s) => s.IsNewForVersion), 'section 12 standards have IsNewForVersion = true');
+}
+
+async function verifyPlaceholderRequirements(ctx: IntegrationCheckContext, versionID: string): Promise<void> {
+    const requirements = await FindRows<RequirementSummaryRow>(
+        ctx,
+        CredentialingEntity.DocumentRequirement,
+        `ProgramVersionID = '${Quote(versionID)}'`,
+        ['ID', 'Name', 'IsRequired', 'SensitivityPolicy'],
+    );
+    AssertEqual(requirements.length, 5, 'placeholder document requirements');
+    AssertEqual(requirements.filter((r) => r.IsRequired && r.SensitivityPolicy === 'Normal').length, 3, 'required Normal document requirements');
+    AssertEqual(
+        requirements.filter((r) => !r.IsRequired && r.SensitivityPolicy === 'Restricted Allowed').length,
+        2,
+        'optional Restricted Allowed document requirements',
+    );
+}
+
+async function verifyReloadIdempotency(ctx: IntegrationCheckContext, world: CredentialingWorld, versionID: string): Promise<void> {
+    const beforePrograms = await CountRows(ctx, CredentialingEntity.Program, `AccreditingOrganizationID = '${Quote(world.OrgA.ID)}'`);
+    const beforeOrgs = await CountRows(ctx, CredentialingEntity.AccreditingOrganization, '');
+    const beforeUsers = await CountRows(ctx, 'MJ: Users', `Email LIKE '%@example.test'`);
+
+    // Bypass the in-memory singleton cache so the full ensure pass runs against the database again.
+    await LoadWorld(ctx);
+
+    AssertEqual(
+        await CountRows(ctx, CredentialingEntity.Program, `AccreditingOrganizationID = '${Quote(world.OrgA.ID)}'`),
+        beforePrograms,
+        'OrgA programs unchanged after second load',
+    );
+    AssertEqual(
+        await CountRows(ctx, CredentialingEntity.Section, `ProgramVersionID = '${Quote(versionID)}'`),
+        12,
+        'placeholder sections unchanged after second load',
+    );
+    AssertEqual(
+        await CountRows(ctx, CredentialingEntity.Standard, `ProgramVersionID = '${Quote(versionID)}'`),
+        36,
+        'placeholder standards unchanged after second load',
+    );
+    AssertEqual(
+        await CountRows(ctx, CredentialingEntity.DocumentRequirement, `ProgramVersionID = '${Quote(versionID)}'`),
+        5,
+        'placeholder requirements unchanged after second load',
+    );
+    AssertEqual(
+        await CountRows(ctx, CredentialingEntity.AccreditingOrganization, ''),
+        beforeOrgs,
+        'accrediting organizations unchanged after second load',
+    );
+    AssertEqual(
+        await CountRows(ctx, 'MJ: Users', `Email LIKE '%@example.test'`),
+        beforeUsers,
+        'world users unchanged after second load',
+    );
+}
+
+const checks: NamedCheck[] = [
+    {
+        Id: 'cred-world.1',
+        Name: 'placeholder program has 12 sections, 36 standards, 5 requirements, 1 interpretive standard, and reloads idempotently',
+        RequiresMutation: true,
+        Fn: async (ctx: IntegrationCheckContext) => {
+            const world = await GetOrLoadWorld(ctx);
+            const versionID = await verifyPlaceholderProgram(ctx, world);
+            await verifyReloadIdempotency(ctx, world, versionID);
+        },
+    },
+    {
+        Id: 'cred-world.2',
+        Name: 'EnsureProgramTree repairs a partially deleted tree while preserving surviving IDs',
+        RequiresMutation: true,
+        Fn: async (ctx: IntegrationCheckContext) => {
+            const world = await GetOrLoadWorld(ctx);
+            const spec = buildRepairSpec(world.OrgA.ID);
+            const first = await EnsureProgramTree(ctx, spec, ctx.User);
+            AssertEqual(first.Sections.length, 3, 'initial sections');
+            AssertEqual(first.Sections.reduce((sum, s) => sum + s.Standards.length, 0), 6, 'initial standards');
+
+            const deletedSection = first.Sections[1];
+            for (const standard of deletedSection.Standards) {
+                await RequireDelete(standard, `repair standard ${standard.Code}`);
+            }
+            await RequireDelete(deletedSection.Section, `repair section ${deletedSection.Section.Number}`);
+
+            AssertEqual(
+                await CountRows(ctx, CredentialingEntity.Section, `ProgramVersionID = '${Quote(first.Version.ID)}'`),
+                2,
+                'sections after partial delete',
+            );
+            AssertEqual(
+                await CountRows(ctx, CredentialingEntity.Standard, `ProgramVersionID = '${Quote(first.Version.ID)}'`),
+                4,
+                'standards after partial delete',
+            );
+
+            const repaired = await EnsureProgramTree(ctx, spec, ctx.User);
+            AssertEqual(repaired.Sections.length, 3, 'repaired sections');
+            AssertEqual(repaired.Sections.reduce((sum, s) => sum + s.Standards.length, 0), 6, 'repaired standards');
+            AssertEqual(
+                await CountRows(ctx, CredentialingEntity.Section, `ProgramVersionID = '${Quote(first.Version.ID)}'`),
+                3,
+                'stored sections after repair',
+            );
+            AssertEqual(
+                await CountRows(ctx, CredentialingEntity.Standard, `ProgramVersionID = '${Quote(first.Version.ID)}'`),
+                6,
+                'stored standards after repair',
+            );
+
+            Assert(UUIDsEqual(repaired.Program.ID, first.Program.ID), 'program kept its ID');
+            Assert(UUIDsEqual(repaired.Version.ID, first.Version.ID), 'version kept its ID');
+            for (const survivingIndex of [0, 2]) {
+                Assert(
+                    UUIDsEqual(repaired.Sections[survivingIndex].Section.ID, first.Sections[survivingIndex].Section.ID),
+                    `surviving section ${survivingIndex + 1} kept its ID`,
+                );
+                for (let j = 0; j < 2; j++) {
+                    Assert(
+                        UUIDsEqual(repaired.Sections[survivingIndex].Standards[j].ID, first.Sections[survivingIndex].Standards[j].ID),
+                        `surviving standard ${survivingIndex + 1}.${j + 1} kept its ID`,
+                    );
+                }
+            }
+            Assert(
+                !UUIDsEqual(repaired.Sections[1].Section.ID, deletedSection.Section.ID),
+                'deleted section was recreated with a new ID',
+            );
+        },
+    },
+    {
+        Id: 'cred-users.1',
+        Name: 'EnsureWorldUsers provisions the six world accounts and their roles without creating organizations',
+        RequiresMutation: true,
+        Fn: async (ctx: IntegrationCheckContext) => {
+            const beforeOrgs = await CountRows(ctx, CredentialingEntity.AccreditingOrganization, '');
+            const users = await EnsureWorldUsers(ctx);
+            Assert(hasRole(users.StaffA, STAFF_ROLE), 'StaffA holds Credentialing Staff');
+            Assert(hasRole(users.StaffB, STAFF_ROLE), 'StaffB holds Credentialing Staff');
+            Assert(hasRole(users.StaffNoMembership, STAFF_ROLE), 'StaffNoMembership holds Credentialing Staff');
+            Assert(hasRole(users.Admin, ADMIN_ROLE), 'Admin holds Credentialing Admin');
+            Assert(hasRole(users.UIOnly, UI_ROLE), 'UIOnly holds UI');
+            Assert(hasRole(users.ApplicantA, APPLICANT_ROLE), 'ApplicantA holds Credentialing Applicant');
+            AssertEqual(
+                await CountRows(ctx, CredentialingEntity.AccreditingOrganization, ''),
+                beforeOrgs,
+                'EnsureWorldUsers creates no accrediting organizations',
+            );
+        },
+    },
+];
+
+for (const check of checks) {
+    IntegrationCheckRegistry.Instance.Register(check);
+}

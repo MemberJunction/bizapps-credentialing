@@ -28,7 +28,14 @@ const ALL_BUNDLES = [
     'cred-smoke',
     'cred-schema',
     'cred-operations-wire',
+    'cred-world',
+    'cred-users',
 ];
+
+/** Bundles registered inside another bundle's `.checks.js` module. */
+const BUNDLE_MODULES = {
+    'cred-users': 'cred-world',
+};
 
 /**
  * Bundles that need the server transport (`mj test run`): they use the server entity subclasses'
@@ -54,10 +61,13 @@ await import('../packages/Entities/dist/index.js');
 
 const requested = only.length ? only : ALL_BUNDLES;
 const bundleNames = [...new Set(requested.map((r) => r.split('.')[0]))];
-for (const bundle of bundleNames) {
-    if (bundle in SERVER_ONLY_BUNDLES) continue;
-    if (!ALL_BUNDLES.includes(bundle)) continue;
-    await import(`../packages/IntegrationTests/dist/checks/${bundle}.checks.js`);
+const moduleNames = [...new Set(
+    bundleNames
+        .filter((bundle) => !(bundle in SERVER_ONLY_BUNDLES) && ALL_BUNDLES.includes(bundle))
+        .map((bundle) => BUNDLE_MODULES[bundle] ?? bundle),
+)];
+for (const moduleName of moduleNames) {
+    await import(`../packages/IntegrationTests/dist/checks/${moduleName}.checks.js`);
 }
 
 const provider = Metadata.Provider;

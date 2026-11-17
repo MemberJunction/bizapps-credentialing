@@ -1,14 +1,15 @@
 import type { BaseEntity, UserInfo } from '@memberjunction/core';
 import type { MJUserApplicationEntity, MJUserEntity, MJUserRoleEntity } from '@memberjunction/core-entities';
 import { Assert, type IntegrationCheckContext } from '@memberjunction/testing-integration/registry';
-import type { mjBizAppsCommonOrganizationEntity } from '@mj-biz-apps/common-entities';
-import type { mjBizAppsCommitteesCommitteeEntity } from '@mj-biz-apps/committees-entities';
+import { LoadGeneratedEntities as LoadCommonEntities, type mjBizAppsCommonOrganizationEntity } from '@mj-biz-apps/common-entities';
+import { LoadGeneratedEntities as LoadCommitteesEntities, type mjBizAppsCommitteesCommitteeEntity } from '@mj-biz-apps/committees-entities';
 import { CredentialingEntity } from '@mj-biz-apps/credentialing-core';
 import type {
     mjBizAppsCredentialingAccreditingOrganizationEntity,
     mjBizAppsCredentialingOrganizationMembershipEntity,
 } from '@mj-biz-apps/credentialing-entities';
 import { FindRows, LoadUserInfo, Quote, RequireSave, View } from '../wire.js';
+import { PlaceholderOrganizationProgramSpec } from './placeholder-organization-program.js';
 import { EnsureProgramTree, type ProgramTreeSpec } from './program-tree.js';
 import {
     GetWorld,
@@ -32,6 +33,10 @@ const COMMITTEES_ENTITY = 'Committees: Committees';
 const COMMITTEE_TYPES_ENTITY = 'Committees: Types';
 /** A committee type shipped in BizApps Committees' own seed data. */
 const COMMITTEE_TYPE_NAME = 'Standing Committee';
+
+// Ensure client entity subclasses for dependency apps are registered even when loaded via client harness.
+LoadCommonEntities();
+LoadCommitteesEntities();
 
 const STAFF_A_EMAIL = 'staff.a@example.test';
 const STAFF_B_EMAIL = 'staff.b@example.test';
@@ -290,8 +295,16 @@ export async function EnsureWorldData(ctx: IntegrationCheckContext): Promise<Wor
     await ensureMembership(ctx, orgB, await LoadUserInfo(ctx, STAFF_B_EMAIL));
     const committeeA = await ensureCommittee(ctx, orgA);
     const sampleProgram = await EnsureProgramTree(ctx, sampleProgramSpec(orgA, committeeA), ctx.User);
+    const placeholderProgram = await EnsureProgramTree(ctx, PlaceholderOrganizationProgramSpec(orgA.ID), ctx.User);
     const programB = await EnsureProgramTree(ctx, programBSpec(orgB), ctx.User);
-    return { OrgA: orgA, OrgB: orgB, CommitteeA: committeeA, SampleProgram: sampleProgram, ProgramB: programB };
+    return {
+        OrgA: orgA,
+        OrgB: orgB,
+        CommitteeA: committeeA,
+        SampleProgram: sampleProgram,
+        PlaceholderProgram: placeholderProgram,
+        ProgramB: programB,
+    };
 }
 
 export async function LoadWorld(ctx: IntegrationCheckContext): Promise<CredentialingWorld> {

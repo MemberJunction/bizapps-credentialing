@@ -47,6 +47,11 @@ export interface WorldData {
      * a check that changes a program makes its own with `MakeScratchProgram`.
      */
     SampleProgram: ProgramTree;
+    /**
+     * `Placeholder Organization Program (sample data)` in OrgA, with its Draft version `2027`.
+     * Read-only to checks.
+     */
+    PlaceholderProgram: ProgramTree;
     /** `Sample Program B` in OrgB, StaffB's organization, with its Draft version `2027`. Read-only to checks. */
     ProgramB: ProgramTree;
 }

@@ -25,7 +25,10 @@ export interface StandardSpec {
     Code: string;
     Statement: string;
     ResponseType: StandardEntity['ResponseType'];
+    IntakeMode?: StandardEntity['IntakeMode'];
+    EvidenceHint?: string | null;
     IsInterpretive?: boolean;
+    IsNewForVersion?: boolean;
     Sequence: number;
 }
 
@@ -40,6 +43,8 @@ export interface SectionSpec {
 /** One document requirement of a tree, keyed in its version by `Name`. */
 export interface DocumentRequirementSpec {
     Name: string;
+    IsRequired?: boolean;
+    SensitivityPolicy?: DocumentRequirementEntity['SensitivityPolicy'];
     Sequence: number;
 }
 
@@ -52,6 +57,7 @@ export interface ProgramTreeSpec {
         SubjectType: ProgramEntity['SubjectType'];
         SubjectNoun: string;
         CredentialPrefix: string;
+        Description?: string | null;
     };
     Version: { Label: string; CommitteeID: string | null };
     Sections: SectionSpec[];
@@ -206,6 +212,9 @@ async function createProgram(ctx: IntegrationCheckContext, spec: ProgramTreeSpec
     program.SubjectType = spec.Program.SubjectType;
     program.SubjectNoun = spec.Program.SubjectNoun;
     program.CredentialPrefix = spec.Program.CredentialPrefix;
+    if (spec.Program.Description !== undefined) {
+        program.Description = spec.Program.Description;
+    }
     await RequireSave(program, `program ${spec.Program.Name}`);
     return program;
 }
@@ -246,7 +255,16 @@ async function createStandard(
     standard.Code = spec.Code;
     standard.Statement = spec.Statement;
     standard.ResponseType = spec.ResponseType;
+    if (spec.IntakeMode != null) {
+        standard.IntakeMode = spec.IntakeMode;
+    }
+    if (spec.EvidenceHint !== undefined) {
+        standard.EvidenceHint = spec.EvidenceHint;
+    }
     standard.IsInterpretive = spec.IsInterpretive ?? false;
+    if (spec.IsNewForVersion != null) {
+        standard.IsNewForVersion = spec.IsNewForVersion;
+    }
     standard.Sequence = spec.Sequence;
     await RequireSave(standard, `standard ${spec.Code}`);
     return standard;
@@ -262,6 +280,12 @@ async function createDocumentRequirement(
     requirement.NewRecord();
     requirement.ProgramVersionID = versionID;
     requirement.Name = spec.Name;
+    if (spec.IsRequired != null) {
+        requirement.IsRequired = spec.IsRequired;
+    }
+    if (spec.SensitivityPolicy != null) {
+        requirement.SensitivityPolicy = spec.SensitivityPolicy;
+    }
     requirement.Sequence = spec.Sequence;
     await RequireSave(requirement, `document requirement ${spec.Name}`);
     return requirement;

@@ -467,6 +467,8 @@ A user API key (`mj_sk_…`, `x-api-key` header) is not used by this harness.
 | `cred-standard-rules` | `CRD-03 - Standard rules` | server only |
 | `cred-operations` | `CRD-04 - Operations` | server only |
 | `cred-isolation` | `CRD-05 - Isolation` | server only |
+| `cred-world` | `CRD-06 - World` | server and client (`pnpm run seed:dev`) |
+| `cred-users` | — (client harness only) | client (`pnpm run seed:users`; registered in `cred-world.checks.ts`) |
 | `cred-operations-wire` | — (client harness only) | client only |
 
 ```sh
@@ -474,8 +476,30 @@ MJ_INTEGRATION_TEST=1 RUN_MUTATION_TESTS=1 corepack pnpm mj test run --name "CRD
 MJ_INTEGRATION_TEST=1 RUN_MUTATION_TESTS=1 corepack pnpm mj test run --name "CRD-03 - Standard rules"  # 8 checks
 MJ_INTEGRATION_TEST=1 RUN_MUTATION_TESTS=1 corepack pnpm mj test run --name "CRD-04 - Operations"     # 10 checks
 MJ_INTEGRATION_TEST=1 RUN_MUTATION_TESTS=1 corepack pnpm mj test run --name "CRD-05 - Isolation"      # 9 checks
+MJ_INTEGRATION_TEST=1 RUN_MUTATION_TESTS=1 corepack pnpm mj test run --name "CRD-06 - World"          # 2 checks
 corepack pnpm run test:integration cred-operations-wire                                               # 3 checks, GraphQL
+corepack pnpm run seed:dev                                                                            # 2 checks (cred-world), GraphQL
+corepack pnpm run seed:users                                                                          # 1 check (cred-users), GraphQL
 ```
+
+**Dev seeding (`seed:dev` and `seed:users`).** Both scripts run `test-harnesses/integration.mjs` on
+the client transport (GraphQL against MJAPI on port `4050` using `MJ_API_KEY`, which resolves to the
+`System` user, `Type = 'Owner'`, holding `Developer` and `Integration` so `MJ: Users`,
+`MJ: User Roles`, `MJ: User Applications`, Common/Committees entities, and all seven credentialing
+entities are writable over GraphQL):
+- `pnpm run seed:dev` (`node test-harnesses/integration.mjs cred-world`): loads the full
+  `CredentialingWorld` (`EnsureWorldUsers` + `EnsureWorldData` including `SampleProgram`,
+  `PlaceholderProgram` with 12 sections / 36 standards / 5 document requirements, and `ProgramB`),
+  verifies idempotent reload, and verifies `EnsureProgramTree` partial-delete repair on a run-unique
+  scratch tree.
+- `pnpm run seed:users` (`node test-harnesses/integration.mjs cred-users`): runs `EnsureWorldUsers`
+  only (creates or finds the six world user accounts, their roles, and Credentialing application
+  rows, with no accrediting organizations), for first-run setup verification. Restart MJAPI
+  afterward before signing in as any newly created user so `UserCache` picks up their roles.
+Both scripts are idempotent when run twice in a row. `packages/IntegrationTests/src/world/load-world.ts`
+calls `LoadGeneratedEntities()` from `@mj-biz-apps/common-entities` and `@mj-biz-apps/committees-entities`
+so dependency-app entity subclasses are registered even when loaded via the client harness without
+the package barrel.
 
 `cred-operations` is server only for three reasons: `.3` writes one `EvaluationMode` with SQL
 (the provider's `ExecuteSQL`, which GraphQL does not have), `.6` sets the static test seam
