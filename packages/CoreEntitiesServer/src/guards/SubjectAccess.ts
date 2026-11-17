@@ -94,6 +94,7 @@ export class SubjectAccess {
                     ExtraFilter: `ID IN (SELECT v.ProgramID FROM [__mj_BizAppsCredentialing].[vwProgramVersions] v WHERE v.ID = '${application.ProgramVersionID}')`,
                     ResultType: 'entity_object',
                     MaxRows: 1,
+                    SkipTotalRowCount: true,
                 },
             ],
             provider,
@@ -233,6 +234,6 @@ export class SubjectAccess {
     /** Parameters reading one whole row of `entityName` by a validated ID, as entity objects. */
     private static byID(entityName: string, id: string): RunViewParams {
         const filter = IsValidUUID(id) ? `ID = '${id}'` : '1 = 0';
-        return { EntityName: entityName, ExtraFilter: filter, ResultType: 'entity_object', MaxRows: 1 };
+        return { EntityName: entityName, ExtraFilter: filter, ResultType: 'entity_object', MaxRows: 1, SkipTotalRowCount: true };
     }
 }

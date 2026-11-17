@@ -19,7 +19,11 @@
  */
 import { randomUUID } from 'node:crypto';
 import { setTimeout as delay } from 'node:timers/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { unlink } from 'node:fs/promises';
 import { CompositeKey, type BaseEntity, type IMetadataProvider, type UserInfo } from '@memberjunction/core';
+import { GenericDatabaseProvider } from '@memberjunction/generic-database-provider';
 import type { MJFileEntity } from '@memberjunction/core-entities';
 import { UUIDsEqual } from '@memberjunction/global';
 import {
@@ -30,7 +34,13 @@ import {
     type IntegrationCheckContext,
     type NamedCheck,
 } from '@memberjunction/testing-integration/registry';
-import { CredentialingEntity, NOT_FOUND_REASON } from '@mj-biz-apps/credentialing-core';
+import {
+    CredentialingEntity,
+    GetApplicationWorkspaceOperation,
+    GetMySubjectsOperation,
+    NOT_FOUND_REASON,
+    OPERATION_REFUSED,
+} from '@mj-biz-apps/credentialing-core';
 import {
     APPLICATION_LOCK_BUSY_REASON,
     AuthoringLock,
@@ -346,7 +356,7 @@ const checks: NamedCheck[] = [
             const { SubjectOne, SubjectTwo, SubjectOrgB } = world.Applicants;
             await withEvidence(ctx, world, async () => {
                 await expectReadsOnly(ctx, SubjectOne.Contacts[0], [SubjectOne], 'contact of Sample Applicant One');
-                await expectReadsOnly(ctx, SubjectOne.Contacts[1], [SubjectOne], 'second contact of Sample Applicant One');
+                await expectReadsOnly(ctx, SubjectOne.Contacts[1], [SubjectOne, SubjectTwo], 'contact of Sample Applicant One and Sample Applicant Two');
                 await expectReadsOnly(ctx, SubjectTwo.Contacts[0], [SubjectTwo], 'contact of Sample Applicant Two');
                 await expectReadsOnly(ctx, SubjectOrgB.Contacts[0], [SubjectOrgB], 'contact of the OrgB subject');
             });
@@ -552,6 +562,110 @@ const checks: NamedCheck[] = [
                 AssertEqual(refusal, APPLICATION_LOCK_BUSY_REASON, 'the waiter is refused');
                 Assert(waited >= LOCK_TIMEOUT_MS - 500, `the waiter waited for the lock's timeout of ${LOCK_TIMEOUT_MS} ms (${waited} ms)`);
             });
+        },
+    },
+    {
+        Id: 'cred-subject-isolation.10',
+        Name: "GetApplicationWorkspace refuses another subject's application like a random ID, and GetMySubjects returns only the caller's subjects",
+        RequiresMutation: true,
+        Fn: async (ctx: IntegrationCheckContext) => {
+            const world = await GetOrLoadWorld(ctx);
+            const { SubjectOne, SubjectTwo } = world.Applicants;
+            const contactOne = SubjectOne.Contacts[0];
+            const op = new GetApplicationWorkspaceOperation();
+
+            const foreign = await op.Execute({ ApplicationID: SubjectTwo.ApplicationID }, { provider: ctx.Provider, user: contactOne });
+            const missing = await op.Execute({ ApplicationID: randomUUID() }, { provider: ctx.Provider, user: contactOne });
+            AssertEqual(foreign.Success, false, 'contact of SubjectOne refused on SubjectTwo application');
+            AssertEqual(missing.Success, false, 'contact of SubjectOne refused on random application ID');
+            AssertEqual(foreign.ResultCode, OPERATION_REFUSED, 'foreign ResultCode');
+            AssertEqual(missing.ResultCode, OPERATION_REFUSED, 'random ResultCode');
+            AssertEqual(foreign.ErrorMessage, NOT_FOUND_REASON, 'foreign ErrorMessage');
+            AssertEqual(missing.ErrorMessage, NOT_FOUND_REASON, 'random ErrorMessage');
+
+            const staffB = await op.Execute({ ApplicationID: SubjectOne.ApplicationID }, { provider: ctx.Provider, user: world.StaffB });
+            AssertEqual(staffB.Success, false, 'staff-b refused on OrgA application');
+            AssertEqual(staffB.ErrorMessage, NOT_FOUND_REASON, 'staff-b ErrorMessage');
+
+            const myOne = await new GetMySubjectsOperation().Execute({}, { provider: ctx.Provider, user: contactOne });
+            Assert(myOne.Success && myOne.Output != null, 'GetMySubjects succeeds for applicant-a');
+            AssertEqual(myOne.Output.Subjects.length, 1, 'applicant-a sees one subject');
+            Assert(UUIDsEqual(myOne.Output.Subjects[0].SubjectID, SubjectOne.ID), 'applicant-a sees SubjectOne');
+
+            const myTwo = await new GetMySubjectsOperation().Execute({}, { provider: ctx.Provider, user: world.ApplicantTwo });
+            Assert(myTwo.Success && myTwo.Output != null, 'GetMySubjects succeeds for applicant-two');
+            AssertEqual(myTwo.Output.Subjects.length, 2, 'applicant-two sees two subjects');
+        },
+    },
+    {
+        Id: 'cred-subject-isolation.11',
+        Name: 'GetApplicationWorkspace returns only whitelisted fields (never EvaluationMode, IsInterpretive, LineageKey, or MinimumAgreeRate)',
+        RequiresMutation: true,
+        Fn: async (ctx: IntegrationCheckContext) => {
+            const world = await GetOrLoadWorld(ctx);
+            const { SubjectOne } = world.Applicants;
+            const res = await new GetApplicationWorkspaceOperation().Execute(
+                { ApplicationID: SubjectOne.ApplicationID },
+                { provider: ctx.Provider, user: SubjectOne.Contacts[0] },
+            );
+            Assert(res.Success && res.Output != null, `GetApplicationWorkspace succeeds (${res.ErrorMessage ?? ''})`);
+            const json = JSON.stringify(res.Output);
+            for (const forbidden of ['EvaluationMode', 'IsInterpretive', 'LineageKey', 'MinimumAgreeRate']) {
+                Assert(!json.includes(`"${forbidden}"`), `workspace JSON omits forbidden key ${forbidden}`);
+            }
+        },
+    },
+    {
+        Id: 'cred-subject-isolation.12',
+        Name: 'a 150-standard version workspace is produced with at most 6 database round trips',
+        RequiresMutation: true,
+        Fn: async (ctx: IntegrationCheckContext) => {
+            const world = await GetOrLoadWorld(ctx);
+            const largeAppID = world.Applicants.SubjectTwo.LargeApplicationID;
+            Assert(largeAppID != null && largeAppID.length > 0, 'Sample Applicant Two has LargeProgram application');
+            const contact = world.Applicants.SubjectTwo.Contacts[0];
+
+            // Count RunView / RunViews batch calls AND SQL statements (CreateSqlLogger) on ctx.Provider.
+            const provider = ctx.Provider;
+            if (!(provider instanceof GenericDatabaseProvider)) {
+                throw new Error('server transport provider is not GenericDatabaseProvider');
+            }
+            const origRunView = provider.RunView;
+            const origRunViews = provider.RunViews;
+            let providerCalls = 0;
+            provider.RunView = ((...args: Parameters<GenericDatabaseProvider['RunView']>) => {
+                providerCalls++;
+                return origRunView.apply(provider, args);
+            }) as GenericDatabaseProvider['RunView'];
+            provider.RunViews = ((...args: Parameters<GenericDatabaseProvider['RunViews']>) => {
+                providerCalls++;
+                return origRunViews.apply(provider, args);
+            }) as GenericDatabaseProvider['RunViews'];
+            const sqlLogPath = join(tmpdir(), `cred-workspace-sql-${randomUUID()}.log`);
+            const logger = await provider.CreateSqlLogger(sqlLogPath);
+            let res;
+            let sqlStatements = 0;
+            try {
+                res = await new GetApplicationWorkspaceOperation().Execute(
+                    { ApplicationID: largeAppID },
+                    { provider: ctx.Provider, user: contact },
+                );
+                sqlStatements = logger.statementCount;
+            } finally {
+                await logger.dispose();
+                await unlink(sqlLogPath).catch(() => undefined);
+                provider.RunView = origRunView;
+                provider.RunViews = origRunViews;
+            }
+            Assert(res.Success && res.Output != null, `GetApplicationWorkspace succeeds for 150-standard version (${res.ErrorMessage ?? ''})`);
+            AssertEqual(res.Output.Sections.length, 10, '10 sections returned');
+            AssertEqual(
+                res.Output.Sections.reduce((sum, s) => sum + s.Standards.length, 0),
+                150,
+                '150 standards returned',
+            );
+            Assert(providerCalls <= 6, `workspace produced in ${providerCalls} RunView/RunViews round trips (limit 6; ${sqlStatements} SQL statements)`);
+            Assert(sqlStatements <= 10, `workspace executed ${sqlStatements} SQL statements (expected constant O(1) <= 10 for 150 standards)`);
         },
     },
 ];

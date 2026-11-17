@@ -9,9 +9,9 @@ import type {
     mjBizAppsCredentialingOrganizationMembershipEntity,
 } from '@mj-biz-apps/credentialing-entities';
 import { FindRows, LoadUserInfo, Quote, RequireSave, View } from '../wire.js';
-import { EnsureWorldSubject } from './applicant-world.js';
+import { EnsureWorldApplication, EnsureWorldSubject } from './applicant-world.js';
 import { PlaceholderOrganizationProgramSpec } from './placeholder-organization-program.js';
-import { EnsureProgramTree, type ProgramTree, type ProgramTreeSpec } from './program-tree.js';
+import { EnsureProgramTree, type ProgramTree, type ProgramTreeSpec, type SectionSpec, type StandardSpec } from './program-tree.js';
 import {
     GetWorld,
     SetWorld,
@@ -158,8 +158,9 @@ export async function EnsureWorldUsers(ctx: IntegrationCheckContext): Promise<Wo
         Admin: await EnsureUser(ctx, ADMIN_EMAIL, 'Admin', [ADMIN_ROLE], 'Credentialing'),
         UIOnly: await EnsureUser(ctx, UI_ONLY_EMAIL, 'Only', [UI_ROLE], 'UI'),
         ApplicantA: await EnsureUser(ctx, APPLICANT_A_EMAIL, 'A', [APPLICANT_ROLE], 'Applicant'),
+        ApplicantTwo: await EnsureUser(ctx, APPLICANT_TWO_EMAIL, 'Two', [APPLICANT_ROLE], 'Applicant'),
     };
-    for (const user of [users.StaffA, users.StaffB, users.StaffNoMembership, users.Admin]) {
+    for (const user of [users.StaffA, users.StaffB, users.StaffNoMembership, users.Admin, users.ApplicantTwo]) {
         await ensureCredentialingApplication(ctx, user);
     }
     return users;
@@ -338,6 +339,36 @@ function applicantProgramBSpec(orgB: WorldOrganization, committee: WorldCommitte
     };
 }
 
+/** `Sample Large Program` in OrgA: Active version `2026`, 10 sections × 15 standards = 150 standards. */
+function sampleLargeProgramSpec(orgA: WorldOrganization, committee: WorldCommittee): ProgramTreeSpec {
+    const sections: SectionSpec[] = [];
+    for (let s = 1; s <= 10; s++) {
+        const standards: StandardSpec[] = [];
+        for (let n = 1; n <= 15; n++) {
+            standards.push({
+                Code: `${s}.${n}`,
+                Statement: `Sample large standard ${s}.${n}.`,
+                ResponseType: 'Attestation',
+                Sequence: n,
+            });
+        }
+        sections.push({ Number: `${s}`, Name: `Large Section ${s}`, Sequence: s, Standards: standards });
+    }
+    return {
+        AccreditingOrganizationID: orgA.ID,
+        Program: {
+            Name: 'Sample Large Program',
+            ProgramType: 'Certification',
+            SubjectType: 'Person',
+            SubjectNoun: 'professional',
+            CredentialPrefix: 'SLP',
+        },
+        Version: { Label: '2026', CommitteeID: committee.ID },
+        Sections: sections,
+        DocumentRequirements: [{ Name: 'Large program document', Sequence: 1 }],
+    };
+}
+
 /** Ensures the tree and activates its version when it is still a Draft (once; later loads find it Active). */
 async function ensureActiveProgram(ctx: IntegrationCheckContext, spec: ProgramTreeSpec): Promise<ProgramTree> {
     const tree = await EnsureProgramTree(ctx, spec, ctx.User);
@@ -366,6 +397,7 @@ export async function EnsureWorldData(ctx: IntegrationCheckContext): Promise<Wor
     const programB = await EnsureProgramTree(ctx, programBSpec(orgB), ctx.User);
     const applicantProgram = await ensureActiveProgram(ctx, applicantProgramSpec(orgA, committeeA));
     const applicantProgramB = await ensureActiveProgram(ctx, applicantProgramBSpec(orgB, committeeB));
+    const largeProgram = await ensureActiveProgram(ctx, sampleLargeProgramSpec(orgA, committeeA));
     return {
         OrgA: orgA,
         OrgB: orgB,
@@ -376,6 +408,7 @@ export async function EnsureWorldData(ctx: IntegrationCheckContext): Promise<Wor
         ProgramB: programB,
         ApplicantProgram: applicantProgram,
         ApplicantProgramB: applicantProgramB,
+        LargeProgram: largeProgram,
     };
 }
 
@@ -394,37 +427,37 @@ async function ensureContactUser(ctx: IntegrationCheckContext, email: string, la
 export async function EnsureApplicantWorld(ctx: IntegrationCheckContext, users: WorldUsers, data: WorldData): Promise<WorldApplicants> {
     const applicantA = users.ApplicantA;
     await ensureCredentialingApplication(ctx, applicantA);
-    const applicantTwo = await ensureContactUser(ctx, APPLICANT_TWO_EMAIL, 'Two');
+    const applicantTwo = users.ApplicantTwo;
     const applicantB = await ensureContactUser(ctx, APPLICANT_B_EMAIL, 'B');
     const applicantOrgB = await ensureContactUser(ctx, APPLICANT_ORG_B_EMAIL, 'Org B');
     const inOrgA = { AccreditingOrganizationID: data.OrgA.ID, InvitedBy: users.StaffA, Program: data.ApplicantProgram };
     const inOrgB = { AccreditingOrganizationID: data.OrgB.ID, InvitedBy: users.StaffB, Program: data.ApplicantProgramB };
-    return {
-        SubjectOne: await EnsureWorldSubject(ctx, {
-            ...inOrgA,
-            DisplayName: 'Sample Applicant One',
-            FirstName: 'Sample',
-            LastName: 'Applicant One',
-            PrimaryEmail: APPLICANT_A_EMAIL,
-            Contacts: [applicantA, applicantTwo],
-        }),
-        SubjectTwo: await EnsureWorldSubject(ctx, {
-            ...inOrgA,
-            DisplayName: 'Sample Applicant Two',
-            FirstName: 'Sample',
-            LastName: 'Applicant Two',
-            PrimaryEmail: APPLICANT_B_EMAIL,
-            Contacts: [applicantB],
-        }),
-        SubjectOrgB: await EnsureWorldSubject(ctx, {
-            ...inOrgB,
-            DisplayName: 'Sample Applicant Org B',
-            FirstName: 'Sample',
-            LastName: 'Applicant Org B',
-            PrimaryEmail: APPLICANT_ORG_B_EMAIL,
-            Contacts: [applicantOrgB],
-        }),
-    };
+    const subjectOne = await EnsureWorldSubject(ctx, {
+        ...inOrgA,
+        DisplayName: 'Sample Applicant One',
+        FirstName: 'Sample',
+        LastName: 'Applicant One',
+        PrimaryEmail: APPLICANT_A_EMAIL,
+        Contacts: [applicantA, applicantTwo],
+    });
+    const subjectTwo = await EnsureWorldSubject(ctx, {
+        ...inOrgA,
+        DisplayName: 'Sample Applicant Two',
+        FirstName: 'Sample',
+        LastName: 'Applicant Two',
+        PrimaryEmail: APPLICANT_B_EMAIL,
+        Contacts: [applicantB, applicantTwo],
+    });
+    subjectTwo.LargeApplicationID = await EnsureWorldApplication(ctx, subjectTwo.ID, data.LargeProgram);
+    const subjectOrgB = await EnsureWorldSubject(ctx, {
+        ...inOrgB,
+        DisplayName: 'Sample Applicant Org B',
+        FirstName: 'Sample',
+        LastName: 'Applicant Org B',
+        PrimaryEmail: APPLICANT_ORG_B_EMAIL,
+        Contacts: [applicantOrgB],
+    });
+    return { SubjectOne: subjectOne, SubjectTwo: subjectTwo, SubjectOrgB: subjectOrgB };
 }
 
 export async function LoadWorld(ctx: IntegrationCheckContext): Promise<CredentialingWorld> {

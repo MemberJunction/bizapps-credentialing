@@ -32,17 +32,21 @@ function count(total: number): RunViewResult<{ ID: string; Name: string }> {
 describe('StandingService', () => {
     beforeEach(() => StandingService.ClearCache());
 
-    it('requests no view for a user holding only Credentialing Applicant', async () => {
-        const source = new StubSource(user('U1', [CredentialingRole.Applicant]));
+    it('counts subject contacts in one count_only view for a user holding Credentialing Applicant', async () => {
+        const source = new StubSource(user('U1', [CredentialingRole.Applicant]), [count(2)]);
         const standing = await new StandingService(source).Load();
-        expect(source.Calls).toEqual([]);
-        expect(standing).toEqual({ RoleNames: [CredentialingRole.Applicant], StaffOrganizations: [], OrganizationCount: null });
+        expect(source.Calls).toHaveLength(1);
+        expect(source.Calls[0]).toHaveLength(1);
+        expect(source.Calls[0][0]).toMatchObject({ EntityName: CredentialingEntity.SubjectContact, ResultType: 'count_only' });
+        expect(source.Calls[0][0].ExtraFilter).toContain("UserID = 'U1'");
+        expect(standing).toEqual({ RoleNames: [CredentialingRole.Applicant], StaffOrganizations: [], OrganizationCount: null, SubjectCount: 2 });
     });
 
     it('requests no view for a user holding no credentialing role', async () => {
         const source = new StubSource(user('U2', ['UI']));
-        await new StandingService(source).Load();
+        const standing = await new StandingService(source).Load();
         expect(source.Calls).toEqual([]);
+        expect(standing.SubjectCount).toBe(0);
     });
 
     it('makes one RunViews call with one view of the readable organizations for staff', async () => {
@@ -51,7 +55,7 @@ describe('StandingService', () => {
         expect(source.Calls).toHaveLength(1);
         expect(source.Calls[0]).toHaveLength(1);
         expect(source.Calls[0][0]).toMatchObject({ EntityName: CredentialingEntity.AccreditingOrganization, Fields: ['ID', 'Name'], ResultType: 'simple' });
-        expect(standing).toEqual({ RoleNames: [CredentialingRole.Staff], StaffOrganizations: [ORG_A], OrganizationCount: null });
+        expect(standing).toEqual({ RoleNames: [CredentialingRole.Staff], StaffOrganizations: [ORG_A], OrganizationCount: null, SubjectCount: 0 });
     });
 
     it('makes one RunViews call with one count view for an admin', async () => {
@@ -62,6 +66,7 @@ describe('StandingService', () => {
         expect(source.Calls[0][0]).toMatchObject({ EntityName: CredentialingEntity.AccreditingOrganization, ResultType: 'count_only' });
         expect(standing.OrganizationCount).toBe(0);
         expect(standing.StaffOrganizations).toEqual([]);
+        expect(standing.SubjectCount).toBe(0);
     });
 
     it('makes one RunViews call with two views for a user holding both internal roles', async () => {
@@ -71,7 +76,7 @@ describe('StandingService', () => {
         expect(source.Calls[0]).toHaveLength(2);
         // An admin's unfiltered read exempts them from the staff row filter, so their own organizations come from the membership.
         expect(source.Calls[0][0].ExtraFilter).toContain("UserID = 'U5'");
-        expect(standing).toEqual({ RoleNames: [CredentialingRole.Staff, CredentialingRole.Admin], StaffOrganizations: [ORG_A], OrganizationCount: 4 });
+        expect(standing).toEqual({ RoleNames: [CredentialingRole.Staff, CredentialingRole.Admin], StaffOrganizations: [ORG_A], OrganizationCount: 4, SubjectCount: 0 });
     });
 
     it('caches the standing for the session and reloads it on request', async () => {

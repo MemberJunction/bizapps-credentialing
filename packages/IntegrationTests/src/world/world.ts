@@ -37,6 +37,11 @@ export interface WorldUsers {
      * `Sample Applicant One` (see {@link WorldApplicants}).
      */
     ApplicantA: UserInfo;
+    /**
+     * Holds only `Credentialing Applicant` (`applicant.two@example.test`); contact of both
+     * `Sample Applicant One` and `Sample Applicant Two`.
+     */
+    ApplicantTwo: UserInfo;
 }
 
 /** A subject of the world with its contacts and its Draft application on its organization's Active version. */
@@ -50,6 +55,8 @@ export interface WorldSubject {
     ApplicationID: string;
     /** The ID of every response of that application (one per standard of the version). */
     ResponseIDs: string[];
+    /** Optional Draft application on `Sample Large Program` (150 standards) for Sample Applicant Two. */
+    LargeApplicationID?: string;
 }
 
 /**
@@ -95,6 +102,8 @@ export interface WorldData {
     ApplicantProgram: ProgramTree;
     /** `Sample Program B Applicants` in OrgB with its Active version `2026` (CommitteeB). Read-only to checks. */
     ApplicantProgramB: ProgramTree;
+    /** `Sample Large Program` in OrgA with Active version `2026` (10 sections × 15 standards = 150). Read-only to checks. */
+    LargeProgram: ProgramTree;
 }
 
 /** Everything a credentialing check can rely on existing. */

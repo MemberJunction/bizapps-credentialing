@@ -240,7 +240,7 @@ async function ensureContacts(
     }
 }
 
-async function createApplication(ctx: IntegrationCheckContext, scope: ApplicantWorldScope, user: UserInfo, spec: WorldSubjectSpec, subjectID: string): Promise<string> {
+async function createApplication(ctx: IntegrationCheckContext, scope: ApplicantWorldScope, user: UserInfo, spec: { Program: ProgramTree }, subjectID: string): Promise<string> {
     const application = await newRecord<ApplicationEntity>(ctx, CredentialingEntity.Application, user);
     application.SubjectID = subjectID;
     application.ProgramVersionID = spec.Program.Version.ID;
@@ -248,4 +248,55 @@ async function createApplication(ctx: IntegrationCheckContext, scope: ApplicantW
     application.IsHistorical = false;
     await scope.Save(application);
     return application.ID;
+}
+
+/**
+ * Ensures `subjectID` holds a Draft application on `program.Version.ID` with one Empty
+ * `StandardResponse` per standard, idempotently. Returns the application ID.
+ */
+export async function EnsureWorldApplication(
+    ctx: IntegrationCheckContext,
+    subjectID: string,
+    program: ProgramTree,
+): Promise<string> {
+    Assert(program.Version.Status === 'Active', `the application version of ${program.Program.Name} is Active`);
+    const standardIDs = program.Sections.flatMap((s) => s.Standards.map((st) => st.ID));
+    const existingApps = await FindRows<{ ID: string }>(
+        ctx,
+        CredentialingEntity.Application,
+        `SubjectID = '${Quote(subjectID)}' AND ProgramVersionID = '${Quote(program.Version.ID)}' AND Status = 'Draft' AND IsHistorical = 0`,
+        ['ID'],
+    );
+    let applicationID = existingApps[0]?.ID ?? null;
+    const existingResponses =
+        applicationID == null
+            ? []
+            : await FindRows<{ StandardID: string }>(ctx, CredentialingEntity.StandardResponse, `ApplicationID = '${Quote(applicationID)}'`, ['StandardID']);
+    const answered = new Set(existingResponses.map((r) => r.StandardID.toLowerCase()));
+    const missingStandards = standardIDs.filter((id) => !answered.has(id.toLowerCase()));
+    if (applicationID != null && missingStandards.length === 0) {
+        return applicationID;
+    }
+    if (writer == null) {
+        throw new Error(
+            `The applicant world application (${program.Program.Name}) is incomplete, and it is written only on the server transport: run ` +
+                `MJ_INTEGRATION_TEST=1 RUN_MUTATION_TESTS=1 corepack pnpm mj test run --name "CRD-06 - World" first.`,
+        );
+    }
+    const activeWriter = writer;
+    const user = activeWriter.WriterUser();
+    await activeWriter.Run(ctx.Provider, async (scope) => {
+        const appID = applicationID ?? (await createApplication(ctx, scope, user, { Program: program }, subjectID));
+        applicationID = appID;
+        for (const standardID of missingStandards) {
+            const response = await newRecord<StandardResponseEntity>(ctx, CredentialingEntity.StandardResponse, user);
+            response.ApplicationID = appID;
+            response.StandardID = standardID;
+            response.SubjectID = subjectID;
+            response.Status = 'Empty';
+            response.AuthorType = 'Human';
+            await scope.Save(response);
+        }
+    });
+    return applicationID!;
 }

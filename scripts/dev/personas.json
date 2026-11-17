@@ -35,7 +35,14 @@
       "signIn": "magic-link",
       "role": "Credentialing Applicant",
       "account": "world",
-      "about": "external applicant; the world creates the account and its role, the redemption adds the application row"
+      "about": "external applicant; contact of Sample Applicant One only"
+    },
+    "applicant-two": {
+      "email": "applicant.two@example.test",
+      "signIn": "magic-link",
+      "role": "Credentialing Applicant",
+      "account": "world",
+      "about": "external applicant; contact of both Sample Applicant One and Sample Applicant Two (for the subject picker)"
     },
     "reviewer-a": {
       "email": "reviewer.a@example.test",

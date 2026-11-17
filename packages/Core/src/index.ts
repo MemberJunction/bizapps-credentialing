@@ -34,3 +34,5 @@ export * from './operations/CreateOrganizationOperation.js';
 export * from './operations/CreateCommitteeOperation.js';
 export * from './operations/InviteApplicantOperation.js';
 export * from './operations/ReissueInvitationOperation.js';
+export * from './operations/GetMySubjectsOperation.js';
+export * from './operations/GetApplicationWorkspaceOperation.js';

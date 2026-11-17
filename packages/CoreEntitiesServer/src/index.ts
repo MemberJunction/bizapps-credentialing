@@ -38,6 +38,8 @@ import { CreateProgramServerOperation } from './operations/CreateProgramServerOp
 import { InviteApplicantServerOperation } from './operations/InviteApplicantServerOperation.js';
 import { ReissueInvitationServerOperation } from './operations/ReissueInvitationServerOperation.js';
 import { ReorderVersionTreeServerOperation } from './operations/ReorderVersionTreeServerOperation.js';
+import { GetMySubjectsServerOperation } from './operations/GetMySubjectsServerOperation.js';
+import { GetApplicationWorkspaceServerOperation } from './operations/GetApplicationWorkspaceServerOperation.js';
 
 export {
     AccreditingOrganizationEntityServer,
@@ -112,6 +114,8 @@ export {
 export { InviteApplicantServerOperation } from './operations/InviteApplicantServerOperation.js';
 export { ReissueInvitationServerOperation } from './operations/ReissueInvitationServerOperation.js';
 export { INTERNAL_ACCOUNT_REASON, INVITATION_LINK_FAILED_NOTE } from './operations/InvitationSupport.js';
+export { GetMySubjectsServerOperation } from './operations/GetMySubjectsServerOperation.js';
+export { GetApplicationWorkspaceServerOperation } from './operations/GetApplicationWorkspaceServerOperation.js';
 
 /**
  * Bootstrap / anti-tree-shaking anchor, called by the server bootstrap. Referencing the classes keeps
@@ -148,8 +152,10 @@ export function LoadBizAppsCredentialingEntitiesServer(): void {
         CreateCommitteeServerOperation,
         InviteApplicantServerOperation,
         ReissueInvitationServerOperation,
+        GetMySubjectsServerOperation,
+        GetApplicationWorkspaceServerOperation,
     ];
-    if (anchor.length !== 17 || operations.length !== 7) {
+    if (anchor.length !== 17 || operations.length !== 9) {
         throw new Error('credentialing server entity subclasses or operations missing');
     }
 }

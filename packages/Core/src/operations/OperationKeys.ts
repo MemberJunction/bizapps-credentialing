@@ -14,6 +14,8 @@ export const CredentialingOperation = {
     CreateCommittee: 'Credentialing.CreateCommittee',
     InviteApplicant: 'Credentialing.InviteApplicant',
     ReissueInvitation: 'Credentialing.ReissueInvitation',
+    GetMySubjects: 'Credentialing.GetMySubjects',
+    GetApplicationWorkspace: 'Credentialing.GetApplicationWorkspace',
 } as const;
 
 /** One of the {@link CredentialingOperation} keys. */
@@ -42,3 +44,6 @@ export const CREDENTIALING_ADMIN_ROLE = 'Credentialing Admin';
 
 /** Shown when issuing the magic-link invite throws after committing the application. */
 export const INVITATION_FAILED_NOTE = 'The applicant was added, but the invitation link could not be created. Use Send a new link.';
+
+/** Fixed final sentence of `Explanation.How` on every AI-assisted standard response. */
+export const APPLICANT_RESPONSIBILITY_SENTENCE = 'You are responsible for this answer once you confirm it.';

@@ -241,8 +241,15 @@ function verifyApplicantWorld(world: CredentialingWorld): void {
     AssertEqual(world.ApplicantProgramB.Version.Status, 'Active', 'OrgB applicant version is Active');
     AssertEqual(SubjectOne.Contacts.length, 2, 'Sample Applicant One contacts');
     Assert(UUIDsEqual(SubjectOne.Contacts[0].ID, world.ApplicantA.ID), 'ApplicantA is the primary contact of Sample Applicant One');
-    AssertEqual(SubjectTwo.Contacts.length, 1, 'Sample Applicant Two contacts');
+    AssertEqual(SubjectTwo.Contacts.length, 2, 'Sample Applicant Two contacts');
     AssertEqual(SubjectOrgB.Contacts.length, 1, 'Sample Applicant Org B contacts');
+    AssertEqual(world.LargeProgram.Sections.length, 10, 'Sample Large Program sections');
+    AssertEqual(
+        world.LargeProgram.Sections.reduce((sum, s) => sum + s.Standards.length, 0),
+        150,
+        'Sample Large Program standards',
+    );
+    Assert(SubjectTwo.LargeApplicationID != null, 'Sample Applicant Two holds a LargeProgram application');
     Assert(UUIDsEqual(SubjectOne.AccreditingOrganizationID, world.OrgA.ID) && UUIDsEqual(SubjectTwo.AccreditingOrganizationID, world.OrgA.ID), 'two subjects in OrgA');
     Assert(UUIDsEqual(SubjectOrgB.AccreditingOrganizationID, world.OrgB.ID), 'one subject in OrgB');
     AssertEqual(SubjectOne.ResponseIDs.length, 3, 'responses of Sample Applicant One (one per standard)');

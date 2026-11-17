@@ -28,6 +28,8 @@ import { LoadCredentialingPipelineResource } from './lib/resources/staff-pipelin
 import { LoadCredentialingOrganizationSetupResource } from './lib/resources/staff-organization-setup.resource';
 import { LoadCredentialingReviewHomeResource } from './lib/resources/review-home.resource';
 import { LoadCredentialingApplicantHomeResource } from './lib/resources/applicant-home.resource';
+import { LoadCredentialingApplicantStandardsResource } from './lib/resources/applicant-standards.resource';
+import { LoadCredentialingApplicantDocumentsResource } from './lib/resources/applicant-documents.resource';
 
 export * from './lib/application/area-nav';
 export { CredentialingApplication, LoadCredentialingApplication } from './lib/application/credentialing.application';
@@ -55,6 +57,22 @@ export { CredentialingPipelineResource, LoadCredentialingPipelineResource } from
 export { CredentialingOrganizationSetupResource, LoadCredentialingOrganizationSetupResource } from './lib/resources/staff-organization-setup.resource';
 export { CredentialingReviewHomeResource, LoadCredentialingReviewHomeResource } from './lib/resources/review-home.resource';
 export { CredentialingApplicantHomeResource, LoadCredentialingApplicantHomeResource } from './lib/resources/applicant-home.resource';
+export { CredentialingApplicantStandardsResource, LoadCredentialingApplicantStandardsResource } from './lib/resources/applicant-standards.resource';
+export { CredentialingApplicantDocumentsResource, LoadCredentialingApplicantDocumentsResource } from './lib/resources/applicant-documents.resource';
+export { ApplicantSubjectResource } from './lib/resources/applicant-subject-resource';
+export { SubjectContext, SUBJECT_ID_PARAM, SUBJECT_NOT_AVAILABLE_MESSAGE, type SubjectIdentity } from './lib/shared/subject-context.service';
+export { ApplicantMessages, APPLICANT_LOAD_FAILED_MESSAGE, APPLICANT_SAVE_FAILED_MESSAGE, type ApplicantMessageKind } from './lib/applicant/shared/applicant-messages';
+export { MyApplicationsPage, type OpenApplicationIntent } from './lib/applicant/my-applications/my-applications.page';
+export {
+    ResolveApplicantView,
+    FormatApplicationAction,
+    FormatApplicationProgress,
+    NO_SUBJECT_MESSAGE,
+    NO_APPLICATIONS_MESSAGE,
+    PICKER_HEADING,
+    APPLICANT_NOT_AVAILABLE_MESSAGE,
+    type ApplicantViewResolution,
+} from './lib/applicant/my-applications/my-applications-model';
 
 /**
  * Bootstrap function named by mj-app.json packages.client[0].startupExport.
@@ -68,4 +86,6 @@ export function LoadBizAppsCredentialingClient(): void {
     LoadCredentialingOrganizationSetupResource();
     LoadCredentialingReviewHomeResource();
     LoadCredentialingApplicantHomeResource();
+    LoadCredentialingApplicantStandardsResource();
+    LoadCredentialingApplicantDocumentsResource();
 }
