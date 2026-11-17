@@ -5,7 +5,10 @@
  * cannot be bypassed: ownership fields that never change, the version lifecycle, one Draft per
  * program, unique labels, codes and requirement names, and tree edits only on a Draft. Writes under a
  * program version run under transaction-owned authoring locks (guards/AuthoringLock.ts) so a rule
- * checked in validation still holds when the row is written.
+ * checked in validation still holds when the row is written. The nine applicant-data entities are
+ * written only inside the application's own operations (guards/OperationWrite.ts); every other save
+ * or delete of them is refused. Services that need packages beyond this one's dependencies are
+ * reached through the registry `services/CredentialingServices.ts`, filled by the Server package.
  *
  * Client code must never import this package; it is a dependency of the Server package only. The
  * sibling entity package is an exact-pinned dependency (all app packages version together); every
@@ -18,6 +21,16 @@ import { ProgramEntityServer } from './ProgramEntityServer.js';
 import { ProgramVersionEntityServer } from './ProgramVersionEntityServer.js';
 import { SectionEntityServer } from './SectionEntityServer.js';
 import { StandardEntityServer } from './StandardEntityServer.js';
+import { SubjectEntityServer } from './SubjectEntityServer.js';
+import { SubjectContactEntityServer } from './SubjectContactEntityServer.js';
+import { ApplicationEntityServer } from './ApplicationEntityServer.js';
+import { StandardResponseEntityServer } from './StandardResponseEntityServer.js';
+import { ResponseCitationEntityServer } from './ResponseCitationEntityServer.js';
+import { EvidenceDocumentEntityServer } from './EvidenceDocumentEntityServer.js';
+import { DocumentAttestationEntityServer } from './DocumentAttestationEntityServer.js';
+import { ApplicationDocumentEntityServer } from './ApplicationDocumentEntityServer.js';
+import { ExtractionEntityServer } from './ExtractionEntityServer.js';
+import { ResponseSourceEntityServer } from './ResponseSourceEntityServer.js';
 import { CloneVersionToDraftServerOperation } from './operations/CloneVersionToDraftServerOperation.js';
 import { CreateCommitteeServerOperation } from './operations/CreateCommitteeServerOperation.js';
 import { CreateOrganizationServerOperation } from './operations/CreateOrganizationServerOperation.js';
@@ -35,7 +48,43 @@ export { ProgramEntityServer } from './ProgramEntityServer.js';
 export { ProgramVersionEntityServer } from './ProgramVersionEntityServer.js';
 export { SectionEntityServer } from './SectionEntityServer.js';
 export { StandardEntityServer } from './StandardEntityServer.js';
-export { AuthoringLock } from './guards/AuthoringLock.js';
+export { SubjectEntityServer } from './SubjectEntityServer.js';
+export { SubjectContactEntityServer } from './SubjectContactEntityServer.js';
+export { ApplicationEntityServer } from './ApplicationEntityServer.js';
+export { StandardResponseEntityServer } from './StandardResponseEntityServer.js';
+export { ResponseCitationEntityServer } from './ResponseCitationEntityServer.js';
+export { EvidenceDocumentEntityServer } from './EvidenceDocumentEntityServer.js';
+export { DocumentAttestationEntityServer } from './DocumentAttestationEntityServer.js';
+export { ApplicationDocumentEntityServer } from './ApplicationDocumentEntityServer.js';
+export { ExtractionEntityServer } from './ExtractionEntityServer.js';
+export { ResponseSourceEntityServer } from './ResponseSourceEntityServer.js';
+export {
+    AuthoringLock,
+    APPLICATION_LOCK_BUSY_REASON,
+    AUTHORING_LOCK_BUSY_REASON,
+    LOCK_TIMEOUT_MS,
+    USER_EMAIL_LOCK_BUSY_REASON,
+} from './guards/AuthoringLock.js';
+export { OperationWrite, OPERATION_ONLY_REASON, type OperationWriteScope } from './guards/OperationWrite.js';
+export { ApplicantRow, APPLICANT_ROW_NOT_SAVED_REASON } from './guards/ApplicantRow.js';
+export { SubjectAccess, type ApplicationAccess, type DocumentAccess, type ResponseAccess } from './guards/SubjectAccess.js';
+export {
+    CredentialingServices,
+    ServiceNotRegisteredReason,
+    type EvidenceReader,
+    type EvidenceStore,
+    type ExtractableKind,
+    type ExtractedText,
+    type InvitationIssuer,
+    type IsolatedProviderFactory,
+    type ReadingRequest,
+    type ReadingResult,
+    type RecognitionResult,
+    type RegisteredServices,
+    type StaffNotifier,
+    type TextExtractor,
+    type TextRecognizer,
+} from './services/CredentialingServices.js';
 export { SystemUser } from './guards/SystemUser.js';
 export { LockedWrite, type WriteKind } from './guards/LockedWrite.js';
 export {
@@ -75,6 +124,16 @@ export function LoadBizAppsCredentialingEntitiesServer(): void {
         SectionEntityServer,
         StandardEntityServer,
         DocumentRequirementEntityServer,
+        SubjectEntityServer,
+        SubjectContactEntityServer,
+        ApplicationEntityServer,
+        StandardResponseEntityServer,
+        ResponseCitationEntityServer,
+        EvidenceDocumentEntityServer,
+        DocumentAttestationEntityServer,
+        ApplicationDocumentEntityServer,
+        ExtractionEntityServer,
+        ResponseSourceEntityServer,
     ];
     const operations = [
         CreateProgramServerOperation,
@@ -83,7 +142,7 @@ export function LoadBizAppsCredentialingEntitiesServer(): void {
         CreateOrganizationServerOperation,
         CreateCommitteeServerOperation,
     ];
-    if (anchor.length !== 7 || operations.length !== 5) {
+    if (anchor.length !== 17 || operations.length !== 5) {
         throw new Error('credentialing server entity subclasses or operations missing');
     }
 }

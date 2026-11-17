@@ -9,12 +9,14 @@ import type {
     mjBizAppsCredentialingOrganizationMembershipEntity,
 } from '@mj-biz-apps/credentialing-entities';
 import { FindRows, LoadUserInfo, Quote, RequireSave, View } from '../wire.js';
+import { EnsureWorldSubject } from './applicant-world.js';
 import { PlaceholderOrganizationProgramSpec } from './placeholder-organization-program.js';
-import { EnsureProgramTree, type ProgramTreeSpec } from './program-tree.js';
+import { EnsureProgramTree, type ProgramTree, type ProgramTreeSpec } from './program-tree.js';
 import {
     GetWorld,
     SetWorld,
     type CredentialingWorld,
+    type WorldApplicants,
     type WorldCommittee,
     type WorldData,
     type WorldOrganization,
@@ -46,6 +48,9 @@ const STAFF_NONE_EMAIL = 'staff.none@example.test';
 const ADMIN_EMAIL = 'admin@example.test';
 const UI_ONLY_EMAIL = 'ui.only@example.test';
 const APPLICANT_A_EMAIL = 'applicant.a@example.test';
+const APPLICANT_B_EMAIL = 'applicant.b@example.test';
+const APPLICANT_TWO_EMAIL = 'applicant.two@example.test';
+const APPLICANT_ORG_B_EMAIL = 'applicant.orgb@example.test';
 
 /** The credentialing role every staff member of an accrediting organization holds. */
 export const STAFF_ROLE = 'Credentialing Staff';
@@ -59,6 +64,7 @@ export const UI_ROLE = 'UI';
 const ORG_A_NAME = 'Sample Accrediting Body A';
 const ORG_B_NAME = 'Sample Accrediting Body B';
 const COMMITTEE_A_NAME = 'Sample Accrediting Body A Standards Committee';
+const COMMITTEE_B_NAME = 'Sample Accrediting Body B Standards Committee';
 
 /** Finds the first row of `entityName` matching `filter` as an entity object of the context user, or null. */
 async function findEntity<T extends BaseEntity>(ctx: IntegrationCheckContext, entityName: string, filter: string): Promise<T | null> {
@@ -201,18 +207,18 @@ async function ensureMembership(ctx: IntegrationCheckContext, organization: Worl
     await RequireSave(membership, `membership of ${user.Email} in ${organization.Name}`);
 }
 
-/** Finds or creates CommitteeA, owned by OrgA's Common organization, with a committee type from Committees' seed data. */
-async function ensureCommittee(ctx: IntegrationCheckContext, owner: WorldOrganization): Promise<WorldCommittee> {
-    let committee = await findEntity<mjBizAppsCommitteesCommitteeEntity>(ctx, COMMITTEES_ENTITY, `Name = '${Quote(COMMITTEE_A_NAME)}'`);
+/** Finds or creates the committee `name`, owned by `owner`'s Common organization, with a committee type from Committees' seed data. */
+async function ensureCommittee(ctx: IntegrationCheckContext, owner: WorldOrganization, name: string): Promise<WorldCommittee> {
+    let committee = await findEntity<mjBizAppsCommitteesCommitteeEntity>(ctx, COMMITTEES_ENTITY, `Name = '${Quote(name)}'`);
     if (!committee) {
         const types = await FindRows<{ ID: string }>(ctx, COMMITTEE_TYPES_ENTITY, `Name = '${Quote(COMMITTEE_TYPE_NAME)}'`, ['ID']);
         Assert(types.length === 1, `expected the Committees seed type '${COMMITTEE_TYPE_NAME}', found ${types.length}`);
         committee = await ctx.Provider.GetEntityObject<mjBizAppsCommitteesCommitteeEntity>(COMMITTEES_ENTITY, ctx.User);
         committee.NewRecord();
-        committee.Name = COMMITTEE_A_NAME;
+        committee.Name = name;
         committee.TypeID = types[0].ID;
         committee.OrganizationID = owner.OrganizationID;
-        await RequireSave(committee, `committee ${COMMITTEE_A_NAME}`);
+        await RequireSave(committee, `committee ${name}`);
     }
     return { ID: committee.ID, Name: committee.Name };
 }
@@ -286,8 +292,66 @@ function programBSpec(orgB: WorldOrganization): ProgramTreeSpec {
 }
 
 /**
- * Creates (or finds) the organizations, the staff memberships, the committee, the sample program and
- * Program B.
+ * `Sample Applicant Program` in OrgA: version `2026`, deciding committee CommitteeA, one section of
+ * three standards and one document requirement. The world loader activates it: it is "the sample
+ * Active version" applications are started on.
+ */
+function applicantProgramSpec(orgA: WorldOrganization, committee: WorldCommittee): ProgramTreeSpec {
+    return {
+        AccreditingOrganizationID: orgA.ID,
+        Program: { Name: 'Sample Applicant Program', ProgramType: 'Certification', SubjectType: 'Person', SubjectNoun: 'professional', CredentialPrefix: 'SAP' },
+        Version: { Label: '2026', CommitteeID: committee.ID },
+        Sections: [
+            {
+                Number: '1',
+                Name: 'Practice',
+                Sequence: 1,
+                Standards: [
+                    { Code: '1.1', Statement: 'The applicant attests to the code of conduct.', ResponseType: 'Attestation', Sequence: 1 },
+                    { Code: '1.2', Statement: 'The applicant describes their current practice.', ResponseType: 'Narrative', Sequence: 2 },
+                    { Code: '1.3', Statement: 'The applicant provides proof of a qualifying degree.', ResponseType: 'Evidence', Sequence: 3 },
+                ],
+            },
+        ],
+        DocumentRequirements: [{ Name: 'Degree certificate', Sequence: 1 }],
+    };
+}
+
+/** `Sample Program B Applicants` in OrgB: version `2026`, deciding committee CommitteeB, one section of two standards; activated by the loader. */
+function applicantProgramBSpec(orgB: WorldOrganization, committee: WorldCommittee): ProgramTreeSpec {
+    return {
+        AccreditingOrganizationID: orgB.ID,
+        Program: { Name: 'Sample Program B Applicants', ProgramType: 'Certification', SubjectType: 'Person', SubjectNoun: 'professional', CredentialPrefix: 'SPA' },
+        Version: { Label: '2026', CommitteeID: committee.ID },
+        Sections: [
+            {
+                Number: '1',
+                Name: 'Eligibility',
+                Sequence: 1,
+                Standards: [
+                    { Code: '1.1', Statement: 'The applicant holds a qualifying credential.', ResponseType: 'Attestation', Sequence: 1 },
+                    { Code: '1.2', Statement: 'The applicant describes their supervised practice.', ResponseType: 'Narrative', Sequence: 2 },
+                ],
+            },
+        ],
+        DocumentRequirements: [{ Name: 'Proof of credential', Sequence: 1 }],
+    };
+}
+
+/** Ensures the tree and activates its version when it is still a Draft (once; later loads find it Active). */
+async function ensureActiveProgram(ctx: IntegrationCheckContext, spec: ProgramTreeSpec): Promise<ProgramTree> {
+    const tree = await EnsureProgramTree(ctx, spec, ctx.User);
+    if (tree.Version.Status === 'Draft') {
+        tree.Version.Status = 'Active';
+        await RequireSave(tree.Version, `activating version ${spec.Version.Label} of ${spec.Program.Name}`);
+    }
+    Assert(tree.Version.Status === 'Active', `${spec.Program.Name} ${spec.Version.Label} is Active (found ${tree.Version.Status})`);
+    return tree;
+}
+
+/**
+ * Creates (or finds) the organizations, the staff memberships, the committees, the sample program,
+ * Program B and the two Active applicant programs.
  * The world's users must exist already ({@link EnsureWorldUsers}).
  */
 export async function EnsureWorldData(ctx: IntegrationCheckContext): Promise<WorldData> {
@@ -295,24 +359,79 @@ export async function EnsureWorldData(ctx: IntegrationCheckContext): Promise<Wor
     const orgB = await ensureAccreditingOrganization(ctx, ORG_B_NAME);
     await ensureMembership(ctx, orgA, await LoadUserInfo(ctx, STAFF_A_EMAIL));
     await ensureMembership(ctx, orgB, await LoadUserInfo(ctx, STAFF_B_EMAIL));
-    const committeeA = await ensureCommittee(ctx, orgA);
+    const committeeA = await ensureCommittee(ctx, orgA, COMMITTEE_A_NAME);
+    const committeeB = await ensureCommittee(ctx, orgB, COMMITTEE_B_NAME);
     const sampleProgram = await EnsureProgramTree(ctx, sampleProgramSpec(orgA, committeeA), ctx.User);
     const placeholderProgram = await EnsureProgramTree(ctx, PlaceholderOrganizationProgramSpec(orgA.ID), ctx.User);
     const programB = await EnsureProgramTree(ctx, programBSpec(orgB), ctx.User);
+    const applicantProgram = await ensureActiveProgram(ctx, applicantProgramSpec(orgA, committeeA));
+    const applicantProgramB = await ensureActiveProgram(ctx, applicantProgramBSpec(orgB, committeeB));
     return {
         OrgA: orgA,
         OrgB: orgB,
         CommitteeA: committeeA,
+        CommitteeB: committeeB,
         SampleProgram: sampleProgram,
         PlaceholderProgram: placeholderProgram,
         ProgramB: programB,
+        ApplicantProgram: applicantProgram,
+        ApplicantProgramB: applicantProgramB,
+    };
+}
+
+/** Finds or creates a subject contact's account: only `Credentialing Applicant`, with the Credentialing application row. */
+async function ensureContactUser(ctx: IntegrationCheckContext, email: string, lastName: string): Promise<UserInfo> {
+    const user = await EnsureUser(ctx, email, lastName, [APPLICANT_ROLE], 'Applicant');
+    await ensureCredentialingApplication(ctx, user);
+    return user;
+}
+
+/**
+ * The applicant world: two subjects in OrgA (`Sample Applicant One` with two contacts, `Sample
+ * Applicant Two`) and one in OrgB, each with a Draft application on its organization's Active
+ * version. Written on the server transport only (`applicant-world.ts`).
+ */
+export async function EnsureApplicantWorld(ctx: IntegrationCheckContext, users: WorldUsers, data: WorldData): Promise<WorldApplicants> {
+    const applicantA = users.ApplicantA;
+    await ensureCredentialingApplication(ctx, applicantA);
+    const applicantTwo = await ensureContactUser(ctx, APPLICANT_TWO_EMAIL, 'Two');
+    const applicantB = await ensureContactUser(ctx, APPLICANT_B_EMAIL, 'B');
+    const applicantOrgB = await ensureContactUser(ctx, APPLICANT_ORG_B_EMAIL, 'Org B');
+    const inOrgA = { AccreditingOrganizationID: data.OrgA.ID, InvitedBy: users.StaffA, Program: data.ApplicantProgram };
+    const inOrgB = { AccreditingOrganizationID: data.OrgB.ID, InvitedBy: users.StaffB, Program: data.ApplicantProgramB };
+    return {
+        SubjectOne: await EnsureWorldSubject(ctx, {
+            ...inOrgA,
+            DisplayName: 'Sample Applicant One',
+            FirstName: 'Sample',
+            LastName: 'Applicant One',
+            PrimaryEmail: APPLICANT_A_EMAIL,
+            Contacts: [applicantA, applicantTwo],
+        }),
+        SubjectTwo: await EnsureWorldSubject(ctx, {
+            ...inOrgA,
+            DisplayName: 'Sample Applicant Two',
+            FirstName: 'Sample',
+            LastName: 'Applicant Two',
+            PrimaryEmail: APPLICANT_B_EMAIL,
+            Contacts: [applicantB],
+        }),
+        SubjectOrgB: await EnsureWorldSubject(ctx, {
+            ...inOrgB,
+            DisplayName: 'Sample Applicant Org B',
+            FirstName: 'Sample',
+            LastName: 'Applicant Org B',
+            PrimaryEmail: APPLICANT_ORG_B_EMAIL,
+            Contacts: [applicantOrgB],
+        }),
     };
 }
 
 export async function LoadWorld(ctx: IntegrationCheckContext): Promise<CredentialingWorld> {
     const users = await EnsureWorldUsers(ctx);
     const data = await EnsureWorldData(ctx);
-    const world: CredentialingWorld = { Loaded: true, ...users, ...data };
+    const applicants = await EnsureApplicantWorld(ctx, users, data);
+    const world: CredentialingWorld = { Loaded: true, ...users, ...data, Applicants: applicants };
     SetWorld(world);
     return world;
 }

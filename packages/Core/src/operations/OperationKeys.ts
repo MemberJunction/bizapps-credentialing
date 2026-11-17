@@ -23,5 +23,8 @@ export const OPERATION_REFUSED = 'REFUSED';
 /** The role an operation that changes programs requires of its caller. */
 export const CREDENTIALING_STAFF_ROLE = 'Credentialing Staff';
 
+/** The external role of a subject's contact. */
+export const CREDENTIALING_APPLICANT_ROLE = 'Credentialing Applicant';
+
 /** The role organization setup requires of its caller. */
 export const CREDENTIALING_ADMIN_ROLE = 'Credentialing Admin';

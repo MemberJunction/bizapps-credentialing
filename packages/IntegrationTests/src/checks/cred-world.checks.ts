@@ -2,7 +2,10 @@
  * `cred-world` and `cred-users` — world seeding and self-repairing tree verification.
  *
  * `cred-world` runs on both transports: `pnpm run seed:dev` executes it over GraphQL as the
- * System user, and `mj test run --name "CRD-06 - World"` runs it on the server transport.
+ * System user, and `mj test run --name "CRD-06 - World"` runs it on the server transport. The
+ * applicant world (subjects, contacts, applications, responses) is written only on the server
+ * transport, through the operation-only write path (`world/applicant-world.ts`); over GraphQL it is
+ * found, and a missing one fails with the command that writes it.
  * `cred-users` runs `EnsureWorldUsers` only (users, roles, and app access — no organization),
  * used by `pnpm run seed:users` for first-run setup verification.
  *
@@ -213,10 +216,45 @@ async function verifyPlaceholderRequirements(ctx: IntegrationCheckContext, versi
     );
 }
 
+/** Entities whose total row count a second world load must leave unchanged (the applicant world and the committees). */
+const COUNTED_ENTITIES: readonly string[] = [
+    CredentialingEntity.Subject,
+    CredentialingEntity.SubjectContact,
+    CredentialingEntity.Application,
+    CredentialingEntity.StandardResponse,
+    'Committees: Committees',
+    'MJ_BizApps_Common: People',
+];
+
+async function countAll(ctx: IntegrationCheckContext): Promise<number[]> {
+    const counts: number[] = [];
+    for (const entityName of COUNTED_ENTITIES) {
+        counts.push(await CountRows(ctx, entityName, ''));
+    }
+    return counts;
+}
+
+/** The applicant world's shape: three subjects, subject one with two contacts, each with a Draft application on an Active version. */
+function verifyApplicantWorld(world: CredentialingWorld): void {
+    const { SubjectOne, SubjectTwo, SubjectOrgB } = world.Applicants;
+    AssertEqual(world.ApplicantProgram.Version.Status, 'Active', 'the sample Active version (OrgA) is Active');
+    AssertEqual(world.ApplicantProgramB.Version.Status, 'Active', 'OrgB applicant version is Active');
+    AssertEqual(SubjectOne.Contacts.length, 2, 'Sample Applicant One contacts');
+    Assert(UUIDsEqual(SubjectOne.Contacts[0].ID, world.ApplicantA.ID), 'ApplicantA is the primary contact of Sample Applicant One');
+    AssertEqual(SubjectTwo.Contacts.length, 1, 'Sample Applicant Two contacts');
+    AssertEqual(SubjectOrgB.Contacts.length, 1, 'Sample Applicant Org B contacts');
+    Assert(UUIDsEqual(SubjectOne.AccreditingOrganizationID, world.OrgA.ID) && UUIDsEqual(SubjectTwo.AccreditingOrganizationID, world.OrgA.ID), 'two subjects in OrgA');
+    Assert(UUIDsEqual(SubjectOrgB.AccreditingOrganizationID, world.OrgB.ID), 'one subject in OrgB');
+    AssertEqual(SubjectOne.ResponseIDs.length, 3, 'responses of Sample Applicant One (one per standard)');
+    AssertEqual(SubjectTwo.ResponseIDs.length, 3, 'responses of Sample Applicant Two');
+    AssertEqual(SubjectOrgB.ResponseIDs.length, 2, 'responses of Sample Applicant Org B');
+}
+
 async function verifyReloadIdempotency(ctx: IntegrationCheckContext, world: CredentialingWorld, versionID: string): Promise<void> {
     const beforePrograms = await CountRows(ctx, CredentialingEntity.Program, `AccreditingOrganizationID = '${Quote(world.OrgA.ID)}'`);
     const beforeOrgs = await CountRows(ctx, CredentialingEntity.AccreditingOrganization, '');
     const beforeUsers = await CountRows(ctx, 'MJ: Users', `Email LIKE '%@example.test'`);
+    const beforeCounts = await countAll(ctx);
 
     // Bypass the in-memory singleton cache so the full ensure pass runs against the database again.
     await LoadWorld(ctx);
@@ -251,15 +289,18 @@ async function verifyReloadIdempotency(ctx: IntegrationCheckContext, world: Cred
         beforeUsers,
         'world users unchanged after second load',
     );
+    const afterCounts = await countAll(ctx);
+    COUNTED_ENTITIES.forEach((entityName, i) => AssertEqual(afterCounts[i], beforeCounts[i], `${entityName} rows unchanged after second load`));
 }
 
 const checks: NamedCheck[] = [
     {
         Id: 'cred-world.1',
-        Name: 'placeholder program has 12 sections, 36 standards, 5 requirements, 1 interpretive standard, and reloads idempotently',
+        Name: 'placeholder program has 12 sections, 36 standards, 5 requirements, 1 interpretive standard; the applicant world has its three subjects; both reload idempotently',
         RequiresMutation: true,
         Fn: async (ctx: IntegrationCheckContext) => {
             const world = await GetOrLoadWorld(ctx);
+            verifyApplicantWorld(world);
             const versionID = await verifyPlaceholderProgram(ctx, world);
             await verifyReloadIdempotency(ctx, world, versionID);
         },

@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import type { BaseEntity } from '@memberjunction/core';
 import type { MJFileEntity } from '@memberjunction/core-entities';
 import {
     Assert,
@@ -14,13 +15,47 @@ import type {
     mjBizAppsCredentialingExtractionEntity,
     mjBizAppsCredentialingSubjectEntity,
 } from '@mj-biz-apps/credentialing-entities';
-import { ExpectSaveRefused, FindRows, RequireDelete, RequireSave } from '../wire.js';
+import { OperationWrite } from '@mj-biz-apps/credentialing-core-entities-server';
+import { FindRows, RequireDelete, RequireSave } from '../wire.js';
 import { GetOrLoadWorld } from '../world/load-world.js';
 
 type SubjectEntity = mjBizAppsCredentialingSubjectEntity;
 type ApplicationEntity = mjBizAppsCredentialingApplicationEntity;
 type EvidenceDocumentEntity = mjBizAppsCredentialingEvidenceDocumentEntity;
 type ExtractionEntity = mjBizAppsCredentialingExtractionEntity;
+
+/**
+ * Applicant data is written only inside an operation's write scope (Task 3), so these schema checks
+ * save and delete their scratch rows through `OperationWrite.Run`, one transaction per write — the
+ * same unique-index behaviour they assert, reached through the one path that may write.
+ */
+async function admittedSave(ctx: IntegrationCheckContext, entity: BaseEntity, label: string): Promise<void> {
+    try {
+        await OperationWrite.Run(ctx.Provider, (scope) => scope.Save(entity));
+    } catch (err: unknown) {
+        throw new Error(`${label}: ${err instanceof Error ? err.message : String(err)}`);
+    }
+}
+
+async function admittedDelete(ctx: IntegrationCheckContext, entity: BaseEntity, label: string): Promise<void> {
+    try {
+        await OperationWrite.Run(ctx.Provider, (scope) => scope.Delete(entity));
+    } catch (err: unknown) {
+        throw new Error(`${label}: ${err instanceof Error ? err.message : String(err)}`);
+    }
+}
+
+/** Asserts an admitted save is refused with a message containing `fragment`. */
+async function admittedSaveRefused(ctx: IntegrationCheckContext, entity: BaseEntity, fragment: string): Promise<void> {
+    let message: string | null = null;
+    try {
+        await OperationWrite.Run(ctx.Provider, (scope) => scope.Save(entity));
+    } catch (err: unknown) {
+        message = err instanceof Error ? err.message : String(err);
+    }
+    Assert(message != null, `expected the save to be refused with "${fragment}", but it succeeded`);
+    Assert(message.includes(fragment), `expected a refusal containing "${fragment}", got "${message}"`);
+}
 
 async function createScratchSubject(ctx: IntegrationCheckContext, accreditingOrganizationID: string): Promise<SubjectEntity> {
     const hex = randomUUID().replace(/-/g, '').slice(0, 8);
@@ -31,7 +66,7 @@ async function createScratchSubject(ctx: IntegrationCheckContext, accreditingOrg
     subject.DisplayName = `Schema Check Subject ${hex}`;
     subject.PrimaryEmail = `schema-check-${hex}@example.test`;
     subject.Status = 'Active';
-    await RequireSave(subject, 'scratch subject');
+    await admittedSave(ctx, subject, 'scratch subject');
     return subject;
 }
 
@@ -71,19 +106,19 @@ const checks: NamedCheck[] = [
             app2.IsHistorical = false;
 
             try {
-                await RequireSave(app1, 'first application');
-                await ExpectSaveRefused(app2, 'UQ_Application_OneLive');
+                await admittedSave(ctx, app1, 'first application');
+                await admittedSaveRefused(ctx, app2, 'UQ_Application_OneLive');
 
                 app1.Status = 'Withdrawn';
                 app1.WithdrawnAt = new Date();
                 app1.WithdrawnByUserID = ctx.User.ID;
-                await RequireSave(app1, 'withdrawing first application');
+                await admittedSave(ctx, app1, 'withdrawing first application');
 
-                await RequireSave(app2, 'second application after withdrawal');
+                await admittedSave(ctx, app2, 'second application after withdrawal');
             } finally {
-                if (app2.IsSaved) await RequireDelete(app2, 'cleanup app2');
-                if (app1.IsSaved) await RequireDelete(app1, 'cleanup app1');
-                if (subject.IsSaved) await RequireDelete(subject, 'cleanup subject');
+                if (app2.IsSaved) await admittedDelete(ctx, app2, 'cleanup app2');
+                if (app1.IsSaved) await admittedDelete(ctx, app1, 'cleanup app1');
+                if (subject.IsSaved) await admittedDelete(ctx, subject, 'cleanup subject');
             }
         },
     },
@@ -124,7 +159,7 @@ const checks: NamedCheck[] = [
                 doc.Status = 'Current';
                 doc.UploadedByUserID = ctx.User.ID;
                 doc.UploadedAt = new Date();
-                await RequireSave(doc, 'scratch evidence document');
+                await admittedSave(ctx, doc, 'scratch evidence document');
 
                 const standardID = world.SampleProgram.Sections[0].Standards[0].ID;
 
@@ -139,7 +174,7 @@ const checks: NamedCheck[] = [
                 ext1.Confidence = 0.95;
                 ext1.Status = 'Proposed';
                 ext1.IsSuperseded = false;
-                await RequireSave(ext1, 'first extraction');
+                await admittedSave(ctx, ext1, 'first extraction');
 
                 ext2.NewRecord();
                 ext2.EvidenceDocumentID = doc.ID;
@@ -152,13 +187,13 @@ const checks: NamedCheck[] = [
                 ext2.Confidence = 0.85;
                 ext2.Status = 'Proposed';
                 ext2.IsSuperseded = false;
-                await ExpectSaveRefused(ext2, 'UQ_Extraction_OneCurrent');
+                await admittedSaveRefused(ctx, ext2, 'UQ_Extraction_OneCurrent');
             } finally {
-                if (ext2.IsSaved) await RequireDelete(ext2, 'cleanup ext2');
-                if (ext1.IsSaved) await RequireDelete(ext1, 'cleanup ext1');
-                if (doc.IsSaved) await RequireDelete(doc, 'cleanup evidence document');
+                if (ext2.IsSaved) await admittedDelete(ctx, ext2, 'cleanup ext2');
+                if (ext1.IsSaved) await admittedDelete(ctx, ext1, 'cleanup ext1');
+                if (doc.IsSaved) await admittedDelete(ctx, doc, 'cleanup evidence document');
                 if (file.IsSaved) await RequireDelete(file, 'cleanup file');
-                if (subject.IsSaved) await RequireDelete(subject, 'cleanup subject');
+                if (subject.IsSaved) await admittedDelete(ctx, subject, 'cleanup subject');
             }
         },
     },

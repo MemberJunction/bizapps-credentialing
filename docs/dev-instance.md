@@ -685,7 +685,9 @@ A user API key (`mj_sk_…`, `x-api-key` header) is not used by this harness.
 | `cred-standard-rules` | `CRD-03 - Standard rules` | server only |
 | `cred-operations` | `CRD-04 - Operations` | server only |
 | `cred-isolation` | `CRD-05 - Isolation` | server only |
-| `cred-world` | `CRD-06 - World` | server and client (`pnpm run seed:dev`) |
+| `cred-world` | `CRD-06 - World` | server and client (`pnpm run seed:dev`; the applicant world is written on the server transport only) |
+| `cred-applicant-schema` | `CRD-07 - Applicant schema` | server only |
+| `cred-subject-isolation` | `CRD-08 - Subject isolation` | server only (check 8 needs a registered `IsolatedProviderFactory`) |
 | `cred-users` | — (client harness only) | client (`pnpm run seed:users`; registered in `cred-world.checks.ts`) |
 | `cred-operations-wire` | — (client harness only) | client only |
 
@@ -695,6 +697,8 @@ MJ_INTEGRATION_TEST=1 RUN_MUTATION_TESTS=1 corepack pnpm mj test run --name "CRD
 MJ_INTEGRATION_TEST=1 RUN_MUTATION_TESTS=1 corepack pnpm mj test run --name "CRD-04 - Operations"     # 20 checks
 MJ_INTEGRATION_TEST=1 RUN_MUTATION_TESTS=1 corepack pnpm mj test run --name "CRD-05 - Isolation"      # 9 checks
 MJ_INTEGRATION_TEST=1 RUN_MUTATION_TESTS=1 corepack pnpm mj test run --name "CRD-06 - World"          # 2 checks
+MJ_INTEGRATION_TEST=1 RUN_MUTATION_TESTS=1 corepack pnpm mj test run --name "CRD-07 - Applicant schema"  # 3 checks
+MJ_INTEGRATION_TEST=1 RUN_MUTATION_TESTS=1 corepack pnpm mj test run --name "CRD-08 - Subject isolation" # 9 checks (8 runs where a provider factory is registered)
 corepack pnpm run test:integration cred-operations-wire                                               # 3 checks, GraphQL
 corepack pnpm run seed:dev                                                                            # 2 checks (cred-world), GraphQL
 corepack pnpm run seed:users                                                                          # 1 check (cred-users), GraphQL
@@ -981,3 +985,69 @@ URL and browser title became `New organization` without a reload, with the succe
 The 0 → 1 transition itself (the label changing from `Set up organization`) is proven by unit test
 (`standing.service.test.ts`, "after the first organization is created …"); it was not re-run in the
 browser because this database has organizations and none is rebuilt for it.
+
+## Applicant world, the sample Active version and operation-only writes (B2 Task 3)
+
+**"The sample Active version"** is version `2026` of `Sample Applicant Program` (OrgA, prefix `SAP`,
+deciding committee `Sample Accrediting Body A Standards Committee`, one section of three standards,
+one document requirement). B1's world holds only Draft versions, one Draft per program is a rule, and
+B1's checks treat `Sample Certified Practitioner` 2027 as a Draft, so the Active version is a program
+of its own. The world loader builds it as a Draft and activates it once (`ensureActiveProgram`,
+`packages/IntegrationTests/src/world/load-world.ts`); later loads find it Active. OrgB has the same
+shape in `Sample Program B Applicants` 2026 (prefix `SPA`, two standards), whose deciding committee
+`Sample Accrediting Body B Standards Committee` is owned by OrgB's Common organization and created the
+way CommitteeA is. `cred-isolation.9` asserts staff-b reads exactly CommitteeB and never CommitteeA.
+
+**The applicant world** (`WorldApplicants`, `world/applicant-world.ts`):
+
+| Subject | Organization | Contacts (all `Credentialing Applicant` only, with the Credentialing app row) | Application |
+|---|---|---|---|
+| `Sample Applicant One` | OrgA | `applicant.a@example.test` (Primary), `applicant.two@example.test` (Staff) | Draft on `Sample Applicant Program` 2026, 3 Empty responses |
+| `Sample Applicant Two` | OrgA | `applicant.b@example.test` (Primary) | Draft on the same version, 3 Empty responses |
+| `Sample Applicant Org B` | OrgB | `applicant.orgb@example.test` (Primary) | Draft on `Sample Program B Applicants` 2026, 2 Empty responses |
+
+Each subject has a BizApps Common person as its party record (`PartyEntityID` = `MJ_BizApps_Common:
+People`, found by email) and contacts recorded as invited by staff-a (OrgA) or staff-b (OrgB): only
+states an invitation could create. Everything is found by natural key, so a second load creates
+nothing (`cred-world.1` compares the row counts of subjects, contacts, applications, responses,
+committees and Common people before and after a second load).
+
+**Applicant data is written only through an operation.** The nine applicant-data entity subclasses
+refuse every save and delete that is not made through `OperationWrite.Run`'s scope
+(`packages/CoreEntitiesServer/src/guards/OperationWrite.ts`) with `This record is changed only
+through the application's own actions.` — for staff and the system user too. So:
+
+- the world's applicant rows are written on the **server transport only**: the package barrel
+  (`packages/IntegrationTests/src/index.ts`, loaded by `mj test run`) registers a writer that runs
+  `OperationWrite.Run` as the system user. `pnpm run seed:dev` (GraphQL, client harness, which never
+  loads the barrel) **finds** the applicant world; when it is missing it fails with the
+  `mj test run --name "CRD-06 - World"` command to run first. On a rebuilt database run the `CRD-*`
+  rows before `seed:dev`, as "First run on the rebuilt database" already orders;
+- check code that needs applicant rows (`CRD-07`, `CRD-08`) writes them through `OperationWrite.Run`.
+
+**Common activity log in the test process.** Creating a Common person runs BizApps Common's
+`Common.LogActivity` entity action. Its class is in `@mj-biz-apps/common-server`, which MJAPI loads
+(`mj/mj.config.cjs` `dynamicPackages`) and the `mj test` process does not, so the first world load in
+that process logs `Could not find a class for action Common.LogActivity` once per new person; the
+person is saved, and no activity row is written for it. Through MJAPI (Task 4's invitations) the
+action runs.
+
+**Lock wait: 14 s, not 15 s.** `AuthoringLock` waits `LOCK_TIMEOUT_MS` = 14 000 ms
+(`packages/CoreEntitiesServer/src/guards/AuthoringLock.ts`). mssql's default request timeout is
+15 000 ms (`node_modules/mssql/lib/tedious/connection-pool.js:43`), which applies to any pool that sets
+none, the `mj test` harness pool among them
+(`mj/packages/TestingFramework/testing-integration/src/bootstrap.ts`); with a 15 000 ms lock wait, a
+waiter there failed with `Timeout: Request failed to complete in 15000ms` instead of the lock's
+sentence (measured, `cred-subject-isolation.9`). MJAPI's request timeout is 30 000 ms. Each lock family
+has its own sentence (`AUTHORING_LOCK_BUSY_REASON`, `USER_EMAIL_LOCK_BUSY_REASON`,
+`APPLICATION_LOCK_BUSY_REASON`): an applicant never reads one about changing a program.
+
+**Service registry and background providers.** `CredentialingServices`
+(`packages/CoreEntitiesServer/src/services/CredentialingServices.ts`) holds what `packages/Server`
+provides (provider factory, invitation issuer, evidence store, text extractor, recognizer, reader,
+notifier); a getter for a service nobody registered throws `The <name> service is not registered on
+this server.` `InBackground` gives each unit of work its own provider from the registered
+`IsolatedProviderFactory` and releases it through the factory. The factory interface has
+`Release(provider)` beside the plan's `Create()`, so `InBackground` releases exactly what it was
+given. Nothing registers a factory in the `mj test` process yet, so `cred-subject-isolation.8` reports
+itself skipped there (`SkipCheck`, not on the allowlist) until Task 4 registers the real one.

@@ -546,10 +546,11 @@ const checks: NamedCheck[] = [
             const world = await GetOrLoadWorld(ctx);
             const byStaffA = lower((await FindRows<{ ID: string }>(ctx, COMMITTEES_ENTITY, '', ['ID'], world.StaffA)).map((r) => r.ID));
             Assert(byStaffA.has(world.CommitteeA.ID.toLowerCase()), 'StaffA reads CommitteeA');
-            for (const [label, user] of [['StaffB', world.StaffB], ['StaffNoMembership', world.StaffNoMembership]] as const) {
-                const rows = await FindRows<{ ID: string }>(ctx, COMMITTEES_ENTITY, '', ['ID'], user);
-                AssertEqual(rows.length, 0, `committees ${label} reads`);
-            }
+            Assert(!byStaffA.has(world.CommitteeB.ID.toLowerCase()), 'StaffA does not read CommitteeB');
+            const byStaffB = (await FindRows<{ ID: string }>(ctx, COMMITTEES_ENTITY, '', ['ID'], world.StaffB)).map((r) => r.ID.toLowerCase());
+            AssertEqual(byStaffB.join(', '), world.CommitteeB.ID.toLowerCase(), 'committees StaffB reads (exactly CommitteeB, never CommitteeA)');
+            const byNone = await FindRows<{ ID: string }>(ctx, COMMITTEES_ENTITY, '', ['ID'], world.StaffNoMembership);
+            AssertEqual(byNone.length, 0, 'committees StaffNoMembership reads');
         },
     },
 ];

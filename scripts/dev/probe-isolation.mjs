@@ -50,7 +50,24 @@ const CONTROL_EMAIL = LoadPersonas().issuer.email;
 const NOT_FOUND = 'Record not found.';
 const READ_REFUSAL = /does not have read permissions? on/i;
 
-const SEVEN_ENTITIES = Object.values(CredentialingEntity);
+/** Every credentialing entity (B1's seven and B2's ten). */
+const ALL_CREDENTIALING_ENTITIES = Object.values(CredentialingEntity);
+/**
+ * The entities an applicant never reads: B1's seven and Response Sources. Since B2 Task 3 applicant-a
+ * is a contact of the world subject `Sample Applicant One`, so it reads that subject's rows of the nine
+ * applicant-data entities by design (proved server-side by `cred-subject-isolation.1`; Task 12 adds
+ * them to this probe as P11).
+ */
+const AUTHORING_ENTITIES = [
+  CredentialingEntity.AccreditingOrganization,
+  CredentialingEntity.OrganizationMembership,
+  CredentialingEntity.Program,
+  CredentialingEntity.ProgramVersion,
+  CredentialingEntity.Section,
+  CredentialingEntity.Standard,
+  CredentialingEntity.DocumentRequirement,
+  CredentialingEntity.ResponseSource,
+];
 const PLATFORM_ENTITIES = ['MJ: Users', 'MJ: Entities', 'MJ_BizApps_Common: People', 'MJ_BizApps_Common: Organizations'];
 
 /** @typedef {import('@memberjunction/graphql-dataprovider').GraphQLDataProvider} Session */
@@ -272,9 +289,12 @@ function reversedStandards(target) {
 
 // ── cases ────────────────────────────────────────────────────────────────────────────────────────
 
-/** P1 / P3: an external role reads nothing from the seven credentialing entities. */
-async function caseSevenEntities(id, persona) {
-  await probeCase(id, persona.Name, () => readsNothingFromAll(persona.Provider, SEVEN_ENTITIES));
+/**
+ * P1 / P3: an external role reads nothing from `entities` — every credentialing entity for a reviewer
+ * or committee member (P3), the authoring entities for a subject contact (P1).
+ */
+async function caseSevenEntities(id, persona, entities = ALL_CREDENTIALING_ENTITIES) {
+  await probeCase(id, persona.Name, () => readsNothingFromAll(persona.Provider, entities));
 }
 
 /** P4: staff-b loads the sample program by its ID over GraphQL. */
@@ -581,7 +601,7 @@ async function main() {
     const controlChanges = await requireRows(control.Provider, 'MJ: Record Changes', `RecordID LIKE '%${target.Program.ID}%'`, ['ID']);
     const queryIDs = await credentialingQueryIDs(control.Provider);
 
-    await caseSevenEntities('P1', applicant);
+    await caseSevenEntities('P1', applicant, AUTHORING_ENTITIES);
     await probeCase('P2', applicant.Name, () => readsNothingFromAll(applicant.Provider, PLATFORM_ENTITIES));
     await caseSevenEntities('P3', reviewer);
     await caseSevenEntities('P3', committee);

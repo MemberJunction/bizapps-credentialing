@@ -32,7 +32,7 @@ Source references are to MemberJunction at tag `v6.2.2`.
 | **Relationship loads** (related-record grids and tabs on a form, `EntityRelationship` views) | Filtered by the platform: they are RunViews of the related entity as the user. | Unreachable (read refused). | same as RunView: `cred-isolation.1`; probe **P1**, **P3** |
 | **Global search** (`Search everything…`, `SearchEntities`) | Filtered by the platform: `SearchEntities` runs RunViews as the requesting user (`mj/packages/MJServer/src/resolvers/SearchEntitiesResolver.ts:104-151`). Knowledge search needs a search scope; no `MJ: Search Scope Entities` or `MJ: Entity Documents` row names a credentialing entity in B1. | Unreachable (no read on the seven; no search scope). | same path as RunView; not probed separately |
 | **Engine caches** (`BaseEngine` subclasses loaded in the browser) | Filtered by the platform: an engine loads through RunView as the signed-in user, and a config the user cannot read is skipped (`BaseEngine.CheckPermissionsOrSkipAll`, `mj/packages/MJCore/src/generic/baseEngine.ts:2138`). B1 adds no credentialing engine. | Same. | Task 8 / Task 12 browser checks (the "Skipping N config(s)" warnings) |
-| **System-user work** | **Three places**, all reached through `SystemUser.Get` (`packages/CoreEntitiesServer/src/guards/SystemUser.ts`, `UserCache.Instance.GetSystemUser()`). **1.** `Credentialing.CreateOrganization` (`packages/CoreEntitiesServer/src/operations/CreateOrganizationServerOperation.ts`), after `Authorize` has established `Credentialing Admin`, writes the Common organization, the accrediting organization, the membership and the `MJ: User Roles` / `MJ: User Applications` rows **as the system user**, because the calling admin has, and should have, no permission on those platform entities. It returns only the IDs it wrote. **2.** Deleting an accrediting organization (`packages/CoreEntitiesServer/src/AccreditingOrganizationEntityServer.ts`) **reads, as the system user, whether that one organization has any program** (`Fields: ['ID']`, `MaxRows: 1`, read-only), because the only role that may delete an organization, `Credentialing Admin`, has no permission on programs: read as the caller, the check was refused and so was every delete (measured). The admin provisions organizations and may be told that programs exist (the refusal is the fixed sentence `Remove this organization's programs before deleting it.`), never which: nothing about a program reaches the caller. The read runs only for a caller holding Delete on accrediting organizations, after the organization has been re-read as that caller; any other caller gets the platform's permission refusal first. **3.** `Credentialing.CreateCommittee` (`packages/CoreEntitiesServer/src/operations/CreateCommitteeServerOperation.ts`), after `Authorize` has established `Credentialing Staff`, **writes one BizApps Committees committee as the system user**, because the write goes to another app's entity that staff must not be able to write freely: staff hold only the filtered Read on `Committees: Committees`, and a Create there would let a staff member make a committee for any organization (or for none). The operation fixes the owning organization itself: the caller names a program, the program and its accrediting organization are read **as the caller** (another organization's program answers `Record not found.`, exactly like a random ID), and the committee's `OrganizationID` is that organization's Common organization, never a value the caller sent. Before the write it reads as the system user, under the organization's authoring lock, whether the committee type exists and whether that one organization already has a committee of the name (`ID` only, at most one row each); the caller learns only the fixed sentences `Choose a committee type.` and `A committee named … already exists for this organization.`, both about the caller's own organization. The committee is created `Active` and private (`IsPublic` 0). Nothing else in this app's code acts as the system user. (Outside this app: magic-link redemption provisions accounts as MJAPI's configured provisioning user, and MJAPI's system API key — used by the integration harness and seeding — is the `System` user; neither is reachable by a signed-in credentialing user.) | Guarded by this app (`FORBIDDEN`; the delete: no Delete permission). | `cred-operations.8`–`.10`, `.13`, `.14`, `.16`–`.20`, `cred-operations-wire.1`; probe **P8**, **P11**, **P12** (staff-b told `Record not found.`, applicant-a `FORBIDDEN`, each like a random program ID; no committee created) |
+| **System-user work** | **Three places in B1** (B2 adds the reads listed under "B2: applicant data" below), all reached through `SystemUser.Get` (`packages/CoreEntitiesServer/src/guards/SystemUser.ts`, `UserCache.Instance.GetSystemUser()`). **1.** `Credentialing.CreateOrganization` (`packages/CoreEntitiesServer/src/operations/CreateOrganizationServerOperation.ts`), after `Authorize` has established `Credentialing Admin`, writes the Common organization, the accrediting organization, the membership and the `MJ: User Roles` / `MJ: User Applications` rows **as the system user**, because the calling admin has, and should have, no permission on those platform entities. It returns only the IDs it wrote. **2.** Deleting an accrediting organization (`packages/CoreEntitiesServer/src/AccreditingOrganizationEntityServer.ts`) **reads, as the system user, whether that one organization has any program** (`Fields: ['ID']`, `MaxRows: 1`, read-only), because the only role that may delete an organization, `Credentialing Admin`, has no permission on programs: read as the caller, the check was refused and so was every delete (measured). The admin provisions organizations and may be told that programs exist (the refusal is the fixed sentence `Remove this organization's programs before deleting it.`), never which: nothing about a program reaches the caller. The read runs only for a caller holding Delete on accrediting organizations, after the organization has been re-read as that caller; any other caller gets the platform's permission refusal first. **3.** `Credentialing.CreateCommittee` (`packages/CoreEntitiesServer/src/operations/CreateCommitteeServerOperation.ts`), after `Authorize` has established `Credentialing Staff`, **writes one BizApps Committees committee as the system user**, because the write goes to another app's entity that staff must not be able to write freely: staff hold only the filtered Read on `Committees: Committees`, and a Create there would let a staff member make a committee for any organization (or for none). The operation fixes the owning organization itself: the caller names a program, the program and its accrediting organization are read **as the caller** (another organization's program answers `Record not found.`, exactly like a random ID), and the committee's `OrganizationID` is that organization's Common organization, never a value the caller sent. Before the write it reads as the system user, under the organization's authoring lock, whether the committee type exists and whether that one organization already has a committee of the name (`ID` only, at most one row each); the caller learns only the fixed sentences `Choose a committee type.` and `A committee named … already exists for this organization.`, both about the caller's own organization. The committee is created `Active` and private (`IsPublic` 0). Nothing else in this app's code acts as the system user. (Outside this app: magic-link redemption provisions accounts as MJAPI's configured provisioning user, and MJAPI's system API key — used by the integration harness and seeding — is the `System` user; neither is reachable by a signed-in credentialing user.) | Guarded by this app (`FORBIDDEN`; the delete: no Delete permission). | `cred-operations.8`–`.10`, `.13`, `.14`, `.16`–`.20`, `cred-operations-wire.1`; probe **P8**, **P11**, **P12** (staff-b told `Record not found.`, applicant-a `FORBIDDEN`, each like a random program ID; no committee created) |
 | **Magic-link invite rows** (`MJ: Magic Link Invites`) | Unreachable: no credentialing role holds any permission row on it; links are issued by the local dev Owner (docs/dev-instance.md, "Signing in as a persona"). | Unreachable. | probe **P10** (Create refused for want of permission; read refused) |
 | **File download** | No credentialing entity stores a file in B1. **Owed by the plan that introduces document uploads:** files must be served through a path that checks the owning record's row filter as the caller. | — | — |
 | **Direct database access** | Unreachable: only the MJAPI and CodeGen service accounts connect to the database; no user role maps to a database login (all five roles have `SQLName: null`, `metadata/roles/.roles.json`). | Unreachable. | — |
@@ -76,3 +76,83 @@ invites from the product needs more than `inviteIssuerRoleNames`:
   proving a staff user cannot create an invite for any other role or application.
 - Until then, probe **P10** proves the present state: neither `staff-b` nor `applicant-a` can create
   or read an invite row.
+
+## B2: applicant data (Task 3)
+
+The nine **applicant-data entities** — Subjects, Subject Contacts, Applications, Standard Responses,
+Response Citations, Evidence Documents, Document Attestations, Application Documents, Extractions —
+each carry their subject (`Subject.ID`, every other row `SubjectID`), so two filters per role cover
+them all. `Response Sources` is authoring data under a version and follows B1's tree pattern.
+
+| Filter | Text | Attached to |
+|---|---|---|
+| `Credentialing: Applicant Subjects` | `(ID IN (SELECT c.SubjectID FROM [__mj_BizAppsCredentialing].[vwSubjectContacts] c WHERE c.UserID = TRY_CAST('{{UserID}}' AS UNIQUEIDENTIFIER)))` | Subjects, for `Credentialing Applicant` |
+| `Credentialing: Applicant Rows By Subject` | `(SubjectID IN (SELECT c.SubjectID FROM [__mj_BizAppsCredentialing].[vwSubjectContacts] c WHERE c.UserID = …))` | the other eight, for `Credentialing Applicant` |
+| `Credentialing: Staff Subjects` | `(AccreditingOrganizationID IN (<membership>))` | Subjects, for `Credentialing Staff` |
+| `Credentialing: Staff Rows By Subject` | `(SubjectID IN (SELECT s.ID FROM [__mj_BizAppsCredentialing].[vwSubjects] s WHERE s.AccreditingOrganizationID IN (<membership>)))` | the other eight, for `Credentialing Staff` |
+
+Grants: `Credentialing Applicant` and `Credentialing Staff` each hold Read, Create and Update — no
+Delete — on the nine, with the matching filter on read, create **and** update.
+`Credentialing Staff` holds RCUD on `Response Sources` with `Credentialing: Staff Rows By Version`.
+`Credentialing Reviewer` and `Credentialing Committee` hold nothing on any of the ten. An applicant
+holds no permission row on Programs, Program Versions, Sections, Standards, Document Requirements,
+Response Sources, Accrediting Organizations or Organization Memberships (`cred-subject-isolation.6`).
+`Extractions` and `Evidence Documents` carry `ExtractedText`: the subject's own material, readable
+to its contacts and its organization's staff.
+
+### How the create and update filters are evaluated (Task 3 Step 3 discovery)
+
+Read from MJ v6.2.2 (`mj/packages/MJCore/src/generic/databaseProviderBase.ts:2126-2195`,
+`mj/packages/GenericDatabaseProvider/src/GenericDatabaseProvider.ts:7633-7760`):
+
+- **Create**: `CheckCreateRLS` evaluates the Create filter against **the new row's values** — a
+  synthetic one-row subquery projecting every non-virtual field as the caller set it
+  (`SELECT CASE WHEN (<filter>) THEN 1 ELSE 0 END FROM (SELECT <values>) AS newrow`, NULLs typed from
+  metadata). It runs after validation and again after the before-save hooks (post-image), so a hook
+  cannot move a new row out of scope. Refusal: `Access denied for new <entity> record`. A column the
+  database fills on insert is NULL there, so `Credentialing: Applicant Subjects` (`ID IN …`) can never
+  admit a Subject created without an explicit ID — no applicant path creates one.
+- **Update**: `CheckRecordRLS` checks the **stored row** by primary key against the Update filter
+  (pre-image; refusal `Record not found or access denied for <entity>`), then
+  `CheckUpdateRLSPostImage` checks the **new values** the same synthetic way. The post-image check is
+  skipped only when the filter decomposes into simple `column <op> literal` terms none of which is
+  dirty; these filters hold subqueries, so it always runs.
+- **Delete**: `CheckRecordRLS` on the stored row with the Delete filter (no role holds Delete on the nine).
+- The filter subqueries run on the saving transaction's connection, so rows inserted earlier in the
+  same operation (a new subject, then its contact) are visible to them (as B1's `CreateProgram` showed).
+
+So create and update filters **are** enforced on the values written. They are not the only guard: the
+nine entity subclasses refuse every save and delete that is not an operation write (below), and every
+operation reaches its rows through `SubjectAccess` first.
+
+### What guards each path
+
+| Path | Guard | Proof |
+|---|---|---|
+| RunView / single-record load / record name / relationship grids of the nine | Filtered by the platform with the four filters above. Another subject's or organization's rows are not returned. | `cred-subject-isolation.1`, `.2` |
+| Generated create/update/delete mutations, any entity `Save`/`Delete` of the nine | **Guarded by this app** — refused for every caller, staff and the system user included, with `This record is changed only through the application's own actions.`: each subclass (`packages/CoreEntitiesServer/src/*EntityServer.ts`, through `guards/ApplicantRow.ts`) admits only a write made through an operation's `OperationWrite` scope (`guards/OperationWrite.ts`, a module-private `WeakSet` that nothing a request sends can reach). An admitted write still runs the platform's permission and filter checks as the caller, after the subclass has restored the immutable columns from the loaded row and set `SubjectID` from the parent (read as the caller). | `cred-subject-isolation.4` (refused, row unchanged), `.5` (admitted write saves as the contact; its record change names the contact; a changed `SubjectID` is restored). Through MJAPI (Task 3 runtime check): staff-a's `UpdatemjBizAppsCredentialingStandardResponse` (`Status: "Confirmed"`) and `DeletemjBizAppsCredentialingStandardResponse` on a `Sample Applicant One` response both answered `This record is changed only through the application's own actions.`; the stored row stayed `Empty`. |
+| Remote operations of Tasks 4–11 | **Guarded by this app** — `SubjectAccess` (`guards/SubjectAccess.ts`) reads the subject, application, response or document **as the caller**; nothing loads → `Record not found.`, identical to a random ID. | `cred-subject-isolation.3` |
+| `Response Sources` writes | Staff only (permission), Draft version only, under the version lock (`ResponseSourceEntityServer.ts`, `ResponseSourceRules`); `ProgramVersionID` is the standard's, set by the server. | Task 10 `cred-prefill.7` |
+
+### System-user reads added by Task 3
+
+All through `SystemUser.Get`, and only **after** the caller's own row filter has admitted the owned row:
+
+- `SubjectAccess.Application` reads the application's **version and program**; `SubjectAccess.Response`
+  reads the response's **standard and version** — by the IDs the admitted row carries, one row each.
+  An applicant holds no permission on authoring entities (plan Decision 3); these entity objects go to
+  server code, never to the client, which receives only what an operation returns.
+- `SubjectAccess.Requirement` reads one **document requirement** by ID and admits it only when the
+  subject (already admitted) holds an application on the requirement's version; otherwise
+  `Record not found.`.
+- `SubjectAccess.ActorFor` reads the subject's **contact rows and its organization's memberships**,
+  filtered to the one user and the one subject (`ID` only), to decide `Applicant` or `Staff`
+  (`Applicant` wins when both, and each also requires the matching role). An applicant cannot read
+  memberships.
+- Probe **P1** is re-scoped: applicant-a is now a contact of `Sample Applicant One`, so P1 asserts it
+  reads nothing from the eight authoring entities (B1's seven and Response Sources); its own-subject
+  reads of the nine are proved by `cred-subject-isolation.1` until Task 12 adds them to the probe (P11).
+  P3 (reviewer, committee member) covers all seventeen entities.
+- The integration world (`packages/IntegrationTests/src/world/applicant-world.ts`) writes its
+  subjects, party records, contacts, applications and responses as the system user inside
+  `OperationWrite`, as an invitation will; test code, not product code.

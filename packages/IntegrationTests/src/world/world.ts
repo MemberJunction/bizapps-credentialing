@@ -32,8 +32,39 @@ export interface WorldUsers {
     Admin: UserInfo;
     /** Holds only the platform `UI` role (`ui.only@example.test`). */
     UIOnly: UserInfo;
-    /** Holds only `Credentialing Applicant` (`applicant.a@example.test`). */
+    /**
+     * Holds only `Credentialing Applicant` (`applicant.a@example.test`); the contact of
+     * `Sample Applicant One` (see {@link WorldApplicants}).
+     */
     ApplicantA: UserInfo;
+}
+
+/** A subject of the world with its contacts and its Draft application on its organization's Active version. */
+export interface WorldSubject {
+    ID: string;
+    DisplayName: string;
+    AccreditingOrganizationID: string;
+    /** The subject's contacts, in the order they were added; the first is the primary contact. */
+    Contacts: UserInfo[];
+    /** The Draft application on the organization's sample Active version. */
+    ApplicationID: string;
+    /** The ID of every response of that application (one per standard of the version). */
+    ResponseIDs: string[];
+}
+
+/**
+ * The applicant world. Written by `EnsureApplicantWorld` as the system user inside the server's
+ * operation-only write path, so it holds only states an operation could create: each subject has a
+ * party record, its contacts were invited by staff of its organization, and its Draft application is
+ * on an Active version of its own organization with one Empty response per standard.
+ */
+export interface WorldApplicants {
+    /** `Sample Applicant One` in OrgA; contacts ApplicantA (`applicant.a@example.test`) and `applicant.two@example.test`. */
+    SubjectOne: WorldSubject;
+    /** `Sample Applicant Two` in OrgA; contact `applicant.b@example.test`. */
+    SubjectTwo: WorldSubject;
+    /** `Sample Applicant Org B` in OrgB; contact `applicant.orgb@example.test`. */
+    SubjectOrgB: WorldSubject;
 }
 
 /** The organizations, committee and sample program the checks read. */
@@ -42,6 +73,8 @@ export interface WorldData {
     OrgB: WorldOrganization;
     /** A committee owned by OrgA's Common organization. */
     CommitteeA: WorldCommittee;
+    /** A committee owned by OrgB's Common organization (the deciding committee of OrgB's Active version). */
+    CommitteeB: WorldCommittee;
     /**
      * `Sample Certified Practitioner` in OrgA, with its Draft version `2027`. Read-only to checks:
      * a check that changes a program makes its own with `MakeScratchProgram`.
@@ -54,11 +87,20 @@ export interface WorldData {
     PlaceholderProgram: ProgramTree;
     /** `Sample Program B` in OrgB, StaffB's organization, with its Draft version `2027`. Read-only to checks. */
     ProgramB: ProgramTree;
+    /**
+     * `Sample Applicant Program` in OrgA with its **Active** version `2026` (deciding committee
+     * CommitteeA): "the sample Active version" the applicant world and the invitation tasks use.
+     * Read-only to checks.
+     */
+    ApplicantProgram: ProgramTree;
+    /** `Sample Program B Applicants` in OrgB with its Active version `2026` (CommitteeB). Read-only to checks. */
+    ApplicantProgramB: ProgramTree;
 }
 
 /** Everything a credentialing check can rely on existing. */
 export interface CredentialingWorld extends WorldUsers, WorldData {
     Loaded: boolean;
+    Applicants: WorldApplicants;
 }
 
 let current: CredentialingWorld | null = null;
