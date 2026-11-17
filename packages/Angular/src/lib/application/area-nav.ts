@@ -92,6 +92,16 @@ export class AreaNav {
         return ranked.map((r, i) => ({ ...r.Item, IsDefault: i === defaultIndex }));
     }
 
+    /**
+     * Whether a resource may open for this user: true exactly when the user's own navigation holds
+     * an item driven by it. The Application record lists every item (so Explorer can resolve any deep
+     * link); this is what keeps a resource from showing an area the user's roles do not serve.
+     */
+    public static CanOpen(standing: Standing, driverClass: string): boolean {
+        const wanted = driverClass.trim().toLowerCase();
+        return AreaNav.ItemsFor(standing).some((item) => item.DriverClass.toLowerCase() === wanted);
+    }
+
     /** What the Staff area shows for this user. */
     public static StaffState(standing: Standing): StaffState {
         if (AreaNav.holds(standing, CredentialingRole.Admin) && standing.OrganizationCount === 0) {

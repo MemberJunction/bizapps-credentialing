@@ -32,6 +32,7 @@ export * from './lib/application/area-nav';
 export { CredentialingApplication, LoadCredentialingApplication } from './lib/application/credentialing.application';
 export { StandingService, type StandingDataSource, type StandingUser } from './lib/shared/standing.service';
 export { OrganizationSetupComponent, type OrganizationSetupErrorField } from './lib/staff/organization-setup/organization-setup.component';
+export { CredentialingAreaResource, AREA_NOT_AVAILABLE_MESSAGE, type AreaResourceState } from './lib/resources/credentialing-area-resource';
 export { CredentialingProgramStudioResource, LoadCredentialingProgramStudioResource } from './lib/resources/staff-program-studio.resource';
 export { CredentialingOrganizationSetupResource, LoadCredentialingOrganizationSetupResource } from './lib/resources/staff-organization-setup.resource';
 export { CredentialingReviewHomeResource, LoadCredentialingReviewHomeResource } from './lib/resources/review-home.resource';

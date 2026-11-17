@@ -205,12 +205,24 @@ Committee → `Assignments` (`CredentialingReviewHomeResource`); Applicant → `
 `Developer` owner) sees no nav items. The scaffold `Overview` page no longer exists.
 
 Observed in Explorer (Task 10, MJ v6.2.2):
-- **Deep links log one error but work.** On a reload of `/app/credentialing/<Nav Item>`, the
-  route guard looks the item up in the record's `DefaultNavItems` JSON only
-  (`mj/packages/Angular/Explorer/explorer-core/src/app-routing.module.ts:500-520`), not in
-  `GetNavItems()`, so it logs `Nav item Program Studio not found in app credentialing` and
-  returns; the shell then restores the tab and the page renders. Opening `/app/credentialing`
-  logs nothing.
+- **Deep links: `DefaultNavItems` lists every item, each resource guards itself.** Explorer's route
+  guard resolves `/app/credentialing/<Nav Item>` from the record's `DefaultNavItems` JSON only
+  (`mj/packages/Angular/Explorer/explorer-core/src/app-routing.module.ts:500-545`), not from
+  `GetNavItems()`; an item missing from that list logs `Nav item … not found in app credentialing`
+  and returns before the tab is queued with the URL's query parameters. So `DefaultNavItems` holds
+  all five labels (`Program Studio`, `Set up organization`, `New organization`, `Assignments`,
+  `My Applications`; only the last is `isDefault`). What a user sees is still decided per user by
+  `GetNavItems()`; a resource opened by URL by a user whose roles do not serve its area
+  (`AreaNav.CanOpen`, `CredentialingAreaResource`) shows only `This area is not available to your
+  account.` and makes no data request. Verified: `staff.a` opening
+  `/app/credentialing/Program%20Studio?probe=1` in a fresh tab gets Program Studio with
+  `Data.Configuration.queryParams = {"probe":"1"}` and no guard error; `admin@example.test` gets the
+  not-available panel there; `staff.a` gets it on the four other items.
+- **A user with no Credentialing role never reaches a resource.** `UI` has no `MJ: Application Roles`
+  grant on Credentialing, so `UserInfoEngine.UserHasApplicationAccess` is false and Explorer shows
+  "No Applications Available" for every Credentialing URL, even with an `MJ: User Applications`
+  row (checked with `ui.only@example.test` and a temporary row, removed afterwards). No
+  credentialing request reached MJAPI.
 - **A saved tab for a removed resource heals once.** A workspace saved while `Overview` existed
   logs `No resource component registered for driver class "CredentialingOverviewResource"` on
   the next sign-in, after which the shell drops the tab and the saved configuration no longer
@@ -430,7 +442,20 @@ before `corepack pnpm run build`.
    corepack pnpm run build:packages
    corepack pnpm exec mj sync push --dir=metadata-tests --ci
    ```
-9. Set `MJ_API_KEY` in `bizapps-credentialing/.env` for the client-transport harness. It is
+9. Set `MJ_BASE_ENCRYPTION_KEY` — the same value — in `mj/.env` (MJAPI) and
+   `bizapps-credentialing/.env` (`mj test`, the dev scripts). It is the key material of the
+   `Base Encryption Key` row (`__mj.EncryptionKey`, `EnvVarKeySource`, algorithm `AES-256-GCM`,
+   256 bits), so it is 32 random bytes, base64-encoded, generated as MJ's message says
+   (`mj/packages/Encryption/src/providers/EnvVarKeySource.ts`):
+   ```sh
+   openssl rand -base64 32
+   # then in each .env:
+   MJ_BASE_ENCRYPTION_KEY=<base64 of 32 random bytes>
+   ```
+   Without it every MJAPI start and `mj test` run prints `ENCRYPTION KEY VALIDATION FAILED`
+   (`EncryptionStartupValidator`), and any save of an encrypted field (`MJ: Credentials`) fails.
+   Set it before anything is encrypted: values encrypted under one key cannot be read with another.
+10. Set `MJ_API_KEY` in `bizapps-credentialing/.env` for the client-transport harness. It is
    MJAPI's **system** API key — the same value as `MJ_API_KEY` in `mj/.env` — not a user
    `mj_sk_…` key (see "Running tests" below). No key is created in Explorer or in the database.
 

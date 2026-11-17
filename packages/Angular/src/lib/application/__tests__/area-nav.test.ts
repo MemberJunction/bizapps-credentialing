@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { AreaNav, AreaNavItem, CredentialingRole, Standing } from '../area-nav';
+import { AreaNav, AreaNavItem, CredentialingResource, CredentialingRole, Standing } from '../area-nav';
 
 const ORG_A = { ID: 'A1111111-1111-1111-1111-111111111111', Name: 'Organization A' };
 
@@ -108,5 +108,44 @@ describe('AreaNav', () => {
                 expect(defaults(items)).toHaveLength(items.length === 0 ? 0 : 1);
             }
         }
+    });
+});
+
+describe('AreaNav.CanOpen', () => {
+    const R = CredentialingResource;
+    const allResources = [R.ProgramStudio, R.OrganizationSetup, R.ReviewHome, R.ApplicantHome];
+
+    /** Which resources each single role may open, with the standing that role loads. */
+    const cases: { Name: string; Standing: Standing; Opens: string[] }[] = [
+        { Name: 'Staff with a membership', Standing: standing([CredentialingRole.Staff], [ORG_A]), Opens: [R.ProgramStudio] },
+        { Name: 'Staff without a membership', Standing: standing([CredentialingRole.Staff], []), Opens: [R.ProgramStudio] },
+        { Name: 'Admin, first run', Standing: standing([CredentialingRole.Admin], [], 0), Opens: [R.OrganizationSetup] },
+        { Name: 'Admin with organizations', Standing: standing([CredentialingRole.Admin], [], 5), Opens: [R.OrganizationSetup] },
+        { Name: 'Reviewer', Standing: standing([CredentialingRole.Reviewer]), Opens: [R.ReviewHome] },
+        { Name: 'Committee', Standing: standing([CredentialingRole.Committee]), Opens: [R.ReviewHome] },
+        { Name: 'Applicant', Standing: standing([CredentialingRole.Applicant]), Opens: [R.ApplicantHome] },
+        { Name: 'no credentialing role', Standing: standing(['UI', 'Developer']), Opens: [] },
+    ];
+
+    for (const c of cases) {
+        for (const resource of allResources) {
+            const expected = c.Opens.includes(resource);
+            it(`${c.Name} ${expected ? 'can' : 'cannot'} open ${resource}`, () => {
+                expect(AreaNav.CanOpen(c.Standing, resource)).toBe(expected);
+            });
+        }
+    }
+
+    it('a user holding several roles can open each of their areas and nothing else', () => {
+        const s = standing([CredentialingRole.Staff, CredentialingRole.Applicant], [ORG_A]);
+        expect(allResources.filter((r) => AreaNav.CanOpen(s, r))).toEqual([R.ProgramStudio, R.ApplicantHome]);
+    });
+
+    it('an unknown driver class is never openable', () => {
+        expect(AreaNav.CanOpen(standing(Object.values(CredentialingRole), [ORG_A], 1), 'SomethingElse')).toBe(false);
+    });
+
+    it('matches the driver class without regard to case', () => {
+        expect(AreaNav.CanOpen(standing([CredentialingRole.Applicant]), R.ApplicantHome.toLowerCase())).toBe(true);
     });
 });

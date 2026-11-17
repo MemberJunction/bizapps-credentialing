@@ -141,13 +141,22 @@ and calls `GetNavItems()` often (every workspace change, tab restore, omnibar
 search), so anything the method reads must be cached. The subclass is bundled the
 same way as a resource component (§2: exported, and anchored from the startup
 export). If the class is not loaded, Explorer falls back to `BaseApplication`, which
-shows `DefaultNavItems` — keep that list to something every user of the app may see.
+shows `DefaultNavItems`.
+
+**`DefaultNavItems` must still list every item.** Explorer's route guard resolves a
+deep link `/app/<app>/<Nav Item>` from the record's `DefaultNavItems` JSON alone, not
+from `GetNavItems()` (MJ 6.2.2, `explorer-core/src/app-routing.module.ts`). An item
+missing there logs `Nav item … not found` and the URL's query parameters never reach
+the resource. So list every label the app can show, and — because that list is no
+longer what each user may see — make each resource check for itself that the
+signed-in user's roles serve it, rendering a plain "not available" message otherwise.
 
 This app does exactly that: `CredentialingApplication`
 (`packages/Angular/src/lib/application/`) shows each user only the areas their
-roles serve — Staff (`Program Studio`, `Set up organization` / `New organization`),
-Review (`Assignments`), Applicant (`My Applications`) — and its `DefaultNavItems`
-holds only the Applicant item.
+roles serve — Staff (`Program Studio`), Admin (`Set up organization` / `New
+organization`), Review (`Assignments`), Applicant (`My Applications`) — its
+`DefaultNavItems` lists all five, and every resource extends
+`CredentialingAreaResource`, which asks `AreaNav.CanOpen` before loading anything.
 
 ## Getting it into a release
 

@@ -2,8 +2,13 @@
  * The Credentialing application in MJ Explorer: navigation by area, decided per user.
  *
  * Selected by `ClassName: "CredentialingApplication"` on the `MJ: Applications` record. Each user
- * sees only the areas their roles serve (see {@link AreaNav}); the record's `DefaultNavItems` holds a
- * single Applicant item and is used only if this class is not loaded.
+ * sees only the areas their roles serve (see {@link AreaNav}).
+ *
+ * The record's `DefaultNavItems` lists EVERY item this app can show, because Explorer's route guard
+ * resolves `/app/credentialing/<item>` from that list alone; an item missing from it makes a deep link
+ * (and the query parameters it carries) fail. That list is therefore not least-privilege: each
+ * resource guards itself through `AreaNav.CanOpen` (`CredentialingAreaResource`) and shows
+ * `This area is not available to your account.` to a user whose roles do not serve it.
  */
 import { LogError } from '@memberjunction/core';
 import { RegisterClass } from '@memberjunction/global';
