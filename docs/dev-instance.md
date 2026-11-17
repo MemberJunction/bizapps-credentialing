@@ -195,8 +195,29 @@ and to the five credentialing roles (access); `UI` has no grant. When signing in
 `admin@memberjunction.org` (`Developer`), `Credentialing` is absent from the app
 switcher initially and is added via **Application launcher → Configure… →
 Available Applications → Add Credentialing → Save Changes** (creating an
-`MJ: User Applications` row, `IsActive = 1`), after which opening `Credentialing`
-loads `CredentialingOverviewResource` at `/app/credentialing/Overview`.
+`MJ: User Applications` row, `IsActive = 1`). Opening `Credentialing` then shows the nav
+items `CredentialingApplication` builds from the user's roles (Task 10; `ClassName:
+"CredentialingApplication"` on the Application record): Credentialing Staff → `Program Studio`
+(`CredentialingProgramStudioResource`); Credentialing Admin → `Set up organization` (no
+organization exists) or `New organization` (`CredentialingOrganizationSetupResource`); Reviewer or
+Committee → `Assignments` (`CredentialingReviewHomeResource`); Applicant → `My Applications`
+(`CredentialingApplicantHomeResource`). A user holding none of the five roles (such as the dev
+`Developer` owner) sees no nav items. The scaffold `Overview` page no longer exists.
+
+Observed in Explorer (Task 10, MJ v6.2.2):
+- **Deep links log one error but work.** On a reload of `/app/credentialing/<Nav Item>`, the
+  route guard looks the item up in the record's `DefaultNavItems` JSON only
+  (`mj/packages/Angular/Explorer/explorer-core/src/app-routing.module.ts:500-520`), not in
+  `GetNavItems()`, so it logs `Nav item Program Studio not found in app credentialing` and
+  returns; the shell then restores the tab and the page renders. Opening `/app/credentialing`
+  logs nothing.
+- **A saved tab for a removed resource heals once.** A workspace saved while `Overview` existed
+  logs `No resource component registered for driver class "CredentialingOverviewResource"` on
+  the next sign-in, after which the shell drops the tab and the saved configuration no longer
+  names it.
+- **Choosing the signed-in user without restarting MJAPI:** set `LOCAL_DEV_EMAIL` in
+  `mj/packages/MJExplorer/src/environments/environment.development.ts` (the file `ng serve`
+  uses; local only), wait for the dev server's rebuild, reload. Remove the line afterwards.
 
 ### Default CodeGen Role Grants (`mj.config.cjs`)
 

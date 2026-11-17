@@ -122,6 +122,33 @@ users need an explicit `MJ: User Applications` row — either through Explorer's
 save script calling `md.GetEntityObject('MJ: User Applications', contextUser)`
 (never raw SQL DML).
 
+## Nav items decided in code: `ClassName`
+
+`DefaultNavItems` is the same list for every user. When the items depend on who is
+signed in, set `ClassName` on the `MJ: Applications` record to a subclass of
+`BaseApplication` (`@memberjunction/ng-base-application`) registered under that
+name, and override `GetNavItems()`:
+
+```ts
+@RegisterClass(BaseApplication, 'CredentialingApplication')
+export class CredentialingApplication extends BaseApplication {
+  override async GetNavItems(): Promise<NavItem[]> { /* items for this user */ }
+}
+```
+
+Explorer creates the application object through the class factory by `ClassName`
+and calls `GetNavItems()` often (every workspace change, tab restore, omnibar
+search), so anything the method reads must be cached. The subclass is bundled the
+same way as a resource component (§2: exported, and anchored from the startup
+export). If the class is not loaded, Explorer falls back to `BaseApplication`, which
+shows `DefaultNavItems` — keep that list to something every user of the app may see.
+
+This app does exactly that: `CredentialingApplication`
+(`packages/Angular/src/lib/application/`) shows each user only the areas their
+roles serve — Staff (`Program Studio`, `Set up organization` / `New organization`),
+Review (`Assignments`), Applicant (`My Applications`) — and its `DefaultNavItems`
+holds only the Applicant item.
+
 ## Getting it into a release
 
 `metadata/` is **dev-time only** — an install never reads it. The Application

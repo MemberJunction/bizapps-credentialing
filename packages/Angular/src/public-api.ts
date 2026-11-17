@@ -10,9 +10,10 @@
  *   src/lib/generated/ — CodeGen Angular output (entity forms; never hand-edited).
  *                        After the first codegen run, import './lib/generated/generated-forms.module'
  *                        here and re-export GeneratedFormsModule, as every shipped BizApp does.
- *   src/lib/overview/  — the Credentialing landing resource (this scaffold's one page)
- *   src/lib/           — future components: credential list, detail/edit panels, holder
- *                        dashboard, "My Credentials" — standalone, @if/@for, events not routing
+ *   src/lib/application/ — CredentialingApplication (nav by area) and the pure AreaNav decision
+ *   src/lib/resources/   — thin Explorer resource components, one per nav item
+ *   src/lib/staff/       — Staff-area widgets (organization setup)
+ *   src/lib/shared/      — StandingService: the signed-in user's roles and organizations
  */
 
 // Entity package side-effect import: fires @RegisterClass for entity subclasses once they exist.
@@ -21,12 +22,20 @@ import './lib/generated/generated-forms.module';
 
 export * from './lib/generated/generated-forms.module';
 
-import { LoadCredentialingOverviewResource } from './lib/overview/credentialing-overview.resource';
+import { LoadCredentialingApplication } from './lib/application/credentialing.application';
+import { LoadCredentialingProgramStudioResource } from './lib/resources/staff-program-studio.resource';
+import { LoadCredentialingOrganizationSetupResource } from './lib/resources/staff-organization-setup.resource';
+import { LoadCredentialingReviewHomeResource } from './lib/resources/review-home.resource';
+import { LoadCredentialingApplicantHomeResource } from './lib/resources/applicant-home.resource';
 
-export {
-    CredentialingOverviewResource,
-    LoadCredentialingOverviewResource,
-} from './lib/overview/credentialing-overview.resource';
+export * from './lib/application/area-nav';
+export { CredentialingApplication, LoadCredentialingApplication } from './lib/application/credentialing.application';
+export { StandingService, type StandingDataSource, type StandingUser } from './lib/shared/standing.service';
+export { OrganizationSetupComponent, type OrganizationSetupErrorField } from './lib/staff/organization-setup/organization-setup.component';
+export { CredentialingProgramStudioResource, LoadCredentialingProgramStudioResource } from './lib/resources/staff-program-studio.resource';
+export { CredentialingOrganizationSetupResource, LoadCredentialingOrganizationSetupResource } from './lib/resources/staff-organization-setup.resource';
+export { CredentialingReviewHomeResource, LoadCredentialingReviewHomeResource } from './lib/resources/review-home.resource';
+export { CredentialingApplicantHomeResource, LoadCredentialingApplicantHomeResource } from './lib/resources/applicant-home.resource';
 
 /**
  * Bootstrap function named by mj-app.json packages.client[0].startupExport.
@@ -34,5 +43,9 @@ export {
  * bundler can conclude the modules are unused.
  */
 export function LoadBizAppsCredentialingClient(): void {
-    LoadCredentialingOverviewResource();
+    LoadCredentialingApplication();
+    LoadCredentialingProgramStudioResource();
+    LoadCredentialingOrganizationSetupResource();
+    LoadCredentialingReviewHomeResource();
+    LoadCredentialingApplicantHomeResource();
 }
