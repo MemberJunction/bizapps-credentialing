@@ -5,7 +5,7 @@
     "Description": "Verify the server enforces standard and section tree editing, immutable links, code uniqueness, evaluation mode and stale-snapshot rules, including under concurrent writes.",
     "InputDefinition": {},
     "ExpectedOutcomes": {
-      "summary": "All eight cred-standard-rules checks pass on scratch programs; the sample program is left unchanged."
+      "summary": "All ten cred-standard-rules checks pass on scratch programs; the sample program is left unchanged."
     },
     "Configuration": {
       "tier": "deterministic",

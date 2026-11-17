@@ -14,6 +14,8 @@
     "build:stream": "turbo --log-order=stream build",
     "build:packages": "turbo --log-order=stream build --filter=\"@mj-biz-apps/credentialing-*\"",
     "dev:owner": "node scripts/dev/ensure-dev-owner.mjs",
+    "persona": "node scripts/dev/mint-persona-link.mjs",
+    "probe:isolation": "node scripts/dev/probe-isolation.mjs",
     "test": "turbo --log-order=stream test --filter=\"@mj-biz-apps/credentialing-*\"",
     "test:integration": "node test-harnesses/integration.mjs",
     "seed:dev": "node test-harnesses/integration.mjs cred-world",

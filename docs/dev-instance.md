@@ -395,6 +395,89 @@ Explorer source or restarting MJExplorer:
 `{ email }` in `POST /auth/dev-login`, which avoids editing `mj/.env` or restarting
 MJAPI after initial user creation, at the cost of recompiling MJExplorer.)
 
+## Signing in as a persona
+
+`scripts/dev/personas.json` names the seven personas. Each has an email, a sign-in method and the
+account's origin:
+
+| Persona | Email | Sign-in | Role | Account created by |
+|---|---|---|---|---|
+| `staff-a` | `staff.a@example.test` | dev-login | Credentialing Staff (OrgA) | world (`seed:users`) |
+| `staff-b` | `staff.b@example.test` | dev-login | Credentialing Staff (OrgB) | world |
+| `staff-none` | `staff.none@example.test` | dev-login | Credentialing Staff, no membership | world |
+| `admin` | `admin@example.test` | dev-login | Credentialing Admin | world |
+| `applicant-a` | `applicant.a@example.test` | magic link | Credentialing Applicant | world; the redemption adds its application row |
+| `reviewer-a` | `reviewer.a@example.test` | magic link | Credentialing Reviewer | the first redemption |
+| `committee-a` | `committee.a@example.test` | magic link | Credentialing Committee | the first redemption |
+
+```sh
+corepack pnpm run persona staff-b        # token=<jwt>            (POST /auth/dev-login)
+corepack pnpm run persona applicant-a    # url=<redemptionUrl>    (a fresh single-use invite, 8 hours)
+corepack pnpm run probe:isolation        # one PASS/FAIL line per case and actor; exit 1 on any FAIL
+```
+
+Both scripts talk to MJAPI over HTTP and GraphQL only (`MJAPI_URL`, default `http://localhost:4050`);
+IDs are looked up by name in the metadata MJAPI serves. MJ's log output goes to stderr, so stdout
+carries only the one line (or the probe's lines).
+
+**Who issues the links: the local dev Owner, `admin@memberjunction.org`** (the `issuer` field of
+`personas.json`). It passes the issuer check because its `Type` is `Owner`: `CanIssueInvites`
+returns true for an Owner before it looks at `inviteIssuerRoleNames`
+(`mj/packages/MJServer/src/auth/magicLink/magicLinkCore.ts:72-85`). It can also write the invite row:
+`MagicLinkService.CreateInvite` saves `MJ: Magic Link Invites` **as the caller**
+(`MagicLinkService.ts:197-207`), and the Owner holds `Developer`, which has Create there. A
+`Credentialing Staff` user passes the issuer check (`inviteIssuerRoleNames: ['Credentialing Staff']`)
+but is then refused with `Does NOT have permission to Create MJ: Magic Link Invites records` (HTTP
+400), and B1 grants no credentialing role anything on that entity — the reason is in
+`docs/isolation-read-paths.md`, "Owed by the plan that adds invite issuing".
+
+**What a redemption does** (`MagicLinkService.RedeemInvite`, `ts:418-560`, and `provisionUser`,
+`:673-720`), measured on this instance:
+- It ensures an `MJ: Application Roles` row giving the invite's role access to the application
+  (`ensureAppAccess`, `:874-919`; the five credentialing roles already have theirs from Task 8).
+- An account whose email is **already in MJAPI's user cache** keeps its account: the invite's role and
+  an `MJ: User Applications` row for the application are added if missing (`ensureRoleAndApp`,
+  `:829-871`). That is how `applicant.a@example.test` gets its Credentialing application row. An
+  existing account holding any role outside the restricted and grantable roles (for example
+  `Developer`) is "protected" and is refused or warned about per `provisioningGuard` (`:690-711`).
+- An email **not in the cache** gets a new account (`Type = User`, `Name` the email, `FirstName = 'Guest'`) with exactly
+  the role and the application row, in one transaction, and is pushed into the cache
+  (`createScopedUser`, `:763-826`). That is how `reviewer.a@` and `committee.a@` come to exist; they
+  are therefore not world users and `seed:users` does not create them. Because the lookup is the cache,
+  restart MJAPI after loading the world: a world account missing from the cache would be created a
+  second time and fail on the duplicate email.
+- The session JWT carries `mj_magic_link: true` and `mj_app_id`. The server keeps the account's real
+  database roles for a named session (`mj/packages/MJServer/src/context.ts:232-290`); Explorer's
+  magic-link provider locks the shell to `mj_app_id` (`GetSessionScope`,
+  `mj/packages/Angular/Explorer/auth-services/src/lib/providers/mjexplorer-magic-link-provider.service.ts:177-186`).
+
+**Task 12 Step 4 discovery — an external role boots Explorer.** After an MJAPI restart, the
+`applicant-a` link opened in chrome-devtools (isolated browser context), the interstitial's
+"Continue to sign in" pressed: Explorer loads on `/app/credentialing`, shows
+`You have no applications yet.`, and has **no app switcher** (the header holds only the Credentialing
+nav item "My Applications"). `http://localhost:4251/app/admin`, `/app/home` (the Home application's
+path) and `/` each land back on `/app/credentialing`. The console holds only the expected
+"Skipping N config(s) … lacks read permission" engine warnings; no shell entity beyond the Task 8
+list was needed, so `.core-entity-permissions.json` is unchanged. Screenshots:
+`../logs/screens/t12-applicant-{credentialing,admin-redirect,home-redirect}.png` (outside the repo).
+
+**A dev-login persona in the browser without restarting MJAPI.** Explorer chooses the magic-link auth
+provider for any page load whose URL fragment carries `#token=`
+(`mj/packages/Angular/Explorer/auth-services/src/lib/auth-services.module.ts:66-81`); that provider only
+stores the token in `sessionStorage` and sends it as the bearer token, and MJAPI validates it by its
+issuer like any other. So a dev-login token can be handed to Explorer directly:
+
+```
+http://localhost:4251/app/credentialing#token=<the jwt printed by: pnpm run persona staff-b>
+```
+
+Measured: opened in a fresh isolated browser context, Explorer signs in as Staff B, shows Program
+Studio with only `Sample Program B`, and (no `mj_magic_link` claim) keeps the app switcher. Use a
+fresh tab or browser context per persona (the token lives in that tab's `sessionStorage`). The token
+is not refreshed; it lasts as long as dev-login's token (8 hours here). Screenshot:
+`../logs/screens/t12-staff-b-fragment-token.png`. The `MJ_DEV_AUTH_DEFAULT_EMAIL` route above still
+works and is the one to use for a normal, refreshing dev session.
+
 ## Rebuild from nothing
 
 If `node mj/packages/MJCLI/bin/run.js dev workspace --force` is run at the
