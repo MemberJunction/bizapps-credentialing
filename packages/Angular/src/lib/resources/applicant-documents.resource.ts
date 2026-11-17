@@ -1,6 +1,7 @@
 /**
  * Applicant Documents resource — guarded by {@link CredentialingAreaResource} and
- * {@link ApplicantSubjectResource}. Task 8 fills in the Document Library inside it.
+ * {@link ApplicantSubjectResource}. Hosts the Document Library and keeps `subjectId` and
+ * optional `documentId` synchronized with the URL.
  */
 import { Component } from '@angular/core';
 import { ResourceData } from '@memberjunction/core-entities';
@@ -9,14 +10,16 @@ import { BaseResourceComponent } from '@memberjunction/ng-shared';
 import { SharedGenericModule } from '@memberjunction/ng-shared-generic';
 import { MJAlertComponent, MJEmptyStateComponent } from '@memberjunction/ng-ui-components';
 import type { MySubject } from '@mj-biz-apps/credentialing-core';
+import { DocumentLibraryPage } from '../applicant/documents/document-library.page';
 import { CredentialingResource } from '../application/area-nav';
+import { SUBJECT_ID_PARAM } from '../shared/subject-context.service';
 import { ApplicantSubjectResource } from './applicant-subject-resource';
 
 @RegisterClass(BaseResourceComponent, 'CredentialingApplicantDocumentsResource')
 @Component({
     standalone: true,
     selector: 'bizapps-cred-applicant-documents-resource',
-    imports: [SharedGenericModule, MJAlertComponent, MJEmptyStateComponent],
+    imports: [SharedGenericModule, MJAlertComponent, MJEmptyStateComponent, DocumentLibraryPage],
     template: `
         <div class="cred-resource">
             @switch (State) {
@@ -44,12 +47,12 @@ import { ApplicantSubjectResource } from './applicant-subject-resource';
                             </ul>
                         </section>
                     } @else if (ActiveSubject) {
-                        <mj-empty-state
-                            Icon="fa-solid fa-folder-open"
-                            [Title]="ActiveSubject.DisplayName"
-                            Message="No documents uploaded yet."
-                            Role="status">
-                        </mj-empty-state>
+                        <bizapps-cred-document-library
+                            [Provider]="Provider"
+                            [Subject]="ActiveSubject"
+                            [RequestedDocumentID]="RequestedDocumentID"
+                            (DocumentViewed)="OnDocumentViewed($event)">
+                        </bizapps-cred-document-library>
                     }
                 }
             }
@@ -57,7 +60,7 @@ import { ApplicantSubjectResource } from './applicant-subject-resource';
     `,
     styles: [`
         :host { display: block; width: 100%; height: 100%; }
-        .cred-resource { height: 100%; padding: var(--mj-space-6); box-sizing: border-box; color: var(--mj-text-primary); }
+        .cred-resource { height: 100%; padding: var(--mj-space-6); box-sizing: border-box; color: var(--mj-text-primary); overflow: auto; }
         .cred-picker__title { margin: 0 0 var(--mj-space-3); font-size: var(--mj-text-xl, 1.25rem); }
         .cred-picker__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--mj-space-2); max-width: 36rem; }
         .cred-picker__btn { width: 100%; min-height: 44px; padding: var(--mj-space-3); text-align: left; border: 1px solid var(--mj-border-default); border-radius: var(--mj-radius-md, 6px); background: var(--mj-bg-surface); color: var(--mj-text-primary); cursor: pointer; }
@@ -65,13 +68,23 @@ import { ApplicantSubjectResource } from './applicant-subject-resource';
 })
 export class CredentialingApplicantDocumentsResource extends ApplicantSubjectResource {
     public ActiveSubject: MySubject | null = null;
+    public RequestedDocumentID: string | null = null;
 
     protected get DriverClass(): string {
         return CredentialingResource.ApplicantDocuments;
     }
 
-    protected override async OnSubjectResolved(subject: MySubject): Promise<void> {
+    protected override async OnSubjectResolved(subject: MySubject, params: Record<string, string>): Promise<void> {
         this.ActiveSubject = subject;
+        this.RequestedDocumentID = params['documentId']?.trim() || null;
+    }
+
+    public OnDocumentViewed(documentID: string | null): void {
+        this.RequestedDocumentID = documentID;
+        this.UpdateQueryParams({
+            [SUBJECT_ID_PARAM]: this.ActiveSubject?.SubjectID ?? null,
+            documentId: documentID,
+        });
     }
 
     async GetResourceDisplayName(_data: ResourceData): Promise<string> {

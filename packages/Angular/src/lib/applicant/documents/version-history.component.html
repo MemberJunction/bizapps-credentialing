@@ -1,0 +1,77 @@
+<dialog
+    #versionsDialog
+    class="cred-versions__dialog"
+    aria-labelledby="cred-versions-title"
+    (cancel)="OnDialogCancel($event)"
+    (keydown)="OnDialogKeydown($event)">
+    <div class="cred-versions__body">
+        <header class="cred-versions__header">
+            <div>
+                <h2 id="cred-versions-title" class="cred-versions__title">
+                    Version history@if (Document; as doc) {: {{ doc.FileName }}}
+                </h2>
+                <p class="cred-versions__subtitle">Focus any SHA-256 hash to read the full digest.</p>
+            </div>
+            <button mjButton Variant="outline" Size="sm" type="button" (click)="Close()">Close</button>
+        </header>
+
+        @if (ErrorMessage) {
+            <mj-alert Variant="error" [Message]="ErrorMessage" [Dismissible]="true" (Dismissed)="ErrorMessage = ''"></mj-alert>
+        }
+
+        @if (Document; as doc) {
+            <div class="cred-versions__table-wrap">
+                <table class="cred-versions__table">
+                    <thead>
+                        <tr>
+                            <th scope="col">Uploaded</th>
+                            <th scope="col">Uploaded by</th>
+                            <th scope="col">SHA-256 hash</th>
+                            <th scope="col">Order</th>
+                            <th scope="col">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @for (v of doc.Versions; track v.EvidenceDocumentID; let i = $index) {
+                            <tr>
+                                <td>{{ FormatDate(v.UploadedAt) }}</td>
+                                <td>{{ v.UploadedByName }}</td>
+                                <td>
+                                    <code
+                                        class="cred-versions__hash"
+                                        tabindex="0"
+                                        [attr.title]="v.ContentHash"
+                                        [attr.aria-label]="'SHA-256 hash ' + v.ContentHash"
+                                        (focus)="OnHashFocus(v.EvidenceDocumentID)"
+                                        (blur)="OnHashBlur(v.EvidenceDocumentID)">
+                                        {{ ExpandedHashID === v.EvidenceDocumentID ? v.ContentHash : ShortHash(v.ContentHash) }}
+                                    </code>
+                                </td>
+                                <td>
+                                    @if (i === 0) {
+                                        <span>Current</span>
+                                    } @else if (v.OrderIsRecorded) {
+                                        <span>Recorded supersession</span>
+                                    } @else {
+                                        <span class="cred-versions__inferred">Inferred from upload date</span>
+                                    }
+                                </td>
+                                <td>
+                                    <button
+                                        mjButton
+                                        Variant="outline"
+                                        Size="sm"
+                                        type="button"
+                                        [disabled]="DownloadingID !== null"
+                                        (click)="DownloadVersion(v)">
+                                        {{ DownloadingID === v.EvidenceDocumentID ? 'Downloading...' : 'Download' }}
+                                    </button>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</dialog>

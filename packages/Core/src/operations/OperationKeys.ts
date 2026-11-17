@@ -22,6 +22,7 @@ export const CredentialingOperation = {
     WithdrawApplication: 'Credentialing.WithdrawApplication',
     AttestInLieu: 'Credentialing.AttestInLieu',
     ConfirmDocumentCurrent: 'Credentialing.ConfirmDocumentCurrent',
+    GetDocumentLibrary: 'Credentialing.GetDocumentLibrary',
 } as const;
 
 /** One of the {@link CredentialingOperation} keys. */

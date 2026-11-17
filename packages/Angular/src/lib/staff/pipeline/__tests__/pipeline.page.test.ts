@@ -3,10 +3,12 @@ import { ChangeDetectorRef, Injector, runInInjectionContext } from '@angular/cor
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
     GetApplicationWorkspaceOperation,
+    GetDocumentLibraryOperation,
     ReissueInvitationOperation,
     ReopenResponseOperation,
     WithdrawApplicationOperation,
     type ApplicationWorkspace,
+    type DocumentLibrary,
 } from '@mj-biz-apps/credentialing-core';
 import { PipelineData, type PipelineApplicationRow, type PipelineContactRow, type PipelineSnapshot } from '../pipeline-data';
 import { PipelinePage } from '../pipeline.page';
@@ -108,10 +110,62 @@ describe('PipelinePage', () => {
             ],
         };
 
+        const library: DocumentLibrary = {
+            Ledgers: [
+                {
+                    ProgramName: 'Sample Applicant Program',
+                    VersionLabel: '2026',
+                    ApplicationID: 'APP-1',
+                    ApplicationStatus: 'Draft',
+                    Rows: [
+                        {
+                            RequirementID: 'REQ-1',
+                            Name: 'Degree certificate',
+                            Description: null,
+                            IsRequired: true,
+                            RestrictedAllowed: false,
+                            Document: {
+                                EvidenceDocumentID: 'DOC-1',
+                                FileName: 'degree.pdf',
+                                ContentType: 'application/pdf',
+                                UploadedAt: '2026-11-17T10:00:00.000Z',
+                                UploadedByName: 'Applicant A',
+                                Status: 'Current',
+                                ContentHash: 'c'.repeat(64),
+                                TextStatus: 'Extracted',
+                                TextNote: null,
+                                ReadingStatus: 'Pending',
+                                ReadingNote: null,
+                                CitationCount: 0,
+                                Versions: [
+                                    {
+                                        EvidenceDocumentID: 'DOC-1',
+                                        UploadedAt: '2026-11-17T10:00:00.000Z',
+                                        UploadedByName: 'Applicant A',
+                                        ContentHash: 'c'.repeat(64),
+                                        OrderIsRecorded: true,
+                                    },
+                                ],
+                            },
+                            Attestation: null,
+                            Locked: false,
+                            LockedReason: null,
+                        },
+                    ],
+                },
+            ],
+            General: [],
+        };
+
         vi.spyOn(GetApplicationWorkspaceOperation.prototype, 'Execute').mockResolvedValue({
             Success: true,
             ResultCode: 'SUCCESS',
             Output: ws,
+        });
+        vi.spyOn(GetDocumentLibraryOperation.prototype, 'Execute').mockResolvedValue({
+            Success: true,
+            ResultCode: 'SUCCESS',
+            Output: library,
         });
         const reopenSpy = vi.spyOn(ReopenResponseOperation.prototype, 'Execute').mockResolvedValue({
             Success: true,
@@ -163,6 +217,12 @@ describe('PipelinePage', () => {
 
         await page.OpenDetail(row);
         expect(page.DetailWorkspace?.Application.ApplicationID).toBe('APP-1');
+        expect(page.DetailLedger?.Rows[0]?.Document?.FileName).toBe('degree.pdf');
+        page.OpenDocumentViewer(page.DetailLedger!.Rows[0].Document!);
+        expect(page.ViewerOpen).toBe(true);
+        expect(page.ViewerDocumentID).toBe('DOC-1');
+        page.CloseViewer();
+        expect(page.ViewerOpen).toBe(false);
         expect(page.CanReopen('Draft', 'Confirmed')).toBe(true);
 
         page.OpenReopenDialog(ws.Sections[0].Standards[0]);

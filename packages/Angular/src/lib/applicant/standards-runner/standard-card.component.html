@@ -50,14 +50,54 @@
             <span class="cred-card__label">Sources:</span>
             <ul class="cred-card__citation-list">
                 @for (citation of Standard.Response.Citations; track citation.CitationID) {
-                    <li class="cred-card__citation-chip">
-                        {{ citation.SourceLabel }}
-                        @if (citation.PageReference) {
-                            ({{ citation.PageReference }})
-                        }
+                    <li>
+                        <button
+                            type="button"
+                            class="cred-card__citation-chip"
+                            (click)="OpenCitation(citation)">
+                            {{ citation.SourceLabel }}
+                            @if (citation.PageReference) {
+                                ({{ citation.PageReference }})
+                            }
+                        </button>
                     </li>
                 }
             </ul>
+        </div>
+    }
+
+    @if (Standard.ResponseType === 'Evidence' && !Actions.IsApplicationLocked) {
+        <div class="cred-card__evidence-box">
+            <div class="cred-card__evidence-head">
+                <button
+                    mjButton
+                    Variant="outline"
+                    Size="sm"
+                    type="button"
+                    (click)="ToggleEvidenceUpload()">
+                    {{ ShowEvidenceUpload ? 'Hide upload' : 'Upload evidence' }}
+                </button>
+                @if (Standard.EvidenceHint) {
+                    <span class="cred-card__hint">Suggested: {{ Standard.EvidenceHint }}</span>
+                }
+            </div>
+            @if (UploadedDocument; as uploaded) {
+                <div class="cred-card__upload-done" role="status">
+                    <span>Uploaded to your Document Library. @if (uploaded.TextNote) {{{ uploaded.TextNote }}}</span>
+                    <button mjButton Variant="outline" Size="sm" type="button" (click)="OpenUploadedDocument()">
+                        View
+                    </button>
+                </div>
+            }
+            @if (ShowEvidenceUpload) {
+                <bizapps-cred-upload-dropzone
+                    [Provider]="ProviderToUse"
+                    [SubjectID]="Application.SubjectID"
+                    [RequirementID]="null"
+                    [Label]="'Upload evidence for ' + Standard.Code"
+                    (Uploaded)="OnEvidenceUploaded($event)">
+                </bizapps-cred-upload-dropzone>
+            }
         </div>
     }
 
@@ -253,4 +293,14 @@
             </div>
         </div>
     </dialog>
+
+    <bizapps-cred-document-viewer
+        [Provider]="ProviderToUse"
+        [DocumentID]="ViewerDocumentID"
+        [FileNameHint]="ViewerFileName"
+        [Citation]="ViewerCitation"
+        [InitialTab]="ViewerInitialTab"
+        [Visible]="ViewerOpen"
+        (Closed)="CloseViewer()">
+    </bizapps-cred-document-viewer>
 </article>

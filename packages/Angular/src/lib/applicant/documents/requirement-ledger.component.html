@@ -1,0 +1,183 @@
+<section class="cred-ledger" [attr.aria-labelledby]="'cred-ledger-title-' + Ledger.ApplicationID">
+    <header class="cred-ledger__header">
+        <div>
+            <h2 [id]="'cred-ledger-title-' + Ledger.ApplicationID" class="cred-ledger__title">
+                {{ Ledger.ProgramName }}
+            </h2>
+            <span class="cred-ledger__version">Version {{ Ledger.VersionLabel }}</span>
+        </div>
+        <span class="cred-ledger__app-status">{{ Ledger.ApplicationStatus }}</span>
+    </header>
+
+    @if (Ledger.Rows.length === 0) {
+        <mj-empty-state
+            Icon="fa-solid fa-file-circle-check"
+            Message="This version has no document requirements."
+            Role="status">
+        </mj-empty-state>
+    } @else {
+        <div class="cred-ledger__table-wrap">
+            <table class="cred-ledger__table">
+                <thead>
+                    <tr>
+                        <th scope="col">Requirement</th>
+                        <th scope="col">Document on file</th>
+                        <th scope="col">Uploaded</th>
+                        <th scope="col">Status</th>
+                        <th scope="col">What the assistant read</th>
+                        <th scope="col">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @for (row of Ledger.Rows; track row.RequirementID) {
+                        @let actions = ActionsFor(row);
+                        <tr>
+                            <td>
+                                <div class="cred-ledger__req-name">
+                                    <strong>{{ row.Name }}</strong>
+                                    @if (row.IsRequired) {
+                                        <span class="cred-ledger__badge">Required</span>
+                                    } @else {
+                                        <span class="cred-ledger__badge cred-ledger__badge--muted">Optional</span>
+                                    }
+                                    @if (row.RestrictedAllowed) {
+                                        <span class="cred-ledger__badge cred-ledger__badge--restricted">Restricted Allowed</span>
+                                    }
+                                </div>
+                                @if (row.Description) {
+                                    <p class="cred-ledger__req-desc">{{ row.Description }}</p>
+                                }
+                            </td>
+                            <td>
+                                @if (row.Document; as doc) {
+                                    <div class="cred-ledger__file-name">{{ doc.FileName }}</div>
+                                    @if (doc.TextNote) {
+                                        <p class="cred-ledger__subnote">{{ doc.TextNote }}</p>
+                                    }
+                                } @else if (row.Attestation; as att) {
+                                    <div class="cred-ledger__attested">{{ AttestedSummary(row) }}</div>
+                                    <p class="cred-ledger__subnote">{{ att.Statement }}</p>
+                                } @else {
+                                    <span class="cred-ledger__muted">None on file</span>
+                                }
+                            </td>
+                            <td>
+                                @if (row.Document; as doc) {
+                                    {{ FormatDate(doc.UploadedAt) }}
+                                } @else if (row.Attestation; as att) {
+                                    {{ FormatDate(att.AttestedAt) }}
+                                } @else {
+                                    —
+                                }
+                            </td>
+                            <td>
+                                <span class="cred-ledger__status">{{ StatusLabel(row) }}</span>
+                            </td>
+                            <td>
+                                @if (row.Document; as doc) {
+                                    <span>{{ WhatWasRead(doc) }}</span>
+                                } @else if (row.Attestation) {
+                                    <span class="cred-ledger__muted">Restricted attestation</span>
+                                } @else {
+                                    <span class="cred-ledger__muted">—</span>
+                                }
+                            </td>
+                            <td>
+                                <div class="cred-ledger__actions">
+                                    @if (actions.ShowUpload) {
+                                        <button
+                                            mjButton
+                                            Variant="primary"
+                                            Size="sm"
+                                            type="button"
+                                            (click)="OnToggleUpload(row.RequirementID)">
+                                            {{ ActiveUploadRequirementID === row.RequirementID ? 'Close upload' : 'Upload' }}
+                                        </button>
+                                    }
+                                    @if (actions.ShowUploadNew) {
+                                        <button
+                                            mjButton
+                                            Variant="outline"
+                                            Size="sm"
+                                            type="button"
+                                            (click)="OnToggleUpload(row.RequirementID)">
+                                            {{ ActiveUploadRequirementID === row.RequirementID ? 'Close upload' : 'Upload new' }}
+                                        </button>
+                                    }
+                                    @if (actions.ShowStillCurrent && row.Document; as doc) {
+                                        <button
+                                            mjButton
+                                            Variant="primary"
+                                            Size="sm"
+                                            type="button"
+                                            [disabled]="ConfirmingDocumentID !== null"
+                                            (click)="StillCurrent.emit(doc)">
+                                            {{ ConfirmingDocumentID === doc.EvidenceDocumentID ? 'Confirming...' : 'Still current' }}
+                                        </button>
+                                    }
+                                    @if (actions.ShowAttest) {
+                                        <button
+                                            mjButton
+                                            Variant="outline"
+                                            Size="sm"
+                                            type="button"
+                                            (click)="OpenAttest.emit(row)">
+                                            {{ actions.AttestLabel }}
+                                        </button>
+                                    }
+                                    @if (actions.ShowView && row.Document; as doc) {
+                                        <button
+                                            mjButton
+                                            Variant="outline"
+                                            Size="sm"
+                                            type="button"
+                                            (click)="ViewDocument.emit(doc)">
+                                            View
+                                        </button>
+                                    }
+                                    @if (actions.ShowVersions && row.Document; as doc) {
+                                        <button
+                                            mjButton
+                                            Variant="outline"
+                                            Size="sm"
+                                            type="button"
+                                            (click)="ViewVersions.emit(doc)">
+                                            Versions ({{ doc.Versions.length }})
+                                        </button>
+                                    }
+                                    @if (actions.ShowDownloadOriginal && row.Document; as doc) {
+                                        <button
+                                            mjButton
+                                            Variant="outline"
+                                            Size="sm"
+                                            type="button"
+                                            [disabled]="DownloadingDocumentID !== null"
+                                            (click)="DownloadDocument.emit(doc)">
+                                            {{ DownloadingDocumentID === doc.EvidenceDocumentID ? 'Downloading...' : 'Download original' }}
+                                        </button>
+                                    }
+                                </div>
+                                @if (actions.Locked && actions.LockedReason) {
+                                    <p class="cred-ledger__locked-reason">{{ actions.LockedReason }}</p>
+                                }
+                            </td>
+                        </tr>
+                        @if (IsApplicant && !actions.Locked && ActiveUploadRequirementID === row.RequirementID) {
+                            <tr class="cred-ledger__upload-row">
+                                <td colspan="6">
+                                    <bizapps-cred-upload-dropzone
+                                        [Provider]="ProviderToUse"
+                                        [SubjectID]="SubjectID"
+                                        [RequirementID]="row.RequirementID"
+                                        [Label]="'Upload for ' + row.Name"
+                                        (Uploaded)="Uploaded.emit($event)">
+                                    </bizapps-cred-upload-dropzone>
+                                </td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</section>

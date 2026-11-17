@@ -175,6 +175,61 @@
                     <mj-alert Variant="warning" [Message]="'Withdrawal reason: ' + detail.Application.WithdrawalReason"></mj-alert>
                 }
 
+                <section class="cred-pipeline__detail-docs" aria-label="Application documents">
+                    <h3 class="cred-pipeline__detail-section-title">Documents</h3>
+                    @if (DetailDocumentsError) {
+                        <mj-alert Variant="error" [Message]="DetailDocumentsError"></mj-alert>
+                    } @else {
+                        @if (DetailLedger; as ledger) {
+                            <bizapps-cred-requirement-ledger
+                                [Provider]="ProviderToUse"
+                                [Ledger]="ledger"
+                                [SubjectID]="detail.Application.SubjectID"
+                                [IsApplicant]="false"
+                                [DownloadingDocumentID]="DownloadingDocumentID"
+                                (ViewDocument)="OpenDocumentViewer($event)"
+                                (ViewVersions)="OpenVersions($event)"
+                                (DownloadDocument)="DownloadDocument($event)">
+                            </bizapps-cred-requirement-ledger>
+                        }
+
+                        @if (DetailLibrary && DetailLibrary.General.length > 0) {
+                            <div class="cred-pipeline__general-docs">
+                                <h4 class="cred-pipeline__detail-subsection-title">General uploads</h4>
+                                <ul class="cred-pipeline__general-list">
+                                    @for (doc of DetailLibrary.General; track doc.EvidenceDocumentID) {
+                                        <li class="cred-pipeline__general-item">
+                                            <div>
+                                                <strong>{{ doc.FileName }}</strong>
+                                                <div class="cred-pipeline__muted">
+                                                    Uploaded {{ FormatDocumentDate(doc.UploadedAt) }} · {{ doc.Status }} · {{ WhatWasRead(doc) }}
+                                                </div>
+                                            </div>
+                                            <div class="cred-pipeline__detail-actions">
+                                                <button mjButton Variant="outline" Size="sm" type="button" (click)="OpenDocumentViewer(doc)">
+                                                    View
+                                                </button>
+                                                <button mjButton Variant="outline" Size="sm" type="button" (click)="OpenVersions(doc)">
+                                                    Versions ({{ doc.Versions.length }})
+                                                </button>
+                                                <button
+                                                    mjButton
+                                                    Variant="outline"
+                                                    Size="sm"
+                                                    type="button"
+                                                    [disabled]="DownloadingDocumentID !== null"
+                                                    (click)="DownloadDocument(doc)">
+                                                    {{ DownloadingDocumentID === doc.EvidenceDocumentID ? 'Downloading...' : 'Download original' }}
+                                                </button>
+                                            </div>
+                                        </li>
+                                    }
+                                </ul>
+                            </div>
+                        }
+                    }
+                </section>
+
                 @for (section of detail.Sections; track section.SectionID) {
                     <div class="cred-pipeline__detail-section">
                         <h3 class="cred-pipeline__detail-section-title">{{ section.Number }}. {{ section.Name }}</h3>
@@ -199,6 +254,21 @@
                                     </p>
                                     @if (std.Response.ReopenReason) {
                                         <p class="cred-pipeline__muted">Reopen reason: {{ std.Response.ReopenReason }}</p>
+                                    }
+                                    @if (std.Response.Citations.length > 0) {
+                                        <div class="cred-pipeline__detail-citations">
+                                            @for (citation of std.Response.Citations; track citation.CitationID) {
+                                                <button
+                                                    type="button"
+                                                    class="cred-pipeline__citation-btn"
+                                                    (click)="OpenCitationViewer(citation)">
+                                                    {{ citation.SourceLabel }}
+                                                    @if (citation.PageReference) {
+                                                        ({{ citation.PageReference }})
+                                                    }
+                                                </button>
+                                            }
+                                        </div>
                                     }
                                     @if (CanReopen(detail.Application.Status, std.Response.Status)) {
                                         <div class="cred-pipeline__detail-std-actions">
@@ -311,4 +381,22 @@
             </button>
         </mj-dialog-actions>
     </mj-dialog>
+
+    <bizapps-cred-document-viewer
+        [Provider]="ProviderToUse"
+        [DocumentID]="ViewerDocumentID"
+        [FileNameHint]="ViewerFileName"
+        [ContentTypeHint]="ViewerContentType"
+        [Citation]="ViewerCitation"
+        [InitialTab]="ViewerInitialTab"
+        [Visible]="ViewerOpen"
+        (Closed)="CloseViewer()">
+    </bizapps-cred-document-viewer>
+
+    <bizapps-cred-version-history
+        [Provider]="ProviderToUse"
+        [Document]="VersionsDocument"
+        [Visible]="VersionsOpen"
+        (Closed)="CloseVersions()">
+    </bizapps-cred-version-history>
 </div>

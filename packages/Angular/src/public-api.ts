@@ -100,6 +100,32 @@ export {
     type CardActions,
     type RunnerSelection,
 } from './lib/applicant/standards-runner/runner-model';
+export { DocumentLibraryPage } from './lib/applicant/documents/document-library.page';
+export { RequirementLedgerComponent } from './lib/applicant/documents/requirement-ledger.component';
+export { UploadDropzoneComponent } from './lib/applicant/documents/upload-dropzone.component';
+export { DocumentViewerComponent, type ViewerCitation, type ViewerTab } from './lib/applicant/documents/document-viewer.component';
+export { VersionHistoryComponent } from './lib/applicant/documents/version-history.component';
+export { EvidenceClient, type EvidenceProviderConfig, type FetchLike, type UploadResult } from './lib/applicant/documents/evidence-client';
+export {
+    UPLOAD_DOES_NOT_SUBMIT_SENTENCE,
+    FormatLibraryDate,
+    FormatHashShort,
+    DefaultAttestationStatement,
+    FormatAttestedNotice,
+    DocumentRowStatusLabel,
+    FormatWhatWasRead,
+    ResolveLedgerRowActions,
+    type LedgerRowActions,
+} from './lib/applicant/documents/library-model';
+export {
+    UNSUPPORTED_PREVIEW_MESSAGE,
+    CITATION_NOT_FOUND_NOTE,
+    RECOGNIZED_SCAN_NOTE,
+    DocumentPreviewKind,
+    SplitForHighlight,
+    type PreviewKind,
+    type HighlightSplit,
+} from './lib/applicant/documents/document-viewer-model';
 
 /**
  * Bootstrap function named by mj-app.json packages.client[0].startupExport.

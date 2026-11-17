@@ -44,6 +44,13 @@
       "account": "world",
       "about": "external applicant; contact of both Sample Applicant One and Sample Applicant Two (for the subject picker)"
     },
+    "applicant-evidence": {
+      "email": "applicant.evidence@example.test",
+      "signIn": "magic-link",
+      "role": "Credentialing Applicant",
+      "account": "world",
+      "about": "external applicant; contact of Sample Evidence Applicant (Sample Evidence Program with Normal and Restricted Allowed requirements)"
+    },
     "reviewer-a": {
       "email": "reviewer.a@example.test",
       "signIn": "magic-link",

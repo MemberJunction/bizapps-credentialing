@@ -25,7 +25,9 @@ import {
     CREDENTIALING_APPLICANT_ROLE,
     CredentialingEntity,
     DOCUMENT_MUST_BE_UPLOADED_REASON,
+    GetDocumentLibraryOperation,
     NOT_FOUND_REASON,
+    OPERATION_REFUSED,
 } from '@mj-biz-apps/credentialing-core';
 import type { mjBizAppsCredentialingEvidenceDocumentEntity } from '@mj-biz-apps/credentialing-entities';
 import { CountRows, FindRows, Quote } from '../wire.js';
@@ -467,6 +469,43 @@ const checks: NamedCheck[] = [
                 Assert((document.LatestResult?.CompleteMessage ?? '').includes(OPERATION_ONLY_SENTENCE), `refusal: ${document.LatestResult?.CompleteMessage ?? ''}`);
             });
             AssertEqual((await documentOf(ctx, ID)).TextNote, before.TextNote, 'the row is unchanged');
+        },
+    },
+    {
+        Id: 'cred-evidence.11',
+        Name: 'GetDocumentLibrary of another subject refuses with Record not found. identical to a random UUID; returns own library to contact and staff-a',
+        RequiresMutation: true,
+        Fn: async (ctx: IntegrationCheckContext) => {
+            const { SubjectID } = await evidenceTargets(ctx);
+            await uploadedDocument(ctx);
+
+            await withSession(ctx, await magicLinkToken(ctx, OTHER_CONTACT), async (otherSession) => {
+                const foreign = await new GetDocumentLibraryOperation().Execute({ SubjectID }, { provider: otherSession });
+                const missing = await new GetDocumentLibraryOperation().Execute({ SubjectID: randomUUID() }, { provider: otherSession });
+                AssertEqual(foreign.Success, false, 'other subject contact refused');
+                AssertEqual(missing.Success, false, 'random subject refused');
+                AssertEqual(foreign.ResultCode, OPERATION_REFUSED, 'foreign ResultCode');
+                AssertEqual(missing.ResultCode, OPERATION_REFUSED, 'random ResultCode');
+                AssertEqual(foreign.ErrorMessage, NOT_FOUND_REASON, 'foreign ErrorMessage');
+                AssertEqual(missing.ErrorMessage, NOT_FOUND_REASON, 'random ErrorMessage');
+            });
+
+            await withSession(ctx, await staffToken(ctx, STAFF_B), async (staffBSession) => {
+                const staffB = await new GetDocumentLibraryOperation().Execute({ SubjectID }, { provider: staffBSession });
+                AssertEqual(staffB.Success, false, 'staff-b refused on OrgA subject');
+                AssertEqual(staffB.ErrorMessage, NOT_FOUND_REASON, 'staff-b ErrorMessage');
+            });
+
+            await withSession(ctx, await magicLinkToken(ctx, EVIDENCE_CONTACT), async (ownerSession) => {
+                const own = await new GetDocumentLibraryOperation().Execute({ SubjectID }, { provider: ownerSession });
+                Assert(own.Success && own.Output != null, `owner loads library (${describe(own)})`);
+                Assert(own.Output.Ledgers.length >= 1, 'at least one application ledger returned');
+            });
+
+            await withSession(ctx, await staffToken(ctx, STAFF_A), async (staffASession) => {
+                const staffA = await new GetDocumentLibraryOperation().Execute({ SubjectID }, { provider: staffASession });
+                Assert(staffA.Success && staffA.Output != null, `staff-a loads library (${describe(staffA)})`);
+            });
         },
     },
     {

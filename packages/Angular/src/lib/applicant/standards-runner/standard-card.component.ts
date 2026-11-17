@@ -25,9 +25,13 @@ import {
     SaveResponseOperation,
     type SelfAssessment,
     type WorkspaceApplication,
+    type WorkspaceCitation,
     type WorkspaceStandard,
     type WorkspaceStandardResponse,
 } from '@mj-biz-apps/credentialing-core';
+import { DocumentViewerComponent, type ViewerCitation, type ViewerTab } from '../documents/document-viewer.component';
+import type { UploadResult } from '../documents/evidence-client';
+import { UploadDropzoneComponent } from '../documents/upload-dropzone.component';
 import { ApplicantMessages } from '../shared/applicant-messages';
 import {
     IntakeSentence,
@@ -47,7 +51,14 @@ const SELF_ASSESSMENT_OPTIONS: readonly { Value: SelfAssessment; Label: string }
 @Component({
     standalone: true,
     selector: 'bizapps-cred-standard-card',
-    imports: [FormsModule, SharedGenericModule, MJAlertComponent, MJButtonDirective],
+    imports: [
+        FormsModule,
+        SharedGenericModule,
+        MJAlertComponent,
+        MJButtonDirective,
+        UploadDropzoneComponent,
+        DocumentViewerComponent,
+    ],
     templateUrl: './standard-card.component.html',
     styleUrls: ['./standard-card.component.scss'],
 })
@@ -69,6 +80,8 @@ export class StandardCardComponent extends BaseAngularComponent {
         this._standard = value;
         if (previousID !== value.StandardID) {
             this.IsEditing = false;
+            this.ShowEvidenceUpload = false;
+            this.UploadedDocument = null;
             this.ErrorMessage = '';
             this.ConfirmErrorMessage = '';
         }
@@ -85,6 +98,14 @@ export class StandardCardComponent extends BaseAngularComponent {
     public IsConfirmDialogOpen = false;
     public ErrorMessage = '';
     public ConfirmErrorMessage = '';
+
+    public ShowEvidenceUpload = false;
+    public UploadedDocument: UploadResult | null = null;
+    public ViewerOpen = false;
+    public ViewerDocumentID: string | null = null;
+    public ViewerFileName = '';
+    public ViewerCitation: ViewerCitation | null = null;
+    public ViewerInitialTab: ViewerTab = 'original';
 
     public get HasUnsavedEdits(): boolean {
         if (!this.IsEditing || this._standard == null) return false;
@@ -116,6 +137,50 @@ export class StandardCardComponent extends BaseAngularComponent {
         if (!iso) return '';
         const parsed = new Date(iso);
         return Number.isNaN(parsed.getTime()) ? iso : DATE_FORMAT.format(parsed);
+    }
+
+    public ToggleEvidenceUpload(): void {
+        if (this.Actions.IsApplicationLocked) return;
+        this.ShowEvidenceUpload = !this.ShowEvidenceUpload;
+        this.cdr.markForCheck();
+    }
+
+    public OnEvidenceUploaded(result: UploadResult): void {
+        this.UploadedDocument = result;
+        this.ShowEvidenceUpload = false;
+        this.cdr.markForCheck();
+    }
+
+    public OpenUploadedDocument(): void {
+        if (!this.UploadedDocument) return;
+        this.ViewerDocumentID = this.UploadedDocument.EvidenceDocumentID;
+        this.ViewerFileName = '';
+        this.ViewerCitation = null;
+        this.ViewerInitialTab = 'original';
+        this.ViewerOpen = true;
+        this.cdr.markForCheck();
+    }
+
+    public OpenCitation(citation: WorkspaceCitation): void {
+        this.ViewerDocumentID = citation.EvidenceDocumentID;
+        this.ViewerFileName = citation.SourceLabel;
+        this.ViewerCitation = {
+            SourceLabel: citation.SourceLabel,
+            PageReference: citation.PageReference,
+            Excerpt: citation.Excerpt,
+            StartOffset: citation.StartOffset,
+            EndOffset: citation.EndOffset,
+        };
+        this.ViewerInitialTab = 'text';
+        this.ViewerOpen = true;
+        this.cdr.markForCheck();
+    }
+
+    public CloseViewer(): void {
+        this.ViewerOpen = false;
+        this.ViewerDocumentID = null;
+        this.ViewerCitation = null;
+        this.cdr.markForCheck();
     }
 
     public StartEdit(): void {

@@ -10,7 +10,11 @@
  * `OperationWrite`, because `SubmitApplication` (Task 11) does not exist yet.
  */
 import { randomUUID } from 'node:crypto';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { unlink } from 'node:fs/promises';
 import { CompositeKey, type BaseEntity, type IMetadataProvider, type RemoteOpResult, type UserInfo } from '@memberjunction/core';
+import { GenericDatabaseProvider } from '@memberjunction/generic-database-provider';
 import type { MJFileEntity } from '@memberjunction/core-entities';
 import { Assert, AssertEqual, IntegrationCheckRegistry, type IntegrationCheckContext, type NamedCheck } from '@memberjunction/testing-integration/registry';
 import {
@@ -18,6 +22,7 @@ import {
     ConfirmDocumentCurrentOperation,
     CredentialingEntity,
     DOCUMENT_REPLACED_REASON,
+    GetDocumentLibraryOperation,
     NOT_FOUND_REASON,
 } from '@mj-biz-apps/credentialing-core';
 import {
@@ -36,11 +41,11 @@ import type {
     mjBizAppsCredentialingEvidenceDocumentEntity,
 } from '@mj-biz-apps/credentialing-entities';
 import { WithActors } from '../actors.js';
-import { CountRows, FindRows, LoadEntity, LoadUserInfo, Quote } from '../wire.js';
+import { CountRows, FindRows, LoadEntity, LoadUserInfo, Quote, RequireSave } from '../wire.js';
 import { EnsureWorldApplication, EnsureWorldSubject } from '../world/applicant-world.js';
 import { EVIDENCE_NORMAL_REQUIREMENT, EVIDENCE_RESTRICTED_REQUIREMENT, GetOrLoadWorld } from '../world/load-world.js';
+import { EnsureProgramTree, type DocumentRequirementSpec, type ProgramTree } from '../world/program-tree.js';
 import type { CredentialingWorld } from '../world/world.js';
-import type { ProgramTree } from '../world/program-tree.js';
 
 type ApplicationEntity = mjBizAppsCredentialingApplicationEntity;
 type ApplicationDocumentEntity = mjBizAppsCredentialingApplicationDocumentEntity;
@@ -344,6 +349,108 @@ const checks: NamedCheck[] = [
             const current = await FindRows<{ ID: string }>(ctx, CredentialingEntity.DocumentAttestation, `SubjectID = '${Quote(SubjectID)}' AND IsSuperseded = 0`, ['ID'], SystemUser.Get('Reading attestations'));
             AssertEqual(current.length, 1, 'one current attestation');
             AssertEqual(current[0].ID.toLowerCase(), second.Output.DocumentAttestationID.toLowerCase(), 'the frozen attestation is still current');
+        },
+    },
+    {
+        Id: 'cred-evidence-rules.12',
+        Name: 'GetDocumentLibrary returns a 30-requirement ledger in at most 4 database round trips',
+        RequiresMutation: true,
+        Fn: async (ctx: IntegrationCheckContext) => {
+            const world = await GetOrLoadWorld(ctx);
+            await registerFixtures(ctx);
+            const requirements: DocumentRequirementSpec[] = [];
+            for (let i = 1; i <= 30; i++) {
+                requirements.push({
+                    Name: `Library Requirement ${String(i).padStart(2, '0')}`,
+                    Sequence: i,
+                    IsRequired: i % 2 === 1,
+                    SensitivityPolicy: i % 5 === 0 ? 'Restricted Allowed' : 'Normal',
+                });
+            }
+            const tree = await EnsureProgramTree(
+                ctx,
+                {
+                    AccreditingOrganizationID: world.OrgA.ID,
+                    Program: {
+                        Name: 'Sample Library Scale Program',
+                        ProgramType: 'Certification',
+                        SubjectType: 'Person',
+                        SubjectNoun: 'professional',
+                        CredentialPrefix: 'SLSP',
+                    },
+                    Version: { Label: '2026', CommitteeID: world.CommitteeA.ID },
+                    Sections: [
+                        {
+                            Number: '1',
+                            Name: 'Evidence',
+                            Sequence: 1,
+                            Standards: [
+                                {
+                                    Code: '1.1',
+                                    Statement: 'The applicant provides the required evidence.',
+                                    ResponseType: 'Evidence',
+                                    Sequence: 1,
+                                },
+                            ],
+                        },
+                    ],
+                    DocumentRequirements: requirements,
+                },
+                ctx.User,
+            );
+            if (tree.Version.Status === 'Draft') {
+                tree.Version.Status = 'Active';
+                await RequireSave(tree.Version, 'activating Sample Library Scale Program 2026');
+            }
+            const contact = world.Applicants.SubjectEvidence.Contacts[0];
+            const { SubjectID } = await scratchSubject(ctx, world, [tree]);
+            await upload(ctx.Provider, contact, SubjectID, tree.DocumentRequirements[0].ID, 'req-01-v1');
+            await upload(ctx.Provider, contact, SubjectID, tree.DocumentRequirements[0].ID, 'req-01-v2');
+            await new AttestInLieuOperation().Execute(
+                {
+                    SubjectID,
+                    DocumentRequirementID: tree.DocumentRequirements[4].ID,
+                    Statement: 'Held on file and available on request.',
+                },
+                { provider: ctx.Provider, user: contact },
+            );
+
+            const provider = ctx.Provider;
+            if (!(provider instanceof GenericDatabaseProvider)) {
+                throw new Error('server transport provider is not GenericDatabaseProvider');
+            }
+            const origRunView = provider.RunView;
+            const origRunViews = provider.RunViews;
+            let providerCalls = 0;
+            provider.RunView = ((...args: Parameters<GenericDatabaseProvider['RunView']>) => {
+                providerCalls++;
+                return origRunView.apply(provider, args);
+            }) as GenericDatabaseProvider['RunView'];
+            provider.RunViews = ((...args: Parameters<GenericDatabaseProvider['RunViews']>) => {
+                providerCalls++;
+                return origRunViews.apply(provider, args);
+            }) as GenericDatabaseProvider['RunViews'];
+            const sqlLogPath = join(tmpdir(), `cred-library-sql-${randomUUID()}.log`);
+            const logger = await provider.CreateSqlLogger(sqlLogPath);
+            let res;
+            let sqlStatements = 0;
+            try {
+                res = await new GetDocumentLibraryOperation().Execute({ SubjectID }, { provider: ctx.Provider, user: contact });
+                sqlStatements = logger.statementCount;
+            } finally {
+                await logger.dispose();
+                await unlink(sqlLogPath).catch(() => undefined);
+                provider.RunView = origRunView;
+                provider.RunViews = origRunViews;
+            }
+
+            Assert(res.Success && res.Output != null, `GetDocumentLibrary succeeds (${describe(res)})`);
+            AssertEqual(res.Output.Ledgers.length, 1, 'one application ledger');
+            AssertEqual(res.Output.Ledgers[0].Rows.length, 30, '30 requirements returned');
+            Assert(res.Output.Ledgers[0].Rows[0].Document != null, 'first requirement has document');
+            AssertEqual(res.Output.Ledgers[0].Rows[0].Document.Versions.length, 2, 'first requirement keeps 2-version history');
+            Assert(res.Output.Ledgers[0].Rows[4].Attestation != null, 'fifth requirement has attestation');
+            Assert(providerCalls <= 4, `library returned in ${providerCalls} RunView/RunViews round trips (limit 4; ${sqlStatements} SQL statements)`);
         },
     },
 ];

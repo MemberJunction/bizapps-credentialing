@@ -5,6 +5,7 @@
  */
 import { ChangeDetectorRef, Component, OnInit, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { UUIDsEqual } from '@memberjunction/global';
 import { BaseAngularComponent } from '@memberjunction/ng-base-types';
 import { SharedGenericModule } from '@memberjunction/ng-shared-generic';
 import {
@@ -18,16 +19,26 @@ import {
 import {
     ApplicationLifecycleRules,
     GetApplicationWorkspaceOperation,
+    GetDocumentLibraryOperation,
     ReissueInvitationOperation,
     ReopenResponseOperation,
     ResponseRules,
     WithdrawApplicationOperation,
     type ApplicationStatus,
     type ApplicationWorkspace,
+    type DocumentLedger,
+    type DocumentLibrary,
     type InviteApplicantOutput,
+    type LibraryDocument,
     type ResponseStatus,
+    type WorkspaceCitation,
     type WorkspaceStandard,
 } from '@mj-biz-apps/credentialing-core';
+import { DocumentViewerComponent, type ViewerCitation, type ViewerTab } from '../../applicant/documents/document-viewer.component';
+import { EvidenceClient } from '../../applicant/documents/evidence-client';
+import { FormatLibraryDate, FormatWhatWasRead } from '../../applicant/documents/library-model';
+import { RequirementLedgerComponent } from '../../applicant/documents/requirement-ledger.component';
+import { VersionHistoryComponent } from '../../applicant/documents/version-history.component';
 import {
     ApplyResponseUpdate,
     ResponseStateLabel,
@@ -82,6 +93,9 @@ const SHORT_DATE_FORMAT = new Intl.DateTimeFormat('en-US', {
         MJDropdownComponent,
         MJEmptyStateComponent,
         InviteWizardComponent,
+        RequirementLedgerComponent,
+        DocumentViewerComponent,
+        VersionHistoryComponent,
     ],
     templateUrl: './pipeline.page.html',
     styleUrls: ['./pipeline.page.scss'],
@@ -108,6 +122,19 @@ export class PipelinePage extends BaseAngularComponent implements OnInit {
     public DetailWorkspace: ApplicationWorkspace | null = null;
     public DetailLoading = false;
     public DetailError = '';
+    public DetailLibrary: DocumentLibrary | null = null;
+    public DetailDocumentsError = '';
+    public DownloadingDocumentID: string | null = null;
+
+    public ViewerOpen = false;
+    public ViewerDocumentID: string | null = null;
+    public ViewerFileName = '';
+    public ViewerContentType = '';
+    public ViewerCitation: ViewerCitation | null = null;
+    public ViewerInitialTab: ViewerTab = 'original';
+
+    public VersionsOpen = false;
+    public VersionsDocument: LibraryDocument | null = null;
 
     public ReopenDialogOpen = false;
     public ReopenTarget: WorkspaceStandard | null = null;
@@ -254,13 +281,90 @@ export class PipelinePage extends BaseAngularComponent implements OnInit {
 
     public async OpenDetail(row: PipelineApplicationRow): Promise<void> {
         this.SelectedApplication = row;
-        await this.loadDetailWorkspace(row.ID);
+        await this.loadDetailWorkspace(row.ID, row.SubjectID);
     }
 
     public CloseDetail(): void {
         this.SelectedApplication = null;
         this.DetailWorkspace = null;
+        this.DetailLibrary = null;
         this.DetailError = '';
+        this.DetailDocumentsError = '';
+    }
+
+    public get DetailLedger(): DocumentLedger | null {
+        if (!this.DetailLibrary || !this.SelectedApplication) return null;
+        const appID = this.SelectedApplication.ID;
+        return this.DetailLibrary.Ledgers.find((l) => UUIDsEqual(l.ApplicationID, appID)) ?? null;
+    }
+
+    public OpenDocumentViewer(doc: LibraryDocument): void {
+        this.ViewerDocumentID = doc.EvidenceDocumentID;
+        this.ViewerFileName = doc.FileName;
+        this.ViewerContentType = doc.ContentType;
+        this.ViewerCitation = null;
+        this.ViewerInitialTab = 'original';
+        this.ViewerOpen = true;
+        this.cdr.markForCheck();
+    }
+
+    public OpenCitationViewer(citation: WorkspaceCitation): void {
+        this.ViewerDocumentID = citation.EvidenceDocumentID;
+        this.ViewerFileName = citation.SourceLabel;
+        this.ViewerContentType = '';
+        this.ViewerCitation = {
+            SourceLabel: citation.SourceLabel,
+            PageReference: citation.PageReference,
+            Excerpt: citation.Excerpt,
+            StartOffset: citation.StartOffset,
+            EndOffset: citation.EndOffset,
+        };
+        this.ViewerInitialTab = 'text';
+        this.ViewerOpen = true;
+        this.cdr.markForCheck();
+    }
+
+    public CloseViewer(): void {
+        this.ViewerOpen = false;
+        this.ViewerDocumentID = null;
+        this.ViewerCitation = null;
+        this.cdr.markForCheck();
+    }
+
+    public OpenVersions(doc: LibraryDocument): void {
+        this.VersionsDocument = doc;
+        this.VersionsOpen = true;
+        this.cdr.markForCheck();
+    }
+
+    public CloseVersions(): void {
+        this.VersionsOpen = false;
+        this.VersionsDocument = null;
+        this.cdr.markForCheck();
+    }
+
+    public async DownloadDocument(doc: LibraryDocument): Promise<void> {
+        if (this.DownloadingDocumentID != null) return;
+        this.DownloadingDocumentID = doc.EvidenceDocumentID;
+        this.DetailDocumentsError = '';
+        this.cdr.markForCheck();
+        try {
+            const client = new EvidenceClient(this.ProviderToUse);
+            await client.Download(doc.EvidenceDocumentID, doc.FileName);
+        } catch (err) {
+            this.DetailDocumentsError = StudioMessages.FromError(err, 'load');
+        } finally {
+            this.DownloadingDocumentID = null;
+            this.cdr.markForCheck();
+        }
+    }
+
+    public FormatDocumentDate(iso: string | null | undefined): string {
+        return FormatLibraryDate(iso);
+    }
+
+    public WhatWasRead(doc: LibraryDocument): string {
+        return FormatWhatWasRead(doc);
     }
 
     public CanReopen(appStatus: ApplicationStatus, respStatus: ResponseStatus): boolean {
@@ -370,7 +474,7 @@ export class PipelinePage extends BaseAngularComponent implements OnInit {
                 return;
             }
             this.CloseWithdrawDialog();
-            await Promise.all([this.Load(), this.loadDetailWorkspace(appID)]);
+            await Promise.all([this.Load(), this.loadDetailWorkspace(appID, this.DetailWorkspace.Application.SubjectID)]);
         } catch (e) {
             this.WithdrawError = StudioMessages.FromError(e, 'save');
         } finally {
@@ -379,21 +483,38 @@ export class PipelinePage extends BaseAngularComponent implements OnInit {
         }
     }
 
-    private async loadDetailWorkspace(applicationID: string): Promise<void> {
+    private async loadDetailWorkspace(applicationID: string, subjectID: string): Promise<void> {
         this.DetailLoading = true;
         this.DetailError = '';
+        this.DetailDocumentsError = '';
         this.DetailWorkspace = null;
+        this.DetailLibrary = null;
         this.cdr.markForCheck();
         try {
-            const res = await new GetApplicationWorkspaceOperation().Execute(
-                { ApplicationID: applicationID },
-                { provider: this.ProviderToUse },
-            );
-            if (!res.Success || res.Output == null) {
-                this.DetailError = StudioMessages.ForUser(res.ErrorMessage || 'Could not load application answers.', 'load');
+            const [workspaceRes, libraryRes] = await Promise.all([
+                new GetApplicationWorkspaceOperation().Execute(
+                    { ApplicationID: applicationID },
+                    { provider: this.ProviderToUse },
+                ),
+                new GetDocumentLibraryOperation()
+                    .Execute({ SubjectID: subjectID }, { provider: this.ProviderToUse })
+                    .catch((err) => ({
+                        Success: false,
+                        ResultCode: 'EXECUTION_ERROR',
+                        ErrorMessage: err instanceof Error ? err.message : String(err),
+                        Output: undefined,
+                    })),
+            ]);
+            if (!workspaceRes.Success || workspaceRes.Output == null) {
+                this.DetailError = StudioMessages.ForUser(workspaceRes.ErrorMessage || 'Could not load application answers.', 'load');
                 return;
             }
-            this.DetailWorkspace = res.Output;
+            this.DetailWorkspace = workspaceRes.Output;
+            if (libraryRes.Success && libraryRes.Output != null) {
+                this.DetailLibrary = libraryRes.Output;
+            } else {
+                this.DetailDocumentsError = StudioMessages.ForUser(libraryRes.ErrorMessage || 'Could not load applicant documents.', 'load');
+            }
         } catch (e) {
             this.DetailError = StudioMessages.FromError(e, 'load');
         } finally {

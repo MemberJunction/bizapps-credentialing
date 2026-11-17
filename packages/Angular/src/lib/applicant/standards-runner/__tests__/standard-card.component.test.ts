@@ -163,4 +163,40 @@ describe('StandardCardComponent', () => {
         submittedCard.StartEdit();
         expect(submittedCard.IsEditing).toBe(false);
     });
+
+    it('toggles evidence upload on an Evidence standard and opens citation viewer on text tab', () => {
+        const evidenceStd: WorkspaceStandard = {
+            ...makeStandard('Located'),
+            ResponseType: 'Evidence',
+            Response: {
+                ...makeStandard('Located').Response,
+                Citations: [
+                    {
+                        CitationID: 'C-1',
+                        EvidenceDocumentID: 'D1111111-1111-1111-1111-111111111111',
+                        SourceLabel: 'safety-policy.pdf',
+                        PageReference: 'p. 1',
+                        Excerpt: 'Quoted passage.',
+                        StartOffset: 0,
+                        EndOffset: 15,
+                    },
+                ],
+            },
+        };
+        const card = createCard(APP_DRAFT, evidenceStd);
+
+        card.ToggleEvidenceUpload();
+        expect(card.ShowEvidenceUpload).toBe(true);
+        card.OnEvidenceUploaded({ EvidenceDocumentID: 'D-2', TextStatus: 'Extracted', TextNote: null });
+        expect(card.ShowEvidenceUpload).toBe(false);
+        expect(card.UploadedDocument?.EvidenceDocumentID).toBe('D-2');
+
+        card.OpenCitation(evidenceStd.Response.Citations[0]);
+        expect(card.ViewerOpen).toBe(true);
+        expect(card.ViewerInitialTab).toBe('text');
+        expect(card.ViewerDocumentID).toBe('D1111111-1111-1111-1111-111111111111');
+        expect(card.ViewerCitation?.Excerpt).toBe('Quoted passage.');
+        card.CloseViewer();
+        expect(card.ViewerOpen).toBe(false);
+    });
 });

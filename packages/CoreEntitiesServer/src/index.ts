@@ -46,6 +46,7 @@ import { ReopenResponseServerOperation } from './operations/ReopenResponseServer
 import { WithdrawApplicationServerOperation } from './operations/WithdrawApplicationServerOperation.js';
 import { AttestInLieuServerOperation } from './operations/AttestInLieuServerOperation.js';
 import { ConfirmDocumentCurrentServerOperation } from './operations/ConfirmDocumentCurrentServerOperation.js';
+import { GetDocumentLibraryServerOperation } from './operations/GetDocumentLibraryServerOperation.js';
 
 export {
     AccreditingOrganizationEntityServer,
@@ -128,6 +129,7 @@ export { ReopenResponseServerOperation } from './operations/ReopenResponseServer
 export { WithdrawApplicationServerOperation } from './operations/WithdrawApplicationServerOperation.js';
 export { AttestInLieuServerOperation } from './operations/AttestInLieuServerOperation.js';
 export { ConfirmDocumentCurrentServerOperation } from './operations/ConfirmDocumentCurrentServerOperation.js';
+export { GetDocumentLibraryServerOperation } from './operations/GetDocumentLibraryServerOperation.js';
 export {
     EvidenceIntake,
     EvidenceRefusal,
@@ -187,8 +189,9 @@ export function LoadBizAppsCredentialingEntitiesServer(): void {
         WithdrawApplicationServerOperation,
         AttestInLieuServerOperation,
         ConfirmDocumentCurrentServerOperation,
+        GetDocumentLibraryServerOperation,
     ];
-    if (anchor.length !== 17 || operations.length !== 15) {
+    if (anchor.length !== 17 || operations.length !== 16) {
         throw new Error('credentialing server entity subclasses or operations missing');
     }
 }
