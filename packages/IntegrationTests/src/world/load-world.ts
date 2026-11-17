@@ -51,6 +51,8 @@ const APPLICANT_A_EMAIL = 'applicant.a@example.test';
 const APPLICANT_B_EMAIL = 'applicant.b@example.test';
 const APPLICANT_TWO_EMAIL = 'applicant.two@example.test';
 const APPLICANT_ORG_B_EMAIL = 'applicant.orgb@example.test';
+/** The contact of `Sample Evidence Applicant` (evidence checks, plan Task 7). */
+export const APPLICANT_EVIDENCE_EMAIL = 'applicant.evidence@example.test';
 
 /** The credentialing role every staff member of an accrediting organization holds. */
 export const STAFF_ROLE = 'Credentialing Staff';
@@ -369,6 +371,41 @@ function sampleLargeProgramSpec(orgA: WorldOrganization, committee: WorldCommitt
     };
 }
 
+/** The program names of the evidence world (plan Task 7). */
+export const EVIDENCE_PROGRAM_NAME = 'Sample Evidence Program';
+/** Its requirement whose policy is `Normal`: a document must be uploaded. */
+export const EVIDENCE_NORMAL_REQUIREMENT = 'Written safety policy';
+/** Its requirement whose policy is `Restricted Allowed`: an attestation may stand in for the document. */
+export const EVIDENCE_RESTRICTED_REQUIREMENT = 'Confidential board minutes';
+
+/**
+ * `Sample Evidence Program` in OrgA: version `2026`, deciding committee CommitteeA, one section of
+ * two standards, one `Normal` and one `Restricted Allowed` document requirement; activated by the
+ * loader. Evidence checks upload and attest against it.
+ */
+function evidenceProgramSpec(orgA: WorldOrganization, committee: WorldCommittee): ProgramTreeSpec {
+    return {
+        AccreditingOrganizationID: orgA.ID,
+        Program: { Name: EVIDENCE_PROGRAM_NAME, ProgramType: 'Certification', SubjectType: 'Person', SubjectNoun: 'professional', CredentialPrefix: 'SEP' },
+        Version: { Label: '2026', CommitteeID: committee.ID },
+        Sections: [
+            {
+                Number: '1',
+                Name: 'Policies',
+                Sequence: 1,
+                Standards: [
+                    { Code: '1.1', Statement: 'The practice keeps a written safety policy and reviews it every year.', ResponseType: 'Evidence', Sequence: 1 },
+                    { Code: '1.2', Statement: 'The board minutes record the annual policy review.', ResponseType: 'Evidence', Sequence: 2 },
+                ],
+            },
+        ],
+        DocumentRequirements: [
+            { Name: EVIDENCE_NORMAL_REQUIREMENT, Sequence: 1, SensitivityPolicy: 'Normal' },
+            { Name: EVIDENCE_RESTRICTED_REQUIREMENT, Sequence: 2, SensitivityPolicy: 'Restricted Allowed' },
+        ],
+    };
+}
+
 /** Ensures the tree and activates its version when it is still a Draft (once; later loads find it Active). */
 async function ensureActiveProgram(ctx: IntegrationCheckContext, spec: ProgramTreeSpec): Promise<ProgramTree> {
     const tree = await EnsureProgramTree(ctx, spec, ctx.User);
@@ -398,6 +435,7 @@ export async function EnsureWorldData(ctx: IntegrationCheckContext): Promise<Wor
     const applicantProgram = await ensureActiveProgram(ctx, applicantProgramSpec(orgA, committeeA));
     const applicantProgramB = await ensureActiveProgram(ctx, applicantProgramBSpec(orgB, committeeB));
     const largeProgram = await ensureActiveProgram(ctx, sampleLargeProgramSpec(orgA, committeeA));
+    const evidenceProgram = await ensureActiveProgram(ctx, evidenceProgramSpec(orgA, committeeA));
     return {
         OrgA: orgA,
         OrgB: orgB,
@@ -409,6 +447,7 @@ export async function EnsureWorldData(ctx: IntegrationCheckContext): Promise<Wor
         ApplicantProgram: applicantProgram,
         ApplicantProgramB: applicantProgramB,
         LargeProgram: largeProgram,
+        EvidenceProgram: evidenceProgram,
     };
 }
 
@@ -457,7 +496,18 @@ export async function EnsureApplicantWorld(ctx: IntegrationCheckContext, users: 
         PrimaryEmail: APPLICANT_ORG_B_EMAIL,
         Contacts: [applicantOrgB],
     });
-    return { SubjectOne: subjectOne, SubjectTwo: subjectTwo, SubjectOrgB: subjectOrgB };
+    const applicantEvidence = await ensureContactUser(ctx, APPLICANT_EVIDENCE_EMAIL, 'Evidence');
+    const subjectEvidence = await EnsureWorldSubject(ctx, {
+        AccreditingOrganizationID: data.OrgA.ID,
+        InvitedBy: users.StaffA,
+        Program: data.EvidenceProgram,
+        DisplayName: 'Sample Evidence Applicant',
+        FirstName: 'Sample',
+        LastName: 'Evidence Applicant',
+        PrimaryEmail: APPLICANT_EVIDENCE_EMAIL,
+        Contacts: [applicantEvidence],
+    });
+    return { SubjectOne: subjectOne, SubjectTwo: subjectTwo, SubjectOrgB: subjectOrgB, SubjectEvidence: subjectEvidence };
 }
 
 export async function LoadWorld(ctx: IntegrationCheckContext): Promise<CredentialingWorld> {

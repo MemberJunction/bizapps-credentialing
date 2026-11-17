@@ -1,5 +1,6 @@
 import { DatabaseProviderBase } from '@memberjunction/core';
 import { CredentialingServices } from '@mj-biz-apps/credentialing-core-entities-server';
+import { WorkerTextExtractor } from '../evidence/WorkerTextExtractor.js';
 import { MagicLinkInvitationIssuer } from '../invitations/MagicLinkInvitationIssuer.js';
 
 /**
@@ -23,5 +24,8 @@ export function RegisterCredentialingServices(): void {
             },
         },
         Invitations: new MagicLinkInvitationIssuer(),
+        Text: new WorkerTextExtractor(),
+        // The evidence store is registered by EvidenceRouteExtension when it starts, because the
+        // storage account it uses is one of that extension's settings.
     });
 }

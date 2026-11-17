@@ -325,6 +325,12 @@ importers:
       '@memberjunction/core':
         specifier: 6.2.2
         version: 6.2.2
+      '@memberjunction/core-entities':
+        specifier: 6.2.2
+        version: 6.2.2
+      '@memberjunction/document-parsing':
+        specifier: 6.2.2
+        version: 6.2.2
       '@memberjunction/global':
         specifier: 6.2.2
         version: 6.2.2
@@ -337,6 +343,15 @@ importers:
       '@memberjunction/sqlserver-dataprovider':
         specifier: 6.2.2
         version: 6.2.2(@aws-sdk/credential-provider-node@3.972.97)(@modelcontextprotocol/sdk@1.30.0(zod@3.25.76))(@smithy/signature-v4@5.7.5)(@types/node@24.10.11)(axios@1.19.0)(chokidar@3.6.0)(encoding@0.1.13)(typescript@5.9.3)(ws@8.21.3)(zod@3.25.76)
+      '@memberjunction/storage':
+        specifier: 6.2.2
+        version: 6.2.2(encoding@0.1.13)(typescript@5.9.3)
+      '@types/express':
+        specifier: ^5.0.6
+        version: 5.0.6
+      express:
+        specifier: ^5.2.1
+        version: 5.2.1
       typescript:
         specifier: ^5.9.3
         version: 5.9.3

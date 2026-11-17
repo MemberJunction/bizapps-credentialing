@@ -72,6 +72,11 @@ export interface WorldApplicants {
     SubjectTwo: WorldSubject;
     /** `Sample Applicant Org B` in OrgB; contact `applicant.orgb@example.test`. */
     SubjectOrgB: WorldSubject;
+    /**
+     * `Sample Evidence Applicant` in OrgA; contact `applicant.evidence@example.test`; its Draft
+     * application is on `Sample Evidence Program` 2026. Evidence checks upload and attest for it.
+     */
+    SubjectEvidence: WorldSubject;
 }
 
 /** The organizations, committee and sample program the checks read. */
@@ -104,6 +109,11 @@ export interface WorldData {
     ApplicantProgramB: ProgramTree;
     /** `Sample Large Program` in OrgA with Active version `2026` (10 sections × 15 standards = 150). Read-only to checks. */
     LargeProgram: ProgramTree;
+    /**
+     * `Sample Evidence Program` in OrgA with Active version `2026`: one `Normal` and one
+     * `Restricted Allowed` document requirement. Read-only to checks.
+     */
+    EvidenceProgram: ProgramTree;
 }
 
 /** Everything a credentialing check can rely on existing. */

@@ -20,6 +20,8 @@ export const CredentialingOperation = {
     ConfirmResponse: 'Credentialing.ConfirmResponse',
     ReopenResponse: 'Credentialing.ReopenResponse',
     WithdrawApplication: 'Credentialing.WithdrawApplication',
+    AttestInLieu: 'Credentialing.AttestInLieu',
+    ConfirmDocumentCurrent: 'Credentialing.ConfirmDocumentCurrent',
 } as const;
 
 /** One of the {@link CredentialingOperation} keys. */
@@ -60,3 +62,12 @@ export const ONLY_APPLICANT_EDIT_REASON = 'Only the applicant can edit an answer
 
 /** Refusal when an invalid self-assessment value is supplied. */
 export const INVALID_SELF_ASSESSMENT_REASON = 'Choose Met, Partially met or Not met.';
+
+/** Refusal when attestation in lieu is asked for a requirement that does not allow restricted material. */
+export const DOCUMENT_MUST_BE_UPLOADED_REASON = 'This document must be uploaded.';
+
+/** Refusal when an attestation in lieu is sent with no statement. */
+export const ATTESTATION_STATEMENT_REQUIRED_REASON = 'Write what you are attesting to.';
+
+/** Refusal when "Still current" is asked for a document that a newer upload replaced. */
+export const DOCUMENT_REPLACED_REASON = 'This document was replaced by a newer upload.';

@@ -14,7 +14,11 @@ import { UserCache } from '@memberjunction/generic-database-provider';
  * - `SubjectAccess` (guards/SubjectAccess.ts) reads, after the caller's own row filter admitted the
  *   owned row, the authoring rows an applicant holds no permission on (version, program, standard,
  *   requirement) and the contact and membership rows that decide how a user acts for a subject
- *   ("B2: applicant data" in that document).
+ *   ("B2: applicant data" in that document);
+ * - the evidence store (`StorageEvidenceStore` in `@mj-biz-apps/credentialing-server`) writes, reads
+ *   and removes evidence files and their `MJ: Files` rows, because no credentialing role holds a
+ *   permission on `MJ: Files` or the storage account: the app's evidence route is the only door to
+ *   the bytes (plan Decision 5).
  *
  * Any new use must be added to that list.
  */

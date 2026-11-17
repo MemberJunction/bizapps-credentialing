@@ -84,4 +84,8 @@ describe('Credentialing Integration Test Bundles', () => {
         ];
         expect(checks.every((c) => c.RequiresMutation === true)).toBe(true);
     });
+    it('registers the cred-evidence-rules bundle with its four checks', () => {
+        const ids = IntegrationCheckRegistry.Instance.GetBundle('cred-evidence-rules').map((c) => c.Id);
+        expect(ids).toEqual(['cred-evidence-rules.14', 'cred-evidence-rules.15', 'cred-evidence-rules.17', 'cred-evidence-rules.18']);
+    });
 });

@@ -14,6 +14,7 @@
     "build:stream": "turbo --log-order=stream build",
     "build:packages": "turbo --log-order=stream build --filter=\"@mj-biz-apps/credentialing-*\"",
     "dev:owner": "node scripts/dev/ensure-dev-owner.mjs",
+    "dev:storage": "node scripts/dev/ensure-dev-storage.mjs",
     "metadata:strip-sync": "node scripts/dev/strip-sync-blocks.mjs",
     "persona": "node scripts/dev/mint-persona-link.mjs",
     "probe:isolation": "node scripts/dev/probe-isolation.mjs",

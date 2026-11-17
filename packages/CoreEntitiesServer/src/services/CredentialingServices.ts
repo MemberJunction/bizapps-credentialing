@@ -1,4 +1,4 @@
-import type { IMetadataProvider, UserInfo } from '@memberjunction/core';
+import { LogError, type IMetadataProvider, type UserInfo } from '@memberjunction/core';
 import { BaseSingleton } from '@memberjunction/global';
 
 /**
@@ -93,6 +93,12 @@ export interface RegisteredServices {
     Recognizer: TextRecognizer;
     Reader: EvidenceReader;
     Notifier: StaffNotifier;
+    /**
+     * Called after an evidence upload has committed, with the new document's ID: the reading queue
+     * registers itself here (Task 9) so a new document is read without waiting for the next sweep.
+     * Optional: with nothing registered, a stored document simply waits for the sweep.
+     */
+    OnEvidenceStored: (documentID: string) => void;
 }
 
 /** The sentence a getter throws for a service nobody registered. */
@@ -155,6 +161,23 @@ export class CredentialingServices {
 
     public static get Notifier(): StaffNotifier {
         return CredentialingServices.get('Notifier');
+    }
+
+    /**
+     * Tells the registered {@link RegisteredServices.OnEvidenceStored} hook that a document was
+     * stored. Fire and forget: nothing registered is not an error, and a hook that throws is logged
+     * here, never thrown into the upload that has already committed.
+     */
+    public static NotifyEvidenceStored(documentID: string): void {
+        const hook = ServiceStore.Instance.Services.OnEvidenceStored;
+        if (hook == null) {
+            return;
+        }
+        try {
+            hook(documentID);
+        } catch (err: unknown) {
+            LogError(`The evidence-stored hook failed for document ${documentID}: ${err instanceof Error ? err.message : String(err)}`);
+        }
     }
 
     /**

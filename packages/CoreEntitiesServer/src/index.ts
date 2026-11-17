@@ -44,6 +44,8 @@ import { SaveResponseServerOperation } from './operations/SaveResponseServerOper
 import { ConfirmResponseServerOperation } from './operations/ConfirmResponseServerOperation.js';
 import { ReopenResponseServerOperation } from './operations/ReopenResponseServerOperation.js';
 import { WithdrawApplicationServerOperation } from './operations/WithdrawApplicationServerOperation.js';
+import { AttestInLieuServerOperation } from './operations/AttestInLieuServerOperation.js';
+import { ConfirmDocumentCurrentServerOperation } from './operations/ConfirmDocumentCurrentServerOperation.js';
 
 export {
     AccreditingOrganizationEntityServer,
@@ -124,6 +126,23 @@ export { SaveResponseServerOperation } from './operations/SaveResponseServerOper
 export { ConfirmResponseServerOperation } from './operations/ConfirmResponseServerOperation.js';
 export { ReopenResponseServerOperation } from './operations/ReopenResponseServerOperation.js';
 export { WithdrawApplicationServerOperation } from './operations/WithdrawApplicationServerOperation.js';
+export { AttestInLieuServerOperation } from './operations/AttestInLieuServerOperation.js';
+export { ConfirmDocumentCurrentServerOperation } from './operations/ConfirmDocumentCurrentServerOperation.js';
+export {
+    EvidenceIntake,
+    EvidenceRefusal,
+    EVIDENCE_OBJECT_PREFIX,
+    type AcceptedEvidence,
+    type CurrentDocumentState,
+    type EvidenceIntakeData,
+    type EvidenceIntakeSeams,
+    type EvidenceIntakeTransaction,
+    type EvidenceRefusalKind,
+    type EvidenceUpload,
+    type NewEvidenceRow,
+} from './evidence/EvidenceIntake.js';
+export { DatabaseEvidenceIntakeData } from './evidence/EvidenceIntakeData.js';
+export { DocumentFreeze, type FrozenTarget } from './evidence/DocumentFreeze.js';
 
 /**
  * Bootstrap / anti-tree-shaking anchor, called by the server bootstrap. Referencing the classes keeps
@@ -166,8 +185,10 @@ export function LoadBizAppsCredentialingEntitiesServer(): void {
         ConfirmResponseServerOperation,
         ReopenResponseServerOperation,
         WithdrawApplicationServerOperation,
+        AttestInLieuServerOperation,
+        ConfirmDocumentCurrentServerOperation,
     ];
-    if (anchor.length !== 17 || operations.length !== 13) {
+    if (anchor.length !== 17 || operations.length !== 15) {
         throw new Error('credentialing server entity subclasses or operations missing');
     }
 }

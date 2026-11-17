@@ -26,11 +26,47 @@ import { LoadBizAppsCredentialingActions } from '@mj-biz-apps/credentialing-acti
 // Server-side entity subclasses register at priority 2 and must load after the
 // client-shared entities so their overrides win.
 import { LoadBizAppsCredentialingEntitiesServer } from '@mj-biz-apps/credentialing-core-entities-server';
+import type { ServerExtensionConfig } from '@memberjunction/server-extensions-core';
 import { RegisterCredentialingServices } from './services/register.js';
+import { EVIDENCE_EXTENSION_DRIVER_CLASS, EvidenceRouteExtension } from './evidence/EvidenceRouteExtension.js';
+import { LocalDiskFileStorage } from './storage/LocalDiskFileStorage.js';
 
 export * from './generated/generated.js';
 export { MagicLinkInvitationIssuer } from './invitations/MagicLinkInvitationIssuer.js';
 export { RegisterCredentialingServices } from './services/register.js';
+export {
+    EVIDENCE_EXTENSION_DRIVER_CLASS,
+    EVIDENCE_STORAGE_ACCOUNT_ENV,
+    EvidenceRouteExtension,
+    ReadBoundedBody,
+    ResolveEvidenceRouteSettings,
+    STORAGE_SETUP_HINT,
+} from './evidence/EvidenceRouteExtension.js';
+export {
+    DOWNLOAD_FAILED_REASON,
+    EvidenceRoutes,
+    SIGN_IN_REQUIRED_REASON,
+    STORAGE_NOT_CONFIGURED_REASON,
+    UPLOAD_FAILED_REASON,
+    type EvidenceRouteSettings,
+    type HttpReply,
+    type UploadBody,
+    type UploadQuery,
+} from './evidence/EvidenceRoutes.js';
+export { StorageEvidenceStore } from './evidence/StorageEvidenceStore.js';
+export { WorkerTextExtractor, MAX_EXTRACTED_CHARACTERS, EXTRACTION_TIME_LIMIT_MS, EXTRACTION_HEAP_LIMIT_MB, TEXT_NOTE } from './evidence/WorkerTextExtractor.js';
+export { LocalDiskFileStorage, LOCAL_DISK_STORAGE_DRIVER_KEY, LOCAL_DISK_PRODUCTION_REASON } from './storage/LocalDiskFileStorage.js';
+
+/**
+ * The server extensions this package publishes; MJAPI reads this export from every installed Open
+ * App server package (`mj/packages/ServerBootstrap/src/index.ts`, `collectServerExtensions`) and
+ * mounts each entry with no host configuration. A host may overlay an entry by `DriverClass` in its
+ * `mj.config.cjs` `serverExtensions[]` (for example to set `Settings.EvidenceStorageAccountName`, or
+ * `Enabled: false`).
+ */
+export const MJ_SERVER_EXTENSIONS: ServerExtensionConfig[] = [
+    { Enabled: true, DriverClass: EVIDENCE_EXTENSION_DRIVER_CLASS, RootPath: '/credentialing', Phase: 'post-auth', Settings: {} },
+];
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
 
@@ -48,4 +84,9 @@ export function LoadBizAppsCredentialingServer(): void {
     LoadBizAppsCredentialingEntitiesServer();
     LoadBizAppsCredentialingActions();
     RegisterCredentialingServices();
+    // Anti-tree-shaking: the evidence extension and the development storage driver register through
+    // @RegisterClass, which runs only when their modules are part of the bundle.
+    if (EvidenceRouteExtension == null || LocalDiskFileStorage == null) {
+        throw new Error('credentialing server extension or storage driver missing');
+    }
 }

@@ -692,6 +692,8 @@ A user API key (`mj_sk_…`, `x-api-key` header) is not used by this harness.
 | `cred-users` | — (client harness only) | client (`pnpm run seed:users`; registered in `cred-world.checks.ts`) |
 | `cred-operations-wire` | — (client harness only) | client only |
 | `cred-invite-wire` | — (client harness only) | client only (checks 7, 8 and 10 against MJAPI's live `MagicLinkService`) |
+| `cred-evidence-rules` | `CRD-11 - Evidence` | server only (fixture store and text extractor; the `EvidenceIntake.Seams.AfterStore` race) |
+| `cred-evidence` | — (client harness only) | client only (the evidence routes over HTTP against MJAPI, real storage and extraction) |
 
 ```sh
 MJ_INTEGRATION_TEST=1 RUN_MUTATION_TESTS=1 corepack pnpm mj test run --name "CRD-02 - Version rules"   # 12 checks
@@ -1089,3 +1091,109 @@ Verified from MJ v6.2.2 (`mj/packages/MJServer/src/index.ts:204-206, 1414-1428`,
   `'Credentialing Applicant'` (plus `'Magic Link Baseline'` as baseline role), `magicLink.explorerUrl`
   pointing to Explorer (`http://localhost:4251`), and `magicLink.contextUserForProvisioning` pointing to an
   active `Owner` user (`System` when unset).
+
+## Evidence storage, routes and text extraction (B2 Task 7)
+
+### How the routes are published and who calls them (Step 1 discovery, MJ v6.2.2)
+
+- **Discovery from the package.** `mj/packages/ServerBootstrap/src/index.ts` (`collectServerExtensions`)
+  reads the `MJ_SERVER_EXTENSIONS` named export (`MJ_SERVER_EXTENSIONS_EXPORT`,
+  `mj/packages/ServerExtensionsCore/src/collect.ts:16`) of every Open App server package it loaded
+  from `dynamicPackages.server`; `package.json` `memberjunction.serverExtensions` is only the fallback
+  when the export yields nothing, so it is **not** needed. `packages/Server/src/index.ts` exports one
+  entry `{ Enabled: true, DriverClass: 'CredentialingEvidenceExtension', RootPath: '/credentialing',
+  Phase: 'post-auth' }` and `EvidenceRouteExtension` overrides `DefaultPhase` to `'post-auth'`. Nothing
+  was added to `mj/mj.config.cjs`. Measured in `logs/mjapi.log` after `servers.sh restart api`:
+  `@mj-biz-apps/credentialing-server: +1 resolver path +1 server extension`, `CredentialingEvidenceExtension
+  at /credentialing (enabled, POST-AUTH; …)`, `Server extension 'CredentialingEvidenceExtension'
+  initialized (post-auth): Credentialing evidence routes mounted at /credentialing (storage account:
+  Credentialing Evidence (Local Disk))`, `Routes: POST /credentialing/evidence, GET
+  /credentialing/evidence/:documentId/content`.
+- **The caller.** Post-auth extensions mount after `CreateUnifiedAuthMiddleware`
+  (`mj/packages/MJServer/src/index.ts:1549-1580`), which sets `req.userPayload` (`UserPayload`, its
+  `userRecord` the `UserInfo`) or answers `401` itself (`mj/packages/MJServer/src/context.ts:727-790`).
+  The route reads only `req.userPayload.userRecord` (checked to be a `UserInfo`); it never takes a user
+  ID from the request. A request without a token is answered `401 {"error":"Authentication required"}`
+  by MJAPI before the route runs (`cred-evidence.6`).
+- **Magic-link sessions.** `BuildMagicLinkSessionUser` (`context.ts:232`) returns the named user
+  (adding only a resource scope or anonymous roles); `mj_app_id` is a claim only, and nothing in
+  MJServer restricts which routes a magic-link session may call. Measured: every applicant request in
+  `cred-evidence` uses a magic-link session minted by the dev Owner and redeemed, and is admitted.
+- **The provider.** MJAPI creates per-request providers only in the GraphQL context
+  (`ContextFunction`, `context.ts`); an extension route gets none. Each request therefore takes a
+  provider from `CredentialingServices.Providers` (`CreateIsolatedProvider`) and releases it when the
+  request settles (`EvidenceRoutes.onOwnProvider`), so the upload's transaction and subject lock never
+  share a provider with another request.
+
+### Storage (Step 2 discovery)
+
+- `FileStorageEngine.UploadFile` (`mj/packages/MJStorage/src/FileStorageEngine.ts:463`) needs `content`,
+  `fileName`, `mimeType`, `contextUser`, and takes `storageAccountId`, `pathPrefix` and `provider`.
+  Without `storageAccountId` it uses `ResolveStorageAccount()`: the first active account, else the first
+  account of any kind (`:307-316`) — so the evidence store always names its account. It writes the object
+  through the account's driver (`GetDriver` → `InitializeDriverWithAccountCredentials`,
+  `mj/packages/MJStorage/src/util.ts:186`), then saves the `MJ: Files` row as `contextUser`.
+- A driver needs: an `MJ: File Storage Providers` row whose `ServerDriverKey` is the driver's
+  `@RegisterClass(FileStorageBase, …)` key (resolved by `ResolveStorageDriver`, `util.ts:62`), and an
+  `MJ: File Storage Accounts` row on it. `FileStorageAccount.CredentialID` is NOT NULL (sqlcmd,
+  `sys.columns`), so an account needs an `MJ: Credentials` row; its decrypted `Values` are passed to
+  the driver's `initialize`. An account with **no** `MJ: File Storage Account Permissions` rows is open
+  to every signed-in user (`StorageAccessEvaluator.ACCOUNT_WITHOUT_PERMISSION_ROWS_IS_OPEN`).
+- Before this task (sqlcmd): `__mj.FileStorageAccount` had **0 rows**, `__mj.[File]` 0 rows; the eight
+  provider rows were MJ's own (all inactive except `External URL`). No usable account existed.
+- `pnpm run dev:storage` (`scripts/dev/ensure-dev-storage.mjs`, root from `--root` or
+  `CREDENTIALING_EVIDENCE_STORE_ROOT`; this instance: `CREDENTIALING_EVIDENCE_STORE_ROOT=<mj-work>/evidence-store`)
+  creates, as the system user through entity objects: the credential type `Credentialing Local Disk
+  Storage` (`RootDirectory`), the credential `Credentialing Evidence Local Disk` (its `Values` stored
+  encrypted, `$ENC$…`, checked with sqlcmd), the provider `Credentialing Local Disk` (ServerDriverKey
+  `Credentialing Local Disk Storage`), the account `Credentialing Evidence (Local Disk)`, and one
+  permission row for the System user (Read and Write), which closes the account to everyone else. No
+  credentialing role gets a row. It sets `CREDENTIALING_EVIDENCE_STORAGE_ACCOUNT` and
+  `CREDENTIALING_EVIDENCE_STORE_ROOT` in `../mj/.env` (only those two lines). A second run finds every
+  row and creates nothing. Because it is the only account on this instance, any MJ feature that uploads
+  without naming an account would also use it (under its own `artifacts/` prefix, which the evidence
+  orphan sweep never touches).
+- With `CREDENTIALING_EVIDENCE_STORAGE_ACCOUNT` unset, MJAPI logs `Credentialing: evidence uploads answer
+  503 because no storage account is configured. Set CREDENTIALING_EVIDENCE_STORAGE_ACCOUNT …` and the
+  upload answers `503 {"Message":"Document storage is not configured on this server."}` (measured once by
+  commenting the line out, restarting, and posting the text PDF as the evidence contact; then restored).
+
+### Text extraction runs in a child process, not a worker thread
+
+Plan Task 7 named a `worker_thread` with `resourceLimits: { maxOldGenerationSizeMb: 512 }`. Measured on
+Node 24.15: three copies of the inflation-bomb DOCX (`word/document.xml` = 300 MB of tiny paragraphs)
+parsed at once in three workers ended the **whole process** in 2 of 10 runs with `FATAL ERROR: Reached
+heap limit … JavaScript heap out of memory`; the native stack ends in `node::worker::Worker::Run`, i.e.
+V8's `FatalProcessOutOfMemory` raised from a worker isolate. In MJAPI that would stop the server. So
+`WorkerTextExtractor` forks `text-extractor.worker.js` per file with `--max-old-space-size=512`, sends
+the bytes over IPC, kills it after 30 s, and runs at most two at once. With that: 10 of 10 runs of three
+concurrent bombs answered `Could Not Read`, the parent process stayed at about 100 MB RSS (it was
+1.7 GB with workers), and a 50 ms timer on the parent kept firing.
+
+**pdf.js and Node's Buffer pool.** `ParsePdf` failed with `bad XRef entry` on the 1 037-byte fixture
+PDF, and a later call returned another file's page count. Cause: pdf.js 1.10 (inside `pdf-parse`)
+builds sub-streams from `bytes.buffer` and ignores `byteOffset`; its message-port clone copies the input
+with `new Buffer(value)`, and a copy under 4 KB lands inside Node's shared 8 KB pool at a non-zero
+offset. The parser process sets `Buffer.poolSize = 0` first, after which every call parsed correctly.
+Files of 4 KB and more were never affected.
+
+### Fixtures
+
+`scripts/dev/make-evidence-fixtures.mjs` generates every evidence fixture (invented content only) into
+`packages/Server/src/evidence/__fixtures__/`. All are committed except `inflation-bomb.docx`: DEFLATE
+cannot compress better than about 1 000 : 1, so the bomb is about 0.9 MB; it is gitignored and generated
+on first use by the unit tests and `cred-evidence`.
+
+### Running the evidence checks
+
+```sh
+corepack pnpm --filter @mj-biz-apps/credentialing-server run test        # extractor, local disk driver, routes
+corepack pnpm --filter @mj-biz-apps/credentialing-core-entities-server exec vitest run src/__tests__/EvidenceIntake.test.ts
+MJ_INTEGRATION_TEST=1 RUN_MUTATION_TESTS=1 corepack pnpm mj test run --name "CRD-11 - Evidence"   # 4 checks
+../servers.sh restart api                  # from the workspace parent, once, after CRD-11 first creates applicant.evidence@example.test
+corepack pnpm run test:integration cred-evidence                                                  # 11 checks, HTTP
+```
+
+`cred-evidence-rules.14` was checked against a negative control: with the re-check inside the
+transaction removed (`EvidenceIntake.write`), it failed with `expected the upload to be refused`;
+restored, it passed.

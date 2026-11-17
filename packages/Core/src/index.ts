@@ -40,3 +40,5 @@ export * from './operations/SaveResponseOperation.js';
 export * from './operations/ConfirmResponseOperation.js';
 export * from './operations/ReopenResponseOperation.js';
 export * from './operations/WithdrawApplicationOperation.js';
+export * from './operations/AttestInLieuOperation.js';
+export * from './operations/ConfirmDocumentCurrentOperation.js';
