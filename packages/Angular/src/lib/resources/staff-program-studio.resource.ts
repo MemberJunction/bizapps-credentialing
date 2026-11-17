@@ -3,8 +3,11 @@
  *
  * Guarded by {@link CredentialingAreaResource}: only a holder of Credentialing Staff opens it. It states
  * why there is nothing to show when the user holds Credentialing Staff without belonging to an
- * organization, instead of an empty screen. The authoring widgets arrive in the Program Studio task;
- * until then a member sees their organizations here.
+ * organization, instead of an empty screen. A member gets `<bizapps-cred-program-studio>`.
+ *
+ * The open program and version round-trip through the URL as `programId` / `versionId`: the page's
+ * `SelectionChanged` is written with `UpdateQueryParams`, and back/forward or a pasted link reaches
+ * the page through `OnQueryParamsChanged`.
  */
 import { Component } from '@angular/core';
 import { ResourceData } from '@memberjunction/core-entities';
@@ -13,15 +16,19 @@ import { BaseResourceComponent } from '@memberjunction/ng-shared';
 import { SharedGenericModule } from '@memberjunction/ng-shared-generic';
 import { MJAlertComponent, MJEmptyStateComponent } from '@memberjunction/ng-ui-components';
 import { CredentialingResource, type StaffOrganization, type Standing } from '../application/area-nav';
+import { ProgramStudioPage, type StudioSelection } from '../staff/program-studio/program-studio.page';
 import { CredentialingAreaResource } from './credentialing-area-resource';
+
+/** The query parameters Program Studio keeps in the URL. */
+export const PROGRAM_STUDIO_PARAMS = { Program: 'programId', Version: 'versionId' } as const;
 
 @RegisterClass(BaseResourceComponent, 'CredentialingProgramStudioResource')
 @Component({
     standalone: true,
     selector: 'bizapps-cred-program-studio-resource',
-    imports: [SharedGenericModule, MJAlertComponent, MJEmptyStateComponent],
+    imports: [SharedGenericModule, MJAlertComponent, MJEmptyStateComponent, ProgramStudioPage],
     template: `
-        <div class="cred-resource">
+        <div class="cred-resource" [class.cred-resource--studio]="State === 'Open' && Organizations.length > 0">
             @switch (State) {
                 @case ('Loading') {
                     <mj-loading Text="Loading Program Studio..."></mj-loading>
@@ -40,12 +47,13 @@ import { CredentialingAreaResource } from './credentialing-area-resource';
                             Message="Your account has the Credentialing Staff role but is not attached to an organization, so there is nothing to show and nothing can be saved. Ask a Credentialing administrator to add you.">
                         </mj-empty-state>
                     } @else {
-                        <h2 class="cred-resource__heading">Program Studio</h2>
-                        <ul class="cred-resource__organizations" aria-label="Your accrediting organizations">
-                            @for (organization of Organizations; track organization.ID) {
-                                <li>{{ organization.Name }}</li>
-                            }
-                        </ul>
+                        <bizapps-cred-program-studio
+                            [Provider]="Provider"
+                            [Organizations]="Organizations"
+                            [VersionID]="VersionParam"
+                            [ProgramID]="ProgramParam"
+                            (SelectionChanged)="OnSelectionChanged($event)">
+                        </bizapps-cred-program-studio>
                     }
                 }
             }
@@ -53,13 +61,14 @@ import { CredentialingAreaResource } from './credentialing-area-resource';
     `,
     styles: [`
         :host { display: block; width: 100%; height: 100%; }
-        .cred-resource { padding: var(--mj-space-6); color: var(--mj-text-primary); }
-        .cred-resource__heading { margin: 0 0 var(--mj-space-3); font-size: var(--mj-text-xl); font-weight: var(--mj-font-semibold); }
-        .cred-resource__organizations { margin: 0; padding-left: var(--mj-space-5); color: var(--mj-text-secondary); line-height: 1.6; }
+        .cred-resource { height: 100%; padding: var(--mj-space-6); color: var(--mj-text-primary); box-sizing: border-box; }
+        .cred-resource--studio { padding: 0; }
     `],
 })
 export class CredentialingProgramStudioResource extends CredentialingAreaResource {
     public Organizations: readonly StaffOrganization[] = [];
+    public ProgramParam: string | null = null;
+    public VersionParam: string | null = null;
 
     protected get DriverClass(): string {
         return CredentialingResource.ProgramStudio;
@@ -67,6 +76,25 @@ export class CredentialingProgramStudioResource extends CredentialingAreaResourc
 
     protected override async OnOpen(standing: Standing): Promise<void> {
         this.Organizations = standing.StaffOrganizations;
+        this.applyParams(this.GetQueryParams());
+    }
+
+    /** The page opened a program or version: keep the URL in step. */
+    public OnSelectionChanged(selection: StudioSelection): void {
+        this.ProgramParam = selection.ProgramID;
+        this.VersionParam = selection.VersionID;
+        this.UpdateQueryParams({ [PROGRAM_STUDIO_PARAMS.Program]: selection.ProgramID, [PROGRAM_STUDIO_PARAMS.Version]: selection.VersionID });
+    }
+
+    /** Back/forward or a pasted link changed the URL: show what it names. */
+    protected override OnQueryParamsChanged(params: Record<string, string>, _source: 'popstate' | 'deeplink'): void {
+        this.applyParams(params);
+        this.cdr.markForCheck();
+    }
+
+    private applyParams(params: Record<string, string>): void {
+        this.VersionParam = params[PROGRAM_STUDIO_PARAMS.Version] || null;
+        this.ProgramParam = params[PROGRAM_STUDIO_PARAMS.Program] || null;
     }
 
     async GetResourceDisplayName(_data: ResourceData): Promise<string> {

@@ -685,3 +685,35 @@ the world's grants (`admin@example.test` → `Credentialing Admin`; `staff.a`, `
 `staff.none@example.test` → `Credentialing Staff`; `ui.only@example.test` → `UI`;
 `applicant.a@example.test` → `Credentialing Applicant`) in its own process, so restart MJAPI after it before signing in as them or
 running `cred-operations-wire`.
+
+## Program Studio (Task 11)
+
+**Loading.** Program Studio reads the program list in one `RunViews` call, then a program in two:
+(1) the program, its versions (entity objects, because settings and status are saved from them) and
+the accrediting organizations the user can read; (2) every version's sections, standards and document
+requirements, and the committees owned by the program's Common organization. Display rows are
+`simple` with named `Fields`. Measured in the browser on the 12-section placeholder program: opening
+it from the list issues exactly two `RunViewsQuery` requests (the other requests in that window are
+Explorer's own workspace save and cache-invalidation check).
+
+**Why two calls and not one.** The first version filtered the tree by
+`ProgramVersionID IN (SELECT … FROM [__mj_BizAppsCredentialing].[vwProgramVersions] …)`. MJAPI refuses
+that from a browser for a user whose read of the subqueried entity is row-filtered:
+`Invalid ExtraFilter: entity 'MJ_BizApps_Credentialing: Program Versions' is row-level-security
+filtered for you — SQL that reads its base view directly cannot apply that filter; read that entity
+with RunView`. A browser filter must not read a row-filtered entity's view in a subquery; the second
+call carries literal ID lists instead (`packages/Angular/src/lib/staff/program-studio/studio-data.ts`).
+
+**How a refused write reaches the screen.** A refused single-record `Save()` or `Delete()` comes back
+from MJAPI as a GraphQL error whose message is the entity's `LatestResult.CompleteMessage`
+(`mj/packages/MJServer/src/generic/ResolverBase.ts`, `DeleteRecord`); `GraphQLDataProvider` copies it
+into the client entity's `LatestResult.Message` and returns `false`
+(`mj/packages/GraphQLDataProvider/src/graphQLDataProvider.ts`, `Delete`). The widgets show
+`LatestResult.CompleteMessage` beside the control that caused it. A remote operation's refusal is its
+`ErrorMessage`. MJ's provider also logs each refusal to the browser console (`[GraphQL] ExecuteGQL
+error caught`, then the sentence); those console errors are expected for a refused write.
+
+**URL.** The open program and version are `?programId=…&versionId=…`; the resource writes them with
+`UpdateQueryParams` when the page emits `SelectionChanged` and applies them in `OnQueryParamsChanged`.
+A `programId` the user cannot read shows `Program not found` (`This program does not exist, or you do
+not have access to it.`), the same as an ID that does not exist.

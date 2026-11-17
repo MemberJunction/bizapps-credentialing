@@ -1,0 +1,124 @@
+<div class="cred-studio">
+    <aside class="cred-studio__list">
+        <bizapps-cred-program-list
+            [Provider]="Provider"
+            [SelectedProgramID]="Mode === 'Program' ? ProgramID : null"
+            [RefreshToken]="ListRefresh"
+            (ProgramSelected)="OnProgramSelected($event)"
+            (NewProgramRequested)="OnNewProgramRequested()">
+        </bizapps-cred-program-list>
+    </aside>
+
+    <section class="cred-studio__main" aria-label="Program">
+        @switch (Mode) {
+            @case ('Empty') {
+                <mj-empty-state Icon="fa-solid fa-diagram-project" Title="Program Studio" Message="Choose a program, or create a new one with New program."></mj-empty-state>
+            }
+            @case ('Wizard') {
+                <bizapps-cred-program-wizard
+                    [Provider]="Provider"
+                    [Organizations]="Organizations"
+                    (ProgramCreated)="OnProgramCreated($event)"
+                    (Cancelled)="OnWizardCancelled()">
+                </bizapps-cred-program-wizard>
+            }
+            @case ('Program') {
+                @switch (LoadState) {
+                    @case ('Loading') {
+                        <mj-loading Text="Loading the program..."></mj-loading>
+                    }
+                    @case ('NotFound') {
+                        <mj-empty-state Icon="fa-solid fa-circle-question" Title="Program not found" [Message]="NotFoundMessage" Role="status"></mj-empty-state>
+                    }
+                    @case ('Error') {
+                        <mj-alert Variant="error" Title="The program could not load" [Message]="LoadError"></mj-alert>
+                    }
+                    @case ('Loaded') {
+                        @if (Bundle; as bundle) {
+                            <header class="cred-studio__program">
+                                <div class="cred-studio__program-text">
+                                    <h2 class="cred-studio__program-name">{{ bundle.Program.Name }}</h2>
+                                    <p class="cred-studio__program-meta">
+                                        {{ bundle.Program.ProgramType }} of {{ bundle.Program.SubjectType === 'Person' ? 'people' : 'organizations' }}
+                                        ({{ bundle.Program.SubjectNoun }}) · prefix {{ bundle.Program.CredentialPrefix }} · {{ bundle.Program.AccreditingOrganization }}
+                                    </p>
+                                    @if (bundle.Program.Description) {
+                                        <p class="cred-studio__program-description">{{ bundle.Program.Description }}</p>
+                                    }
+                                </div>
+                                @if (VersionChoices.length > 0) {
+                                    <div class="cred-studio__version-pick">
+                                        <span id="cred-studio-version-label" class="cred-studio__label">Version</span>
+                                        <mj-dropdown
+                                            AriaLabelledBy="cred-studio-version-label"
+                                            [Data]="VersionChoices"
+                                            TextField="Text"
+                                            ValueField="ID"
+                                            [ValuePrimitive]="true"
+                                            [ngModel]="SelectedVersionID"
+                                            (ngModelChange)="OnVersionPicked($event)">
+                                        </mj-dropdown>
+                                    </div>
+                                }
+                                @if (IsRefreshing) {
+                                    <span class="cred-studio__refreshing" role="status"><i class="fa-solid fa-rotate fa-spin" aria-hidden="true"></i> Refreshing...</span>
+                                }
+                            </header>
+
+                            @if (SelectedVersionID) {
+                                <mj-tab-nav [Tabs]="Tabs" [ActiveKey]="Tab" (TabChange)="OnTabChange($event)"></mj-tab-nav>
+                                <div class="cred-studio__tab" role="tabpanel">
+                                    @switch (Tab) {
+                                        @case ('Standards') {
+                                            <div class="cred-studio__authoring" [class.cred-studio__authoring--editor]="EditorOpen">
+                                                <bizapps-cred-version-tree
+                                                    [Provider]="Provider"
+                                                    [VersionID]="SelectedVersionID"
+                                                    [Bundle]="bundle"
+                                                    [SelectedStandardID]="SelectedStandardID"
+                                                    (StandardSelected)="OnStandardSelected($event)"
+                                                    (StandardAddRequested)="OnStandardAddRequested($event)"
+                                                    (VersionChanged)="OnVersionChanged($event)"
+                                                    (ReloadRequested)="OnReloadRequested()">
+                                                </bizapps-cred-version-tree>
+                                                @if (EditorOpen) {
+                                                    <bizapps-cred-standard-editor
+                                                        [Provider]="Provider"
+                                                        [CanAuthor]="View.CanAuthor"
+                                                        [StandardID]="SelectedStandardID"
+                                                        [NewStandard]="NewStandard"
+                                                        (Saved)="OnStandardSaved($event)"
+                                                        (Closed)="OnEditorClosed()">
+                                                    </bizapps-cred-standard-editor>
+                                                }
+                                            </div>
+                                        }
+                                        @case ('Settings') {
+                                            <bizapps-cred-version-settings
+                                                [Provider]="Provider"
+                                                [Version]="SelectedVersion"
+                                                [Committees]="bundle.Committees"
+                                                (Saved)="OnReloadRequested()">
+                                            </bizapps-cred-version-settings>
+                                        }
+                                        @case ('Documents') {
+                                            <bizapps-cred-document-requirements
+                                                [Provider]="Provider"
+                                                [VersionID]="SelectedVersionID"
+                                                [Requirements]="bundle.Requirements"
+                                                [CanAuthor]="View.CanAuthor"
+                                                (Changed)="OnReloadRequested()">
+                                            </bizapps-cred-document-requirements>
+                                        }
+                                    }
+                                </div>
+                            } @else {
+                                <mj-empty-state Icon="fa-solid fa-code-branch" Message="This program has no version."></mj-empty-state>
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    </section>
+</div>

@@ -12,7 +12,7 @@
  *                        here and re-export GeneratedFormsModule, as every shipped BizApp does.
  *   src/lib/application/ — CredentialingApplication (nav by area) and the pure AreaNav decision
  *   src/lib/resources/   — thin Explorer resource components, one per nav item
- *   src/lib/staff/       — Staff-area widgets (organization setup)
+ *   src/lib/staff/       — Staff-area widgets (organization setup, Program Studio)
  *   src/lib/shared/      — StandingService: the signed-in user's roles and organizations
  */
 
@@ -32,8 +32,18 @@ export * from './lib/application/area-nav';
 export { CredentialingApplication, LoadCredentialingApplication } from './lib/application/credentialing.application';
 export { StandingService, type StandingDataSource, type StandingUser } from './lib/shared/standing.service';
 export { OrganizationSetupComponent, type OrganizationSetupErrorField } from './lib/staff/organization-setup/organization-setup.component';
+export { StudioViewModel, type StudioVersionView, type SettingsTierEditable } from './lib/staff/program-studio/studio-view-model';
+export { StudioData, COMMITTEE_ENTITY, type StudioDataSource, type ProgramBundle, type ProgramLoad, type ProgramListRow, type ProgramRow, type SectionRow, type StandardRow, type RequirementRow, type CommitteeRow } from './lib/staff/program-studio/studio-data';
+export { StudioTree, type TreeSection, type SequenceChange, type StandardErrorField } from './lib/staff/program-studio/studio-tree';
+export { ProgramStudioPage, PROGRAM_NOT_FOUND_MESSAGE, type StudioSelection, type StudioMode, type ProgramLoadState, type StudioTab } from './lib/staff/program-studio/program-studio.page';
+export { ProgramListComponent } from './lib/staff/program-studio/program-list.component';
+export { ProgramWizardComponent, type WizardOrganization, type WizardErrorField } from './lib/staff/program-studio/program-wizard.component';
+export { VersionTreeComponent, type TreeErrorTarget } from './lib/staff/program-studio/version-tree.component';
+export { StandardEditorComponent, EVALUATION_MODE_NOTE, type NewStandardTarget } from './lib/staff/program-studio/standard-editor.component';
+export { VersionSettingsComponent, FROZEN_SETTINGS_SENTENCE, ROLLOUT_FLAGS_SENTENCE, type SettingDescriptor, type SettingsGroup, type SettingsTier } from './lib/staff/program-studio/version-settings.component';
+export { DocumentRequirementsComponent } from './lib/staff/program-studio/document-requirements.component';
 export { CredentialingAreaResource, AREA_NOT_AVAILABLE_MESSAGE, type AreaResourceState } from './lib/resources/credentialing-area-resource';
-export { CredentialingProgramStudioResource, LoadCredentialingProgramStudioResource } from './lib/resources/staff-program-studio.resource';
+export { CredentialingProgramStudioResource, LoadCredentialingProgramStudioResource, PROGRAM_STUDIO_PARAMS } from './lib/resources/staff-program-studio.resource';
 export { CredentialingOrganizationSetupResource, LoadCredentialingOrganizationSetupResource } from './lib/resources/staff-organization-setup.resource';
 export { CredentialingReviewHomeResource, LoadCredentialingReviewHomeResource } from './lib/resources/review-home.resource';
 export { CredentialingApplicantHomeResource, LoadCredentialingApplicantHomeResource } from './lib/resources/applicant-home.resource';

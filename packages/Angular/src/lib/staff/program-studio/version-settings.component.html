@@ -1,0 +1,72 @@
+@if (Version) {
+    <section class="cred-settings" aria-label="Version settings">
+        @for (g of Groups; track g.Tier) {
+            <fieldset class="cred-settings__group" [attr.aria-describedby]="'cred-settings-note-' + g.Tier">
+                <legend class="cred-settings__heading">{{ g.Heading }}</legend>
+                <p class="cred-settings__note" [id]="'cred-settings-note-' + g.Tier">
+                    @if (Editable[g.Tier] && g.Tier !== 'RolloutFlags') {
+                        Fixed once the version is activated.
+                    } @else {
+                        {{ g.FrozenNote }}
+                    }
+                </p>
+                <div class="cred-settings__rows">
+                    @for (s of g.Settings; track s.Field) {
+                        <div class="cred-settings__row">
+                            @if (Editable[g.Tier]) {
+                                @if (s.Kind === 'flag') {
+                                    <label class="cred-settings__label" [for]="InputID(s.Field)">{{ s.Label }}</label>
+                                    <mj-switch [InputId]="InputID(s.Field)" [(ngModel)]="Version[s.Field]" OnLabel="Yes" OffLabel="No"></mj-switch>
+                                }
+                                @if (s.Kind === 'integer') {
+                                    <label class="cred-settings__label" [for]="InputID(s.Field)">{{ s.Label }} ({{ s.Unit }})</label>
+                                    <mj-numeric-input [InputId]="InputID(s.Field)" [(ngModel)]="Version[s.Field]" [Min]="0" [Step]="1" [Decimals]="0"></mj-numeric-input>
+                                }
+                                @if (s.Kind === 'rate') {
+                                    <label class="cred-settings__label" [for]="InputID(s.Field)">{{ s.Label }} (0 to 1)</label>
+                                    <mj-numeric-input [InputId]="InputID(s.Field)" [(ngModel)]="Version[s.Field]" [Min]="0" [Max]="1" [Step]="0.01" [Decimals]="4"></mj-numeric-input>
+                                }
+                                @if (s.Kind === 'committee') {
+                                    <span class="cred-settings__label" [id]="InputID(s.Field) + '-label'">{{ s.Label }}</span>
+                                    <mj-dropdown
+                                        [AriaLabelledBy]="InputID(s.Field) + '-label'"
+                                        [Data]="CommitteeChoices"
+                                        TextField="Name"
+                                        ValueField="ID"
+                                        [ValuePrimitive]="true"
+                                        Placeholder="Choose a committee"
+                                        [(ngModel)]="Version.CommitteeID">
+                                    </mj-dropdown>
+                                    @if (Committees.length === 0) {
+                                        <p class="cred-settings__hint">No committee of this program's organization is available to you.</p>
+                                    }
+                                }
+                            } @else {
+                                <span class="cred-settings__label">{{ s.Label }}</span>
+                                <span class="cred-settings__value" [attr.data-field]="s.Field">{{ ValueText(s) }}</span>
+                            }
+                        </div>
+                    }
+                </div>
+            </fieldset>
+        }
+
+        @if (AnyEditable) {
+            <div class="cred-settings__actions">
+                <button mjButton Variant="primary" type="button" [disabled]="!CanSave" (click)="Save()" [attr.aria-busy]="IsSaving ? 'true' : null"
+                    [attr.aria-describedby]="ErrorMessage ? 'cred-settings-error' : null">
+                    Save settings
+                </button>
+                <button mjButton Variant="outline" type="button" [disabled]="IsSaving || !Version.Dirty" (click)="Discard()">Discard changes</button>
+            </div>
+        }
+        <div aria-live="polite">
+            @if (ErrorMessage) {
+                <p id="cred-settings-error" class="cred-settings__error" role="alert">{{ ErrorMessage }}</p>
+            }
+            @if (SavedMessage) {
+                <p class="cred-settings__saved" role="status">{{ SavedMessage }}</p>
+            }
+        </div>
+    </section>
+}

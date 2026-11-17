@@ -1,0 +1,70 @@
+<section class="cred-wiz" aria-labelledby="cred-wiz-heading">
+    <h2 id="cred-wiz-heading" class="cred-wiz__heading">New program</h2>
+    <p class="cred-wiz__intro">The program is created with its first version as a Draft, ready for sections and standards.</p>
+    <form class="cred-wiz__form" (ngSubmit)="Submit()" novalidate>
+        @if (ShowOrganization) {
+        <div class="cred-wiz__field">
+            <span id="cred-wiz-org-label" class="cred-wiz__label">Organization</span>
+            <mj-dropdown name="OrganizationID" AriaLabelledBy="cred-wiz-org-label" [Data]="OrganizationChoices" TextField="Name" ValueField="ID" [ValuePrimitive]="true"
+                Placeholder="Choose the organization" [(ngModel)]="OrganizationID"></mj-dropdown>
+            @if (ErrorFor('Organization')) {
+                <p class="cred-wiz__error" role="alert">{{ ErrorFor('Organization') }}</p>
+            }
+        </div>
+        }
+        <div class="cred-wiz__field">
+            <label for="cred-wiz-name">Program name</label>
+            <input id="cred-wiz-name" name="Name" type="text" class="mj-input" autocomplete="off" [(ngModel)]="Name" [readonly]="IsSubmitting" [attr.aria-invalid]="ErrorFor('Name') ? 'true' : null" [attr.aria-describedby]="ErrorFor('Name') ? 'cred-wiz-name-error' : null" />
+            @if (ErrorFor('Name')) {
+                <p id="cred-wiz-name-error" class="cred-wiz__error" role="alert">{{ ErrorFor('Name') }}</p>
+            }
+        </div>
+        <div class="cred-wiz__field">
+            <span id="cred-wiz-type-label" class="cred-wiz__label">Program type</span>
+            <mj-dropdown name="ProgramType" AriaLabelledBy="cred-wiz-type-label" [Data]="ProgramTypes" Placeholder="Choose..." [(ngModel)]="ProgramType"></mj-dropdown>
+        </div>
+        <div class="cred-wiz__field">
+            <span id="cred-wiz-subject-label" class="cred-wiz__label">Who it credentials</span>
+            <mj-dropdown name="SubjectType" AriaLabelledBy="cred-wiz-subject-label" [Data]="SubjectTypes" Placeholder="Choose..." [(ngModel)]="SubjectType"></mj-dropdown>
+        </div>
+        <div class="cred-wiz__field">
+            <label for="cred-wiz-noun">Subject noun (for example "facility" or "professional")</label>
+            <input id="cred-wiz-noun" name="SubjectNoun" type="text" class="mj-input" autocomplete="off" [(ngModel)]="SubjectNoun" [readonly]="IsSubmitting" [attr.aria-invalid]="ErrorFor('SubjectNoun') ? 'true' : null" [attr.aria-describedby]="ErrorFor('SubjectNoun') ? 'cred-wiz-noun-error' : null" />
+            @if (ErrorFor('SubjectNoun')) {
+                <p id="cred-wiz-noun-error" class="cred-wiz__error" role="alert">{{ ErrorFor('SubjectNoun') }}</p>
+            }
+        </div>
+        <div class="cred-wiz__field">
+            <label for="cred-wiz-prefix">Credential prefix</label>
+            <input id="cred-wiz-prefix" name="CredentialPrefix" type="text" class="mj-input" autocomplete="off" [(ngModel)]="CredentialPrefix" [readonly]="IsSubmitting" [attr.aria-invalid]="ErrorFor('CredentialPrefix') ? 'true' : null" [attr.aria-describedby]="ErrorFor('CredentialPrefix') ? 'cred-wiz-prefix-error' : null" />
+            @if (ErrorFor('CredentialPrefix')) {
+                <p id="cred-wiz-prefix-error" class="cred-wiz__error" role="alert">{{ ErrorFor('CredentialPrefix') }}</p>
+            }
+        </div>
+        <div class="cred-wiz__field">
+            <label for="cred-wiz-description">Description</label>
+            <textarea id="cred-wiz-description" name="Description" rows="3" class="mj-input" [(ngModel)]="Description" [readonly]="IsSubmitting"></textarea>
+        </div>
+        <div class="cred-wiz__field">
+            <label for="cred-wiz-label">First version label (for example "2027")</label>
+            <input id="cred-wiz-label" name="FirstVersionLabel" type="text" class="mj-input" autocomplete="off" [(ngModel)]="FirstVersionLabel" [readonly]="IsSubmitting" [attr.aria-invalid]="ErrorFor('FirstVersionLabel') ? 'true' : null" [attr.aria-describedby]="ErrorFor('FirstVersionLabel') ? 'cred-wiz-label-error' : null" />
+            @if (ErrorFor('FirstVersionLabel')) {
+                <p id="cred-wiz-label-error" class="cred-wiz__error" role="alert">{{ ErrorFor('FirstVersionLabel') }}</p>
+            }
+        </div>
+        <div class="cred-wiz__actions">
+            <button mjButton Variant="primary" type="submit" [disabled]="!CanSubmit" [attr.aria-busy]="IsSubmitting ? 'true' : null">
+                @if (IsSubmitting) {
+                    <i class="fa-solid fa-spinner fa-spin" aria-hidden="true"></i>
+                }
+                Create program
+            </button>
+            <button mjButton Variant="outline" type="button" [disabled]="IsSubmitting" (click)="Cancel()">Cancel</button>
+        </div>
+        <div aria-live="polite">
+            @if (ErrorFor('Form')) {
+                <p class="cred-wiz__error" role="alert">{{ ErrorFor('Form') }}</p>
+            }
+        </div>
+    </form>
+</section>
