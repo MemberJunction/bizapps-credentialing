@@ -1197,3 +1197,97 @@ corepack pnpm run test:integration cred-evidence                                
 `cred-evidence-rules.14` was checked against a negative control: with the re-check inside the
 transaction removed (`EvidenceIntake.write`), it failed with `expected the upload to be refused`;
 restored, it passed.
+
+## The reading queue: scan recognition and evidence reading on Gemini (B2 Task 9)
+
+### Step 1 discovery: the prompt runner, file inputs and Gemini (MJ v6.2.2)
+
+- **Running a stored prompt from server code.** `AIPromptRunner.ExecutePrompt(params)`
+  (`mj/packages/AI/Prompts/src/AIPromptRunner.ts:302`, package `@memberjunction/ai-prompts`) with an
+  `AIPromptParams` (`@memberjunction/ai-core-plus`, `CorePlus/src/prompt.types.ts:368`): `prompt` (the
+  entity, from `AIEngineBase.Instance.Prompts` after `AIEngineBase.Instance.Config(false, user)`,
+  `@memberjunction/ai-engine-base`), `data` (template variables), `contextUser`,
+  `conversationMessages` + `templateMessageRole: 'system'` (the rendered template is the system message,
+  the conversation follows). The run's ID is `result.promptRun.ID` (`AIModelRunResult.promptRun`,
+  `CorePlus/src/model-run.types.ts:39`). `ExecutePrompt` does not throw: every failure returns
+  `success: false` with `errorMessage` (`AIPromptRunner.ts:478-539`). `packages/Server/src/reading/PromptRunner.ts`
+  wraps this as `MJStoredPromptRunner`.
+- **Template escaping.** The template engine HTML-escapes variables by default. Measured through
+  `RunAIPrompt`: a document text containing `&` reached Gemini as `&amp;` (`AIPromptRun.Messages`), so a
+  quoted excerpt would not be found in the stored text. `MJStoredPromptRunner` sets
+  `params.templateAutoescape = false` (`AIPromptRunner.RenderOptions`, `:171`).
+- **Attaching a PDF or image.** A user message whose `content` is an array of `ChatMessageContentBlock`
+  (`mj/packages/AI/Core/src/generic/chat.types.ts:28`): a `file_url` (PDF) or `image_url` block holding a
+  `data:<mime>;base64,…` URL, with `mimeType`. The Gemini driver turns any media block with a data URL
+  into an `inlineData` part with that MIME type (`mj/packages/AI/Providers/Gemini/src/index.ts:1201-1253`,
+  `mjContentBlockToGeminiPart`); it never uploads through Google's File API. Measured live through
+  MJAPI's `RunAIPrompt` mutation (system API key): `scanned-page.pdf` (2 029 bytes) and
+  `printed-paragraph.png` were transcribed exactly (`[Page 1] THE PRACTICE REVIEWS ITS / WRITTEN SAFETY
+  POLICY / EVERY TWELVE MONTHS.`), runs `98F2BE12-…`, `55DDA616-…`.
+- **Request size.** The prompt runner enforces no media size (modality limits are read for agents only,
+  `BaseAIEngine.ts:2700-2780`). The model row declares `File` input `application/pdf` with
+  `MaxSizeBytes` 20 971 520 (`__mj.AIModelModality`, Gemini 3.8 Flash). Measured: a one-page image-only
+  PDF of 18 750 668 bytes (just under `RecognitionRules.MaxBytes` = 18 874 368; 25 000 892 base64
+  characters inline) was accepted and answered (`[Page 1] [no text]`, run `63AB121B-…`, 5.1 s). So
+  `RecognitionRules.MaxBytes` is unchanged. Note: the runner stores the conversation messages, file
+  included, in `AIPromptRun.Messages` (`storedMessagesJSON`, `:4285`): that run's row holds 50 MB.
+  Credentialing roles hold no permission on `MJ: AI Prompt Runs`.
+- **JSON output in prompt metadata.** `ResponseFormat: 'JSON'`, `OutputType: 'object'` and an
+  `OutputExample` (the CHECK `OutputType <> 'object' OR OutputExample IS NOT NULL` requires it), with
+  `ValidationBehavior`. `Warn` is used: a reply that does not parse is returned as text and
+  `PromptEvidenceReader.ParseReaderAnswer` decides (`NothingFound` with the run ID), instead of the run
+  failing and reading as "could not run".
+- **No model or credential.** Selection throws `No suitable model found for prompt …`, caught by
+  `ExecutePrompt` (`success: false`, no prompt run). `MJStoredPromptRunner` maps that prefix to
+  `No AI model is available on this server.`; any other failure to `The assistant service could not be
+  reached.`; a missing prompt to `The assistant is not set up on this server.`
+- **`RequireSpecificModels: true` on both prompts.** With it false, `SelectionStrategy: 'Specific'`
+  appends power-matched fallback models when the listed ones lack credentials
+  (`BaseModelRunner.ts:711-726`). Measured: with both of the reader's prompt-model rows pointed at
+  uncredentialed models, the run silently used Gemini 3.1 Flash-Lite. A fallback model need not accept a
+  PDF part, and "no model" could never surface as `Could Not Run`, so both prompts require their listed
+  models. A host with another vendor edits the prompts' model lists (metadata), not code.
+- **Gemini rows in this database.** Active `Google` inference rows (`GeminiLLM`): Gemini 2.5 Flash,
+  2.5 Flash-Lite, 2.5 Pro, 3 Flash, 3.1 Flash-Lite, 3.1 Pro, 3.5 Flash, 3.5 Flash-Lite, 3.6 Flash,
+  3.7 Flash, 3.8 Flash, 4 Argon (plus Gemma). Only **Gemini 3.8 Flash** has `MJ: AI Model Modalities`
+  rows, among them `File` input `application/pdf` and `Image` input. Both prompts list Gemini 3.8 Flash
+  (priority 10) then Gemini 3.5 Flash (priority 5), vendor Google; every live run recorded here was
+  served by Gemini 3.8 Flash. The key is `AI_VENDOR_API_KEY__GeminiLLM` in `../mj/.env` (never printed).
+- **Live confirmation, one run each through MJAPI's server code:** `Credentialing: Evidence Reader`
+  answered valid JSON with the excerpt verbatim (run `26C0A4EF-…`, 607 prompt tokens);
+  `Credentialing: Scan Reader` transcribed the scan (above).
+
+### How it runs
+
+- The prompts are metadata (`metadata/prompts/.credentialing-reading-prompts.json`, templates under
+  `metadata/prompts/templates/`, the reader's output example under `metadata/prompts/output/`), pushed
+  with `corepack pnpm exec mj sync push --dir=metadata --ci` then `corepack pnpm run metadata:strip-sync`.
+  The push creates the templates' `MJ: Template Params` rows itself. MJAPI caches prompts and prompt
+  models (`AIEngineBase`): **restart MJAPI after a push.** A change saved through MJAPI itself (its
+  GraphQL mutations) reaches the cache without a restart, but not at once: a `Read again` 1 s after
+  restoring the reader's model rows still saw the old list; one 35 s later used Gemini (measured).
+  No cache broadcast is configured on this instance, so a change from another process needs a restart.
+- MJAPI starts the queue from `EvidenceRouteExtension.OnAllExtensionsMounted`
+  (`packages/Server/src/reading/background.ts`): it registers the upload nudge, runs the boot sweep 10 s
+  later and then sweeps every 5 minutes (log: `Credentialing: reading queue started (boot sweep in 10 s,
+  then every 5 minutes).`). A server whose `serverRole` is `api` does not start it.
+- The first boot after this task read the 89 waiting documents of earlier checks: 82 with no bound
+  standard became `0 passages found for 0 standards.` with no model call, and the 7 waiting scans were
+  recognized on Gemini. Any later `Pending`/`Running`-stale document is picked up within 5 minutes
+  without a person acting; a document set to `Pending` before a restart was read at boot (measured:
+  process start 23:03:15Z, reader runs 23:04:06Z, attempt 1).
+- `mj test run` registers no nudge and no timer; checks call `ReadingQueue.DrainOnce` / `Sweep` with
+  `ReadingQueue.Seams.OnlySubjectIDs` set to their own scratch subjects, so fixture answers never reach
+  another document.
+
+```sh
+corepack pnpm --filter @mj-biz-apps/credentialing-core-entities-server exec vitest run src/__tests__/ReadingQueue.test.ts   # 22 tests
+corepack pnpm --filter @mj-biz-apps/credentialing-server exec vitest run src/reading                                       # 17 tests
+MJ_INTEGRATION_TEST=1 RUN_MUTATION_TESTS=1 corepack pnpm mj test run --name "CRD-12 - Reader"                               # 10 checks
+corepack pnpm run -s persona applicant-reading      # the reading persona (Sample Reading Applicant)
+```
+
+The world's `Sample Reading Program` 2026 (OrgA) has R.1 (Prefill) and R.2 (Locate) bound to `Safety
+policy` by one `Document Extraction` source each (written through the entity on the Draft version
+before the loader activates it), R.3 (Manual) unbound, and `Other record` with no bound standard. Its
+subject `Sample Reading Applicant` has the contact `applicant.reading@example.test`.

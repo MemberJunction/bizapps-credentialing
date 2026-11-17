@@ -50,6 +50,7 @@ const SERVER_ONLY_BUNDLES = {
     'cred-isolation': 'CRD-05 - Isolation',
     'cred-invite': 'CRD-09 - Invitations',
     'cred-evidence-rules': 'CRD-11 - Evidence',
+    'cred-reader': 'CRD-12 - Reader',
 };
 
 const args = process.argv.slice(2);

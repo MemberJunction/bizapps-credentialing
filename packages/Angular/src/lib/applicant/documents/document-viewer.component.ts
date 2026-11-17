@@ -369,9 +369,15 @@ export class DocumentViewerComponent extends BaseAngularComponent implements OnD
         });
     }
 
+    /**
+     * Opens the dialog. The open is queued a microtask after `Visible` turns true, and the host may have
+     * removed the component from the page by then (Explorer restoring a saved tab and switching away):
+     * `showModal` on a dialog that is not in the document throws `InvalidStateError`, so a detached
+     * dialog is left closed.
+     */
     private showModal(): void {
         const dialog = this.DialogRef?.nativeElement;
-        if (dialog && !dialog.open && typeof dialog.showModal === 'function') {
+        if (dialog && dialog.isConnected && !dialog.open && typeof dialog.showModal === 'function') {
             dialog.showModal();
         }
         this.cdr.markForCheck();

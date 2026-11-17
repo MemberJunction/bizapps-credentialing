@@ -41,6 +41,8 @@
                     [ActiveUploadRequirementID]="ActiveUploadRequirementID"
                     [ConfirmingDocumentID]="ConfirmingDocumentID"
                     [DownloadingDocumentID]="DownloadingDocumentID"
+                    [RequeueingDocumentID]="RequeueingDocumentID"
+                    (ReadAgain)="OnReadAgain($event)"
                     (ToggleUpload)="OnToggleUpload($event)"
                     (Uploaded)="OnUploaded($event)"
                     (StillCurrent)="OnStillCurrent($event)"
@@ -99,6 +101,17 @@
                                         <td>{{ WhatWasRead(doc) }}</td>
                                         <td>
                                             <div class="cred-docs__actions">
+                                                @if (CanReadAgain(doc)) {
+                                                    <button
+                                                        mjButton
+                                                        Variant="primary"
+                                                        Size="sm"
+                                                        type="button"
+                                                        [disabled]="RequeueingDocumentID !== null"
+                                                        (click)="OnReadAgain(doc)">
+                                                        {{ RequeueingDocumentID === doc.EvidenceDocumentID ? 'Asking...' : 'Read again' }}
+                                                    </button>
+                                                }
                                                 <button mjButton Variant="outline" Size="sm" type="button" (click)="OpenViewer(doc)">
                                                     View
                                                 </button>

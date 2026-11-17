@@ -1,0 +1,27 @@
+{
+  "entity": "MJ: AI Prompts",
+  "filePattern": "**/.*.json",
+  "ignoreDirectories": ["templates", "output"],
+  "pull": {
+    "createNewFileIfNotFound": true,
+    "newFileName": ".prompts.json",
+    "appendRecordsToExistingFile": true,
+    "updateExistingRecords": true,
+    "ignoreNullFields": true,
+    "ignoreVirtualFields": true,
+    "preserveFields": ["TemplateText", "OutputExample"],
+    "lookupFields": {
+      "TypeID": { "entity": "MJ: AI Prompt Types", "field": "Name" }
+    },
+    "relatedEntities": {
+      "MJ: AI Prompt Models": {
+        "entity": "MJ: AI Prompt Models",
+        "foreignKey": "PromptID",
+        "lookupFields": {
+          "ModelID": { "entity": "MJ: AI Models", "field": "Name" },
+          "VendorID": { "entity": "MJ: AI Vendors", "field": "Name" }
+        }
+      }
+    }
+  }
+}

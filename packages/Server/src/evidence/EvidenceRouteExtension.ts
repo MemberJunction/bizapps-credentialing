@@ -14,6 +14,7 @@ import { EvidenceFileRules } from '@mj-biz-apps/credentialing-core';
 import { CredentialingServices } from '@mj-biz-apps/credentialing-core-entities-server';
 import { EvidenceRoutes, type EvidenceRouteSettings, type HttpReply, type UploadBody } from './EvidenceRoutes.js';
 import { StorageEvidenceStore } from './StorageEvidenceStore.js';
+import { StartBackgroundReading, StopBackgroundReading } from '../reading/background.js';
 
 /** The `DriverClass` this extension registers under and publishes in `MJ_SERVER_EXTENSIONS`. */
 export const EVIDENCE_EXTENSION_DRIVER_CLASS = 'CredentialingEvidenceExtension';
@@ -141,8 +142,21 @@ export class EvidenceRouteExtension extends BaseServerExtension {
         }
     }
 
+    /**
+     * Once every extension is mounted the server has booted (its metadata, providers and user cache
+     * are ready): the reading queue's nudge, boot sweep and sweep timer start here (plan Task 9).
+     */
+    public async OnAllExtensionsMounted(): Promise<void> {
+        try {
+            await StartBackgroundReading();
+        } catch (err: unknown) {
+            LogStatus(`Credentialing: the reading queue could not start: ${err instanceof Error ? err.message : String(err)}`);
+        }
+    }
+
     public async Shutdown(): Promise<void> {
-        // Stateless: in-flight requests finish with the HTTP server.
+        // In-flight requests finish with the HTTP server; the reading queue's timers stop here.
+        StopBackgroundReading();
     }
 
     public async HealthCheck(): Promise<ExtensionHealthResult> {

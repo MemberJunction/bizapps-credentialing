@@ -23,6 +23,7 @@ export const CredentialingOperation = {
     AttestInLieu: 'Credentialing.AttestInLieu',
     ConfirmDocumentCurrent: 'Credentialing.ConfirmDocumentCurrent',
     GetDocumentLibrary: 'Credentialing.GetDocumentLibrary',
+    RequeueReading: 'Credentialing.RequeueReading',
 } as const;
 
 /** One of the {@link CredentialingOperation} keys. */
@@ -72,3 +73,6 @@ export const ATTESTATION_STATEMENT_REQUIRED_REASON = 'Write what you are attesti
 
 /** Refusal when "Still current" is asked for a document that a newer upload replaced. */
 export const DOCUMENT_REPLACED_REASON = 'This document was replaced by a newer upload.';
+
+/** Refusal when "Read again" is asked for a document the assistant has read, or cannot read. */
+export const READING_NOT_REQUEUEABLE_REASON = 'Only a document the assistant could not read can be read again.';

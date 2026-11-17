@@ -47,6 +47,7 @@ import { WithdrawApplicationServerOperation } from './operations/WithdrawApplica
 import { AttestInLieuServerOperation } from './operations/AttestInLieuServerOperation.js';
 import { ConfirmDocumentCurrentServerOperation } from './operations/ConfirmDocumentCurrentServerOperation.js';
 import { GetDocumentLibraryServerOperation } from './operations/GetDocumentLibraryServerOperation.js';
+import { RequeueReadingServerOperation } from './operations/RequeueReadingServerOperation.js';
 
 export {
     AccreditingOrganizationEntityServer,
@@ -93,6 +94,7 @@ export {
     type RecognitionResult,
     type RegisteredServices,
     type StaffNotifier,
+    type SweepStep,
     type TextExtractor,
     type TextRecognizer,
 } from './services/CredentialingServices.js';
@@ -130,6 +132,34 @@ export { WithdrawApplicationServerOperation } from './operations/WithdrawApplica
 export { AttestInLieuServerOperation } from './operations/AttestInLieuServerOperation.js';
 export { ConfirmDocumentCurrentServerOperation } from './operations/ConfirmDocumentCurrentServerOperation.js';
 export { GetDocumentLibraryServerOperation } from './operations/GetDocumentLibraryServerOperation.js';
+export { RequeueReadingServerOperation } from './operations/RequeueReadingServerOperation.js';
+export { ReadingQueue, ORPHAN_FILE_MINUTES } from './reading/ReadingQueue.js';
+export {
+    ReadingWorker,
+    CompleteReadingNote,
+    NO_TEXT_FOUND_NOTE,
+    READING_FAILED_FINAL_NOTE,
+    READING_FAILED_RETRY_NOTE,
+    RECOGNIZED_TEXT_NOTE,
+    RECOGNIZED_TRUNCATED_NOTE,
+    type DrainCounts,
+    type ReadingLimits,
+    type ReadingQueueSeams,
+    type ReadingWorkerOptions,
+} from './reading/ReadingWorker.js';
+export { DatabaseReadingData } from './reading/DatabaseReadingData.js';
+export type {
+    DocumentLockScope,
+    DocumentReadingStatus,
+    DocumentTextStatus,
+    NewExtraction,
+    ReadingCommitScope,
+    ReadingData,
+    ReadingDocument,
+    ReadingStateChange,
+    RecognizedTextChange,
+    StandardToRead,
+} from './reading/ReadingData.js';
 export {
     EvidenceIntake,
     EvidenceRefusal,
@@ -190,8 +220,9 @@ export function LoadBizAppsCredentialingEntitiesServer(): void {
         AttestInLieuServerOperation,
         ConfirmDocumentCurrentServerOperation,
         GetDocumentLibraryServerOperation,
+        RequeueReadingServerOperation,
     ];
-    if (anchor.length !== 17 || operations.length !== 16) {
+    if (anchor.length !== 17 || operations.length !== 17) {
         throw new Error('credentialing server entity subclasses or operations missing');
     }
 }

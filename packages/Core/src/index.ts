@@ -43,3 +43,4 @@ export * from './operations/WithdrawApplicationOperation.js';
 export * from './operations/AttestInLieuOperation.js';
 export * from './operations/ConfirmDocumentCurrentOperation.js';
 export * from './operations/GetDocumentLibraryOperation.js';
+export * from './operations/RequeueReadingOperation.js';

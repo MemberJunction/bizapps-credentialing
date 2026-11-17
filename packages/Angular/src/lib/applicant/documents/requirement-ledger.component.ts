@@ -3,7 +3,7 @@
  *
  * Displays one application's requirements with document on file / attestation notice, uploaded
  * date, status, "What the assistant read", and state-appropriate actions (`Upload`, `Upload new`,
- * `Still current`, `View`, `Versions`, `Download original`, `Attest instead of uploading`).
+ * `Still current`, `View`, `Versions`, `Download original`, `Attest instead of uploading`, `Read again`).
  */
 import { Component, EventEmitter, Input, Output } from '@angular/core';
 import { BaseAngularComponent } from '@memberjunction/ng-base-types';
@@ -35,6 +35,7 @@ export class RequirementLedgerComponent extends BaseAngularComponent {
     @Input() public ActiveUploadRequirementID: string | null = null;
     @Input() public ConfirmingDocumentID: string | null = null;
     @Input() public DownloadingDocumentID: string | null = null;
+    @Input() public RequeueingDocumentID: string | null = null;
 
     @Output() public readonly ToggleUpload = new EventEmitter<string | null>();
     @Output() public readonly Uploaded = new EventEmitter<UploadResult>();
@@ -43,6 +44,7 @@ export class RequirementLedgerComponent extends BaseAngularComponent {
     @Output() public readonly ViewVersions = new EventEmitter<LibraryDocument>();
     @Output() public readonly DownloadDocument = new EventEmitter<LibraryDocument>();
     @Output() public readonly OpenAttest = new EventEmitter<LedgerRow>();
+    @Output() public readonly ReadAgain = new EventEmitter<LibraryDocument>();
 
     public ActionsFor(row: LedgerRow): LedgerRowActions {
         return ResolveLedgerRowActions(row, this.IsApplicant);

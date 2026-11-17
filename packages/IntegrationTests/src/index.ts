@@ -45,6 +45,7 @@ export * from './world/program-tree.js';
 export * from './world/placeholder-organization-program.js';
 export * from './world/load-world.js';
 export * from './world/applicant-world.js';
+export * from './world/FixtureReading.js';
 export * from './checks/cred-smoke.checks.js';
 export * from './checks/cred-schema.checks.js';
 export * from './checks/cred-applicant-schema.checks.js';
@@ -57,5 +58,6 @@ export * from './checks/cred-subject-isolation.checks.js';
 export * from './checks/cred-invite.checks.js';
 export * from './checks/cred-responses.checks.js';
 export * from './checks/cred-evidence-rules.checks.js';
+export * from './checks/cred-reader.checks.js';
 
 export function LoadCredentialingIntegrationTests(): void {}

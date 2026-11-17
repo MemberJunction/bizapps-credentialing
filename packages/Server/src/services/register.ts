@@ -2,6 +2,8 @@ import { DatabaseProviderBase } from '@memberjunction/core';
 import { CredentialingServices } from '@mj-biz-apps/credentialing-core-entities-server';
 import { WorkerTextExtractor } from '../evidence/WorkerTextExtractor.js';
 import { MagicLinkInvitationIssuer } from '../invitations/MagicLinkInvitationIssuer.js';
+import { PromptEvidenceReader } from '../reading/PromptEvidenceReader.js';
+import { PromptTextRecognizer } from '../reading/PromptTextRecognizer.js';
 
 /**
  * Registers the server-side implementations (`@memberjunction/server`, magic-link service, storage,
@@ -25,6 +27,10 @@ export function RegisterCredentialingServices(): void {
         },
         Invitations: new MagicLinkInvitationIssuer(),
         Text: new WorkerTextExtractor(),
+        Recognizer: new PromptTextRecognizer(),
+        Reader: new PromptEvidenceReader(),
+        // The reading queue's nudge (OnEvidenceStored) is registered when the background work starts
+        // (reading/background.ts, from the evidence extension once the server has booted).
         // The evidence store is registered by EvidenceRouteExtension when it starts, because the
         // storage account it uses is one of that extension's settings.
     });

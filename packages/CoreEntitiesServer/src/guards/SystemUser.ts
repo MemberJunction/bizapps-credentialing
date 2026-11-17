@@ -18,7 +18,9 @@ import { UserCache } from '@memberjunction/generic-database-provider';
  * - the evidence store (`StorageEvidenceStore` in `@mj-biz-apps/credentialing-server`) writes, reads
  *   and removes evidence files and their `MJ: Files` rows, because no credentialing role holds a
  *   permission on `MJ: Files` or the storage account: the app's evidence route is the only door to
- *   the bytes (plan Decision 5).
+ *   the bytes (plan Decision 5);
+ * - the reading queue (`reading/DatabaseReadingData.ts`) claims, reads and commits documents, and the
+ *   recognizer and reader run their prompts, as the system user, because background work has no caller.
  *
  * Any new use must be added to that list.
  */

@@ -9,6 +9,7 @@
     "applications",
     "application-roles",
     "row-level-security-filters",
-    "entity-permissions"
+    "entity-permissions",
+    "prompts"
   ]
 }

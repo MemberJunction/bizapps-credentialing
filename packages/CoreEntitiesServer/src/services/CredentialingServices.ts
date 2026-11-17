@@ -51,9 +51,13 @@ export interface EvidenceStore {
     RemoveOrphans(olderThanMinutes: number, referencedFileIDs: (candidateIDs: string[]) => Promise<Set<string>>): Promise<number>;
 }
 
-/** What text recognition of a scan gave (Task 9). */
+/**
+ * What text recognition of a scan gave (Task 9). `Truncated` is true when the transcription was cut
+ * at the stored-text limit; `Unreadable` means the model answered but found no text; `CouldNotRun`
+ * means no model ran at all (no model or credential, a vendor refusal, a transport failure).
+ */
 export type RecognitionResult =
-    | { Kind: 'Recognized'; Text: string; PageCount: number | null; PromptRunID: string | null }
+    | { Kind: 'Recognized'; Text: string; PageCount: number | null; Truncated: boolean; PromptRunID: string | null }
     | { Kind: 'Unreadable'; PromptRunID: string | null }
     | { Kind: 'CouldNotRun'; Reason: string };
 
@@ -99,6 +103,24 @@ export interface RegisteredServices {
      * Optional: with nothing registered, a stored document simply waits for the sweep.
      */
     OnEvidenceStored: (documentID: string) => void;
+    /**
+     * Called after the reading queue committed a document's reading, with the subject's ID: the prefill
+     * runner registers itself here (Task 10) so a reading drafts answers with no call from the browser.
+     * Optional: with nothing registered, nothing runs. Awaited by the queue; a failure is logged there.
+     */
+    OnReadingCommitted: (subjectID: string) => Promise<void>;
+}
+
+/**
+ * One step of the reading queue's sweep that another part of the app contributes (Task 11 adds the
+ * redispatch of submissions). `Phase` places it around the queue's own steps (requeue, orphan
+ * removal, drain): `BeforeQueue` steps run first, `AfterQueue` steps last. Each step runs in its own
+ * try/catch, so one failing never skips another.
+ */
+export interface SweepStep {
+    Name: string;
+    Phase: 'BeforeQueue' | 'AfterQueue';
+    Run: () => Promise<void>;
 }
 
 /** The sentence a getter throws for a service nobody registered. */
@@ -112,6 +134,7 @@ export function ServiceNotRegisteredReason(name: keyof RegisteredServices): stri
  */
 class ServiceStore extends BaseSingleton<ServiceStore> {
     public Services: Partial<RegisteredServices> = {};
+    public SweepSteps: SweepStep[] = [];
 
     protected constructor() {
         super();
@@ -161,6 +184,34 @@ export class CredentialingServices {
 
     public static get Notifier(): StaffNotifier {
         return CredentialingServices.get('Notifier');
+    }
+
+    /** Adds a sweep step; a step of the same name replaces the earlier one, so registering twice is harmless. */
+    public static AddSweepStep(step: SweepStep): void {
+        const store = ServiceStore.Instance;
+        store.SweepSteps = [...store.SweepSteps.filter((s) => s.Name !== step.Name), step];
+    }
+
+    /** The registered sweep steps, in registration order. */
+    public static get SweepSteps(): readonly SweepStep[] {
+        return ServiceStore.Instance.SweepSteps;
+    }
+
+    /**
+     * Runs the registered {@link RegisteredServices.OnReadingCommitted} hook for `subjectID`. Nothing
+     * registered is not an error; a hook that throws is logged here and never reaches the caller,
+     * whose reading has already committed.
+     */
+    public static async NotifyReadingCommitted(subjectID: string): Promise<void> {
+        const hook = ServiceStore.Instance.Services.OnReadingCommitted;
+        if (hook == null) {
+            return;
+        }
+        try {
+            await hook(subjectID);
+        } catch (err: unknown) {
+            LogError(`The reading-committed hook failed for subject ${subjectID}: ${err instanceof Error ? err.message : String(err)}`);
+        }
     }
 
     /**

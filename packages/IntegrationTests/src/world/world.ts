@@ -77,6 +77,11 @@ export interface WorldApplicants {
      * application is on `Sample Evidence Program` 2026. Evidence checks upload and attest for it.
      */
     SubjectEvidence: WorldSubject;
+    /**
+     * `Sample Reading Applicant` in OrgA; contact `applicant.reading@example.test`; its Draft
+     * application is on `Sample Reading Program` 2026. Reading checks and the reading persona use it.
+     */
+    SubjectReading: WorldSubject;
 }
 
 /** The organizations, committee and sample program the checks read. */
@@ -114,6 +119,12 @@ export interface WorldData {
      * `Restricted Allowed` document requirement. Read-only to checks.
      */
     EvidenceProgram: ProgramTree;
+    /**
+     * `Sample Reading Program` in OrgA with Active version `2026`: standards `R.1` (Prefill) and `R.2`
+     * (Locate) bound by a `Document Extraction` source to the requirement `Safety policy`, `R.3`
+     * (Manual) unbound, and a requirement `Other record` no standard is bound to. Read-only to checks.
+     */
+    ReadingProgram: ProgramTree;
 }
 
 /** Everything a credentialing check can rely on existing. */

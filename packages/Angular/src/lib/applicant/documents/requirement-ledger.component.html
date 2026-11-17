@@ -145,6 +145,17 @@
                                             Versions ({{ doc.Versions.length }})
                                         </button>
                                     }
+                                    @if (actions.ShowReadAgain && row.Document; as doc) {
+                                        <button
+                                            mjButton
+                                            Variant="primary"
+                                            Size="sm"
+                                            type="button"
+                                            [disabled]="RequeueingDocumentID !== null"
+                                            (click)="ReadAgain.emit(doc)">
+                                            {{ RequeueingDocumentID === doc.EvidenceDocumentID ? 'Asking...' : 'Read again' }}
+                                        </button>
+                                    }
                                     @if (actions.ShowDownloadOriginal && row.Document; as doc) {
                                         <button
                                             mjButton

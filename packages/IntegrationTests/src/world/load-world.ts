@@ -7,6 +7,7 @@ import { CredentialingEntity } from '@mj-biz-apps/credentialing-core';
 import type {
     mjBizAppsCredentialingAccreditingOrganizationEntity,
     mjBizAppsCredentialingOrganizationMembershipEntity,
+    mjBizAppsCredentialingResponseSourceEntity,
 } from '@mj-biz-apps/credentialing-entities';
 import { FindRows, LoadUserInfo, Quote, RequireSave, View } from '../wire.js';
 import { EnsureWorldApplication, EnsureWorldSubject } from './applicant-world.js';
@@ -406,10 +407,89 @@ function evidenceProgramSpec(orgA: WorldOrganization, committee: WorldCommittee)
     };
 }
 
+/** The program the reading checks read against (plan Task 9). */
+export const READING_PROGRAM_NAME = 'Sample Reading Program';
+/** Its requirement that `R.1` (Prefill) and `R.2` (Locate) are bound to. */
+export const READING_BOUND_REQUIREMENT = 'Safety policy';
+/** Its requirement no standard is bound to. */
+export const READING_UNBOUND_REQUIREMENT = 'Other record';
+/** The contact of `Sample Reading Applicant`. */
+export const APPLICANT_READING_EMAIL = 'applicant.reading@example.test';
+
+/** `Sample Reading Program` in OrgA: version `2026`, one section, R.1 Prefill and R.2 Locate (bound), R.3 Manual. */
+function readingProgramSpec(orgA: WorldOrganization, committee: WorldCommittee): ProgramTreeSpec {
+    return {
+        AccreditingOrganizationID: orgA.ID,
+        Program: { Name: READING_PROGRAM_NAME, ProgramType: 'Certification', SubjectType: 'Person', SubjectNoun: 'professional', CredentialPrefix: 'SRP' },
+        Version: { Label: '2026', CommitteeID: committee.ID },
+        Sections: [
+            {
+                Number: '1',
+                Name: 'Safety',
+                Sequence: 1,
+                Standards: [
+                    {
+                        Code: 'R.1',
+                        Statement: 'The practice keeps a written safety policy and reviews it every year.',
+                        ResponseType: 'Evidence',
+                        IntakeMode: 'Prefill',
+                        EvidenceHint: 'The safety policy, showing how often it is reviewed.',
+                        Sequence: 1,
+                    },
+                    {
+                        Code: 'R.2',
+                        Statement: 'Signed minutes of each policy review are kept.',
+                        ResponseType: 'Evidence',
+                        IntakeMode: 'Locate',
+                        EvidenceHint: 'The record of how review minutes are kept.',
+                        Sequence: 2,
+                    },
+                    { Code: 'R.3', Statement: 'The applicant describes how staff learn about the safety policy.', ResponseType: 'Narrative', Sequence: 3 },
+                ],
+            },
+        ],
+        DocumentRequirements: [
+            { Name: READING_BOUND_REQUIREMENT, Sequence: 1, SensitivityPolicy: 'Normal' },
+            { Name: READING_UNBOUND_REQUIREMENT, Sequence: 2, SensitivityPolicy: 'Normal', IsRequired: false },
+        ],
+    };
+}
+
+/**
+ * Binds R.1 and R.2 of the reading program to `Safety policy` with one `Document Extraction` source
+ * each, through the entity on the version while it is still a Draft (sources change only on a Draft
+ * version, Decision 7); a source already there (by standard and requirement) is kept.
+ */
+async function ensureReadingSources(ctx: IntegrationCheckContext, tree: ProgramTree): Promise<void> {
+    const requirement = tree.DocumentRequirements.find((r) => r.Name === READING_BOUND_REQUIREMENT);
+    Assert(requirement != null, `${READING_PROGRAM_NAME} has the requirement ${READING_BOUND_REQUIREMENT}`);
+    const bound = tree.Sections.flatMap((s) => s.Standards).filter((s) => s.Code === 'R.1' || s.Code === 'R.2');
+    for (const standard of bound) {
+        const filter = `StandardID = '${Quote(standard.ID)}' AND DocumentRequirementID = '${Quote(requirement.ID)}'`;
+        if ((await FindRows<{ ID: string }>(ctx, CredentialingEntity.ResponseSource, filter, ['ID'])).length > 0) {
+            continue;
+        }
+        const source = await ctx.Provider.GetEntityObject<mjBizAppsCredentialingResponseSourceEntity>(CredentialingEntity.ResponseSource, ctx.User);
+        source.NewRecord();
+        source.StandardID = standard.ID;
+        source.SourceType = 'Document Extraction';
+        source.DocumentRequirementID = requirement.ID;
+        source.Mode = 'Prefill Only';
+        source.Rank = 1;
+        source.Sequence = 0;
+        await RequireSave(source, `the source binding ${standard.Code} to ${READING_BOUND_REQUIREMENT}`);
+    }
+}
+
 /** Ensures the tree and activates its version when it is still a Draft (once; later loads find it Active). */
-async function ensureActiveProgram(ctx: IntegrationCheckContext, spec: ProgramTreeSpec): Promise<ProgramTree> {
+async function ensureActiveProgram(
+    ctx: IntegrationCheckContext,
+    spec: ProgramTreeSpec,
+    beforeActivation?: (tree: ProgramTree) => Promise<void>,
+): Promise<ProgramTree> {
     const tree = await EnsureProgramTree(ctx, spec, ctx.User);
     if (tree.Version.Status === 'Draft') {
+        await beforeActivation?.(tree);
         tree.Version.Status = 'Active';
         await RequireSave(tree.Version, `activating version ${spec.Version.Label} of ${spec.Program.Name}`);
     }
@@ -436,6 +516,7 @@ export async function EnsureWorldData(ctx: IntegrationCheckContext): Promise<Wor
     const applicantProgramB = await ensureActiveProgram(ctx, applicantProgramBSpec(orgB, committeeB));
     const largeProgram = await ensureActiveProgram(ctx, sampleLargeProgramSpec(orgA, committeeA));
     const evidenceProgram = await ensureActiveProgram(ctx, evidenceProgramSpec(orgA, committeeA));
+    const readingProgram = await ensureActiveProgram(ctx, readingProgramSpec(orgA, committeeA), (tree) => ensureReadingSources(ctx, tree));
     return {
         OrgA: orgA,
         OrgB: orgB,
@@ -448,6 +529,7 @@ export async function EnsureWorldData(ctx: IntegrationCheckContext): Promise<Wor
         ApplicantProgramB: applicantProgramB,
         LargeProgram: largeProgram,
         EvidenceProgram: evidenceProgram,
+        ReadingProgram: readingProgram,
     };
 }
 
@@ -507,7 +589,18 @@ export async function EnsureApplicantWorld(ctx: IntegrationCheckContext, users: 
         PrimaryEmail: APPLICANT_EVIDENCE_EMAIL,
         Contacts: [applicantEvidence],
     });
-    return { SubjectOne: subjectOne, SubjectTwo: subjectTwo, SubjectOrgB: subjectOrgB, SubjectEvidence: subjectEvidence };
+    const applicantReading = await ensureContactUser(ctx, APPLICANT_READING_EMAIL, 'Reading');
+    const subjectReading = await EnsureWorldSubject(ctx, {
+        AccreditingOrganizationID: data.OrgA.ID,
+        InvitedBy: users.StaffA,
+        Program: data.ReadingProgram,
+        DisplayName: 'Sample Reading Applicant',
+        FirstName: 'Sample',
+        LastName: 'Reading Applicant',
+        PrimaryEmail: APPLICANT_READING_EMAIL,
+        Contacts: [applicantReading],
+    });
+    return { SubjectOne: subjectOne, SubjectTwo: subjectTwo, SubjectOrgB: subjectOrgB, SubjectEvidence: subjectEvidence, SubjectReading: subjectReading };
 }
 
 export async function LoadWorld(ctx: IntegrationCheckContext): Promise<CredentialingWorld> {

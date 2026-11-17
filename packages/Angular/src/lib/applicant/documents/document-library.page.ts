@@ -11,6 +11,7 @@ import {
     ElementRef,
     EventEmitter,
     Input,
+    OnDestroy,
     Output,
     ViewChild,
     inject,
@@ -28,6 +29,7 @@ import {
     AttestInLieuOperation,
     ConfirmDocumentCurrentOperation,
     GetDocumentLibraryOperation,
+    RequeueReadingOperation,
     type DocumentLibrary,
     type LedgerRow,
     type LibraryDocument,
@@ -37,9 +39,12 @@ import { ApplicantMessages } from '../shared/applicant-messages';
 import { DocumentViewerComponent } from './document-viewer.component';
 import { EvidenceClient, type UploadResult } from './evidence-client';
 import {
+    CanReadAgain,
     DefaultAttestationStatement,
     FormatLibraryDate,
     FormatWhatWasRead,
+    LIBRARY_POLL_MS,
+    LibraryNeedsPolling,
 } from './library-model';
 import { RequirementLedgerComponent } from './requirement-ledger.component';
 import { UploadDropzoneComponent } from './upload-dropzone.component';
@@ -62,8 +67,10 @@ import { VersionHistoryComponent } from './version-history.component';
     templateUrl: './document-library.page.html',
     styleUrls: ['./document-library.page.scss'],
 })
-export class DocumentLibraryPage extends BaseAngularComponent {
+export class DocumentLibraryPage extends BaseAngularComponent implements OnDestroy {
     private readonly cdr = inject(ChangeDetectorRef);
+    private pollTimer: ReturnType<typeof setTimeout> | null = null;
+    private destroyed = false;
     private _subject: MySubject | null = null;
     private _requestedDocumentID: string | null = null;
     private loadCounter = 0;
@@ -112,6 +119,7 @@ export class DocumentLibraryPage extends BaseAngularComponent {
     public ActiveUploadRequirementID: string | null = null;
     public ConfirmingDocumentID: string | null = null;
     public DownloadingDocumentID: string | null = null;
+    public RequeueingDocumentID: string | null = null;
 
     public ViewerOpen = false;
     public ViewerDocumentID: string | null = null;
@@ -132,6 +140,41 @@ export class DocumentLibraryPage extends BaseAngularComponent {
 
     public WhatWasRead(doc: LibraryDocument): string {
         return FormatWhatWasRead(doc);
+    }
+
+    public CanReadAgain(doc: LibraryDocument): boolean {
+        return CanReadAgain(doc);
+    }
+
+    public ngOnDestroy(): void {
+        this.destroyed = true;
+        this.stopPolling();
+    }
+
+    /** `Read again`: asks the server to read a document the assistant could not read; the poll then shows its progress. */
+    public async OnReadAgain(doc: LibraryDocument): Promise<void> {
+        if (this.RequeueingDocumentID != null) return;
+        this.RequeueingDocumentID = doc.EvidenceDocumentID;
+        this.ActionErrorMessage = '';
+        this.ActionSuccessMessage = '';
+        this.cdr.markForCheck();
+        try {
+            const res = await new RequeueReadingOperation().Execute(
+                { EvidenceDocumentID: doc.EvidenceDocumentID },
+                { provider: this.ProviderToUse },
+            );
+            if (!res.Success) {
+                this.ActionErrorMessage = ApplicantMessages.ForUser(res.ErrorMessage || 'Could not ask the assistant to read this document again.', 'save');
+                return;
+            }
+            this.ActionSuccessMessage = `The assistant will read ${doc.FileName} again.`;
+            await this.loadLibrary();
+        } catch (err) {
+            this.ActionErrorMessage = ApplicantMessages.FromError(err, 'save');
+        } finally {
+            this.RequeueingDocumentID = null;
+            this.cdr.markForCheck();
+        }
     }
 
     public OnToggleUpload(requirementID: string | null): void {
@@ -303,12 +346,20 @@ export class DocumentLibraryPage extends BaseAngularComponent {
         }
     }
 
-    private async loadLibrary(): Promise<void> {
+    /**
+     * Loads the library. A `silent` load (the poll) keeps what is on screen while it runs and shows no
+     * error over it. After every load the poll is scheduled again while any document is still being
+     * read (`Pending` or `Running`) and stopped otherwise.
+     */
+    private async loadLibrary(silent = false): Promise<void> {
         if (!this._subject) return;
+        this.stopPolling();
         const token = ++this.loadCounter;
-        this.IsLoading = true;
-        this.ErrorMessage = '';
-        this.cdr.markForCheck();
+        if (!silent) {
+            this.IsLoading = true;
+            this.ErrorMessage = '';
+            this.cdr.markForCheck();
+        }
         try {
             const res = await new GetDocumentLibraryOperation().Execute(
                 { SubjectID: this._subject.SubjectID },
@@ -316,24 +367,46 @@ export class DocumentLibraryPage extends BaseAngularComponent {
             );
             if (token !== this.loadCounter) return;
             if (!res.Success || res.Output == null) {
-                this.ErrorMessage = ApplicantMessages.ForUser(
-                    res.ErrorMessage || 'Could not load your document library.',
-                    'load',
-                );
+                if (!silent) {
+                    this.ErrorMessage = ApplicantMessages.ForUser(
+                        res.ErrorMessage || 'Could not load your document library.',
+                        'load',
+                    );
+                }
                 return;
             }
             this.Library = res.Output;
-            if (this._requestedDocumentID) {
+            if (this._requestedDocumentID && !silent) {
                 this.openRequestedDocument(this._requestedDocumentID);
             }
         } catch (err) {
             if (token !== this.loadCounter) return;
-            this.ErrorMessage = ApplicantMessages.FromError(err, 'load');
+            if (!silent) {
+                this.ErrorMessage = ApplicantMessages.FromError(err, 'load');
+            }
         } finally {
             if (token === this.loadCounter) {
                 this.IsLoading = false;
+                this.schedulePoll();
                 this.cdr.markForCheck();
             }
+        }
+    }
+
+    private schedulePoll(): void {
+        if (this.destroyed || !LibraryNeedsPolling(this.Library)) {
+            return;
+        }
+        this.pollTimer = setTimeout(() => {
+            this.pollTimer = null;
+            void this.loadLibrary(true);
+        }, LIBRARY_POLL_MS);
+    }
+
+    private stopPolling(): void {
+        if (this.pollTimer != null) {
+            clearTimeout(this.pollTimer);
+            this.pollTimer = null;
         }
     }
 

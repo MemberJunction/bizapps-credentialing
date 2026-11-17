@@ -196,3 +196,25 @@ cannot read or write directly:
 - **What stays as the caller:** the subject, requirement admission, the current document and the
   applications that froze it, and every `EvidenceDocument` / `DocumentAttestation` write are made as
   the caller inside `OperationWrite` (`EvidenceIntake`, `AttestInLieu`, `ConfirmDocumentCurrent`).
+
+### System-user work added by Task 9 (the reading queue)
+
+- **The reading queue** (`packages/CoreEntitiesServer/src/reading/DatabaseReadingData.ts`) has no
+  caller: it is started by an upload's nudge after commit, by the boot sweep and by the sweep timer. It
+  reads and writes as the system user, on a fresh isolated provider per unit of work, and every write is
+  an entity save inside `OperationWrite` under `AuthoringLock.ForDocument` (claims, renewals, requeues,
+  failures) or `ForSubject` then `ForDocument` (the commit), after a re-read. What it writes: the
+  document's `ReadingStatus`/`ReadingNote`/claim columns, a scan's recognized text once
+  (`ExtractedText`, `TextStatus`, `TextNote`, `PageCount`), and `Extraction` rows for standards of the
+  subject's **Draft** applications only (re-read inside the commit's locks; a submitted application's
+  extractions are neither superseded nor added to). It reads only the document, the sources naming its
+  requirement, those standards and the subject's Draft applications on those versions. Nothing it reads
+  is returned to a client; the contact and staff see its results through `GetDocumentLibrary` as before.
+- **The recognizer and the reader** (`packages/Server/src/reading/`) run the prompts
+  `Credentialing: Scan Reader` / `Credentialing: Evidence Reader` as the system user. Their prompt runs
+  hold the document's text, and the scan reader's hold the file itself (`AIPromptRun.Messages`); no
+  credentialing role holds a permission on `MJ: AI Prompt Runs` (Task 12 probe P16).
+- **`Credentialing.RequeueReading`** ("Read again") stays as the caller: the document is read through
+  `SubjectAccess.Document` (another subject's or organization's document answers `Record not found.`),
+  `ActorFor` must be `Applicant` or `Staff`, and the save is the caller's, inside `OperationWrite`
+  (`cred-reader.9`).

@@ -51,6 +51,13 @@
       "account": "world",
       "about": "external applicant; contact of Sample Evidence Applicant (Sample Evidence Program with Normal and Restricted Allowed requirements)"
     },
+    "applicant-reading": {
+      "email": "applicant.reading@example.test",
+      "signIn": "magic-link",
+      "role": "Credentialing Applicant",
+      "account": "world",
+      "about": "external applicant; contact of Sample Reading Applicant (Sample Reading Program: R.1 Prefill and R.2 Locate bound to Safety policy, R.3 Manual, Other record unbound)"
+    },
     "reviewer-a": {
       "email": "reviewer.a@example.test",
       "signIn": "magic-link",

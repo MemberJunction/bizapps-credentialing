@@ -7,6 +7,7 @@ import {
     AttestInLieuOperation,
     ConfirmDocumentCurrentOperation,
     GetDocumentLibraryOperation,
+    RequeueReadingOperation,
     type DocumentLibrary,
     type MySubject,
 } from '@mj-biz-apps/credentialing-core';
@@ -157,6 +158,79 @@ describe('DocumentLibraryPage and DocumentViewerComponent', () => {
             expect.any(Object),
         );
         expect(page.ActionSuccessMessage).toContain('Attestation recorded');
+        page.ngOnDestroy();
+    });
+
+    it('reloads every 5 seconds while a document is being read, stops when none is, and Read again requeues and reloads', async () => {
+        vi.useFakeTimers();
+        try {
+            const withStatus = (status: 'Pending' | 'Running' | 'Complete' | 'Could Not Run'): DocumentLibrary => ({
+                ...LIBRARY,
+                Ledgers: [
+                    {
+                        ...LIBRARY.Ledgers[0],
+                        Rows: [{ ...LIBRARY.Ledgers[0].Rows[0], Document: { ...LIBRARY.Ledgers[0].Rows[0].Document!, ReadingStatus: status, ReadingNote: status === 'Could Not Run' ? 'No AI model is available on this server.' : null } }],
+                    },
+                ],
+            });
+            const answers = [withStatus('Pending'), withStatus('Running'), withStatus('Complete'), withStatus('Could Not Run'), withStatus('Pending'), withStatus('Complete')];
+            const libSpy = vi.spyOn(GetDocumentLibraryOperation.prototype, 'Execute').mockImplementation(async () => ({ Success: true, ResultCode: 'SUCCESS', Output: answers.shift() ?? withStatus('Complete') }));
+            const requeueSpy = vi.spyOn(RequeueReadingOperation.prototype, 'Execute').mockResolvedValue({
+                Success: true,
+                ResultCode: 'SUCCESS',
+                Output: { EvidenceDocumentID: 'D1111111-1111-1111-1111-111111111111', ReadingStatus: 'Pending', ReadingNote: null },
+            });
+            const page = createLibraryPage();
+            page.Subject = SUBJECT;
+            await vi.advanceTimersByTimeAsync(0);
+            expect(libSpy).toHaveBeenCalledTimes(1);
+            await vi.advanceTimersByTimeAsync(4999);
+            expect(libSpy).toHaveBeenCalledTimes(1);
+            await vi.advanceTimersByTimeAsync(1);
+            expect(libSpy).toHaveBeenCalledTimes(2);
+            await vi.advanceTimersByTimeAsync(5000);
+            expect(libSpy).toHaveBeenCalledTimes(3);
+            expect(page.Library?.Ledgers[0].Rows[0].Document?.ReadingStatus).toBe('Complete');
+            await vi.advanceTimersByTimeAsync(20000);
+            expect(libSpy).toHaveBeenCalledTimes(3);
+
+            // A Could Not Run document: Read again requeues it and polling resumes until it completes.
+            page.Subject = null;
+            page.Subject = SUBJECT;
+            await vi.advanceTimersByTimeAsync(0);
+            const couldNot = page.Library?.Ledgers[0].Rows[0].Document;
+            expect(couldNot?.ReadingStatus).toBe('Could Not Run');
+            expect(page.CanReadAgain(couldNot!)).toBe(true);
+            await page.OnReadAgain(couldNot!);
+            expect(requeueSpy).toHaveBeenCalledWith({ EvidenceDocumentID: 'D1111111-1111-1111-1111-111111111111' }, expect.any(Object));
+            expect(page.ActionSuccessMessage).toBe('The assistant will read safety-policy.pdf again.');
+            expect(page.Library?.Ledgers[0].Rows[0].Document?.ReadingStatus).toBe('Pending');
+            await vi.advanceTimersByTimeAsync(5000);
+            expect(page.Library?.Ledgers[0].Rows[0].Document?.ReadingStatus).toBe('Complete');
+            const calls = libSpy.mock.calls.length;
+            page.ngOnDestroy();
+            await vi.advanceTimersByTimeAsync(30000);
+            expect(libSpy.mock.calls.length).toBe(calls);
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
+    it('opens the viewer dialog only while it is in the document', async () => {
+        vi.spyOn(EvidenceClient.prototype, 'Fetch').mockResolvedValue(new Blob([]));
+        vi.spyOn(RunView, 'FromMetadataProvider').mockReturnValue({
+            RunView: vi.fn().mockResolvedValue({ Success: true, Results: [] }),
+        } as unknown as ReturnType<typeof RunView.FromMetadataProvider>);
+        for (const connected of [false, true]) {
+            const viewer = createViewer();
+            viewer.Provider = { ConfigData: { URL: 'http://localhost:4050/', Token: 'tok' } } as unknown as DocumentViewerComponent['Provider'];
+            const showModal = vi.fn();
+            viewer.DialogRef = { nativeElement: { isConnected: connected, open: false, showModal } as unknown as HTMLDialogElement };
+            viewer.DocumentID = 'D1111111-1111-1111-1111-111111111111';
+            viewer.Visible = true;
+            await new Promise((r) => setTimeout(r, 0));
+            expect(showModal).toHaveBeenCalledTimes(connected ? 1 : 0);
+        }
     });
 
     it('revokes blob URLs on viewer close and highlights matching cited text', async () => {

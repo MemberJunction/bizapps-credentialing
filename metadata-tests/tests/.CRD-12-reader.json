@@ -1,0 +1,24 @@
+{
+  "fields": {
+    "TypeID": "@lookup:MJ: Test Types.Name=Integration Test",
+    "Name": "CRD-12 - Reader",
+    "Description": "Verify the reading queue on the server transport with the fixture recognizer and reader (answers keyed by standard code) and real isolated providers: an upload is read into one extraction per bound standard whose offsets slice the stored text to the excerpt, a second drain adds nothing, a replacement supersedes the old extractions, a quote absent from the document is discarded and counted, a document telling the reader to mark the standard met confirms nothing, an unbound requirement reads 0 passages for 0 standards, a reader that throws leaves the upload accepted and the document Failed, a crashed Running claim is reclaimed only once stale, Could Not Run is requeued by the boot sweep and by RequeueReading, two concurrent commits on one subject both land and a forced rollback leaves the other's extractions, and a scan's recognized text is stored once.",
+    "InputDefinition": {},
+    "ExpectedOutcomes": {
+      "summary": "All ten cred-reader checks pass."
+    },
+    "Configuration": {
+      "tier": "deterministic",
+      "transport": "server",
+      "checks": [
+        {
+          "type": "cred-reader"
+        }
+      ]
+    },
+    "Status": "Active"
+  },
+  "primaryKey": {
+    "ID": "B61589BD-2DF9-4DDC-904B-B93BA98FA0F5"
+  }
+}

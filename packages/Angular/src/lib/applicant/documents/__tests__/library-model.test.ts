@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import type { LedgerRow, LibraryDocument } from '@mj-biz-apps/credentialing-core';
+import type { DocumentLibrary } from '@mj-biz-apps/credentialing-core';
 import {
+    CanReadAgain,
     DefaultAttestationStatement,
+    LibraryNeedsPolling,
+    READING_IN_PROGRESS_SENTENCE,
     DocumentRowStatusLabel,
     FormatAttestedNotice,
     FormatHashShort,
@@ -142,6 +146,41 @@ describe('library-model', () => {
         });
     });
 
+    describe('Read again and polling', () => {
+        it('offers Read again to the applicant only on Could Not Run or Failed, locked or not', () => {
+            for (const status of ['Could Not Run', 'Failed'] as const) {
+                expect(ResolveLedgerRowActions(makeRow({ Document: makeDoc({ ReadingStatus: status }) }), true).ShowReadAgain).toBe(true);
+                expect(ResolveLedgerRowActions(makeRow({ Locked: true, LockedReason: 'Locked.', Document: makeDoc({ ReadingStatus: status }) }), true).ShowReadAgain).toBe(true);
+                expect(ResolveLedgerRowActions(makeRow({ Document: makeDoc({ ReadingStatus: status }) }), false).ShowReadAgain).toBe(false);
+            }
+            for (const status of ['Pending', 'Running', 'Complete', 'Not Applicable'] as const) {
+                expect(CanReadAgain({ ReadingStatus: status })).toBe(false);
+                expect(ResolveLedgerRowActions(makeRow({ Document: makeDoc({ ReadingStatus: status }) }), true).ShowReadAgain).toBe(false);
+            }
+            expect(ResolveLedgerRowActions(makeRow(), true).ShowReadAgain).toBe(false);
+        });
+
+        it('polls while any ledger or general document is Pending or Running, and stops otherwise', () => {
+            const library = (ledgerStatus: LibraryDocument['ReadingStatus'] | null, general: LibraryDocument['ReadingStatus'][]): DocumentLibrary => ({
+                Ledgers: [
+                    {
+                        ProgramName: 'P',
+                        VersionLabel: '1',
+                        ApplicationID: 'A',
+                        ApplicationStatus: 'Draft',
+                        Rows: [makeRow({ Document: ledgerStatus == null ? null : makeDoc({ ReadingStatus: ledgerStatus }) })],
+                    },
+                ],
+                General: general.map((s) => makeDoc({ ReadingStatus: s })),
+            });
+            expect(LibraryNeedsPolling(null)).toBe(false);
+            expect(LibraryNeedsPolling(library('Pending', []))).toBe(true);
+            expect(LibraryNeedsPolling(library('Complete', ['Running']))).toBe(true);
+            expect(LibraryNeedsPolling(library('Complete', ['Failed', 'Could Not Run', 'Not Applicable']))).toBe(false);
+            expect(LibraryNeedsPolling(library(null, []))).toBe(false);
+        });
+    });
+
     describe('FormatWhatWasRead', () => {
         it('shows citation count when ReadingStatus is Complete with citations', () => {
             expect(FormatWhatWasRead(makeDoc({ ReadingStatus: 'Complete', CitationCount: 3 }))).toBe('3 passages cited');
@@ -161,9 +200,14 @@ describe('library-model', () => {
             ).toBe(scanNote);
         });
 
-        it('shows a clear waiting sentence for Pending extracted text', () => {
-            expect(FormatWhatWasRead(makeDoc({ TextStatus: 'Extracted', ReadingStatus: 'Pending' }))).toBe(
-                'Waiting for the assistant to read this document.',
+        it('shows Reading… for Pending and Running extracted text', () => {
+            expect(FormatWhatWasRead(makeDoc({ TextStatus: 'Extracted', ReadingStatus: 'Pending' }))).toBe(READING_IN_PROGRESS_SENTENCE);
+            expect(FormatWhatWasRead(makeDoc({ TextStatus: 'Extracted', ReadingStatus: 'Running' }))).toBe('Reading…');
+        });
+
+        it('shows the final sentence of a completed reading with no citations yet', () => {
+            expect(FormatWhatWasRead(makeDoc({ ReadingStatus: 'Complete', CitationCount: 0, ReadingNote: '2 passages found for 2 standards.' }))).toBe(
+                '2 passages found for 2 standards.',
             );
         });
 
