@@ -23,9 +23,9 @@ describe('Credentialing Integration Test Bundles', () => {
         expect(ids).toEqual(Array.from({ length: 12 }, (_, i) => `cred-standard-rules.${i + 1}`));
     });
 
-    it('registers the cred-operations bundle with its fifteen checks', () => {
+    it('registers the cred-operations bundle with its twenty checks', () => {
         const ids = IntegrationCheckRegistry.Instance.GetBundle('cred-operations').map((c) => c.Id);
-        expect(ids).toEqual(Array.from({ length: 15 }, (_, i) => `cred-operations.${i + 1}`));
+        expect(ids).toEqual(Array.from({ length: 20 }, (_, i) => `cred-operations.${i + 1}`));
     });
 
     it('registers the cred-isolation bundle with its nine checks', () => {

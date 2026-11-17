@@ -38,6 +38,7 @@ const {
   CloneVersionToDraftOperation,
   ReorderVersionTreeOperation,
   CreateOrganizationOperation,
+  CreateCommitteeOperation,
 } = await ImportCredentialing();
 
 /** The world's program of accrediting body A (packages/IntegrationTests/src/world/load-world.ts). */
@@ -361,7 +362,7 @@ async function caseQueries(persona, credentialingQueryIDs) {
   });
 }
 
-/** P8: an applicant creates a Program by entity save and calls the four remote operations. */
+/** P8: an applicant creates a Program by entity save and calls the four program and organization remote operations (P12 covers CreateCommittee). */
 async function caseApplicantWrites(applicant, staffA, admin, target) {
   await probeCase('P8', applicant.Name, async () => {
     const session = applicant.Provider;
@@ -518,6 +519,43 @@ async function caseDeleteOrganization(persona, admin, target) {
   });
 }
 
+/**
+ * P12: an actor calls `Credentialing.CreateCommittee` for the sample program of accrediting body A.
+ * The operation writes the committee as the system user, so its own checks are all that stand between
+ * a caller and another organization's committee list. staff-b (staff of body B) must be told
+ * `Record not found.`, exactly as for a random program ID; applicant-a must be refused outright
+ * (`FORBIDDEN`). In both cases no committee of the probe's name exists afterwards, as the control
+ * reader (who reads every committee) sees it.
+ *
+ * @param {PersonaSession} persona
+ * @param {Session} control
+ * @param {Target} target
+ * @param {string} committeeTypeID a committee type that exists, so the refusal is not about the type
+ * @param {'not-found' | 'forbidden'} expected
+ */
+async function caseCreateCommittee(persona, control, target, committeeTypeID, expected) {
+  await probeCase('P12', persona.Name, async () => {
+    const name = `Probe Committee ${randomUUID().replace(/-/g, '').slice(0, 8)}`;
+    /** @param {string} programID */
+    const attempt = (programID) => new CreateCommitteeOperation().Execute({ ProgramID: programID, Name: name, CommitteeTypeID: committeeTypeID }, { provider: persona.Provider });
+    const real = await attempt(String(target.Program.ID));
+    const random = await attempt(randomUUID().toUpperCase());
+    const problems = [];
+    if (real.Success) problems.push('CreateCommittee for the sample program SUCCEEDED');
+    else if (expected === 'not-found' && real.ErrorMessage !== NOT_FOUND) problems.push(`refused otherwise than as not found: ${describe(real)}`);
+    else if (expected === 'forbidden' && real.ResultCode !== 'FORBIDDEN') problems.push(`refused otherwise than as forbidden: ${describe(real)}`);
+    if (!real.Success && (real.ResultCode !== random.ResultCode || real.ErrorMessage !== random.ErrorMessage)) {
+      problems.push(`the refusal ${describe(real)} differs from the random-ID refusal ${describe(random)}`);
+    }
+    const created = await requireRows(control, 'Committees: Committees', `Name = '${quote(name)}'`, ['ID']);
+    if (created.length) problems.push(`${created.length} committees named ${name} exist`);
+    return {
+      passed: problems.length === 0,
+      detail: problems.length ? problems.join('; ') : `CreateCommittee for the sample program: ${describe(real)}, like a random program ID; no committee created`,
+    };
+  });
+}
+
 // ── run ──────────────────────────────────────────────────────────────────────────────────────────
 
 /**
@@ -560,6 +598,10 @@ async function main() {
     await caseInviteRows(staffB, controlInvites.length);
     await caseDeleteOrganization(staffB, admin, target);
     await caseDeleteOrganization(applicant, admin, target);
+    const committeeTypes = await requireRows(control.Provider, 'Committees: Types', '', ['ID']);
+    if (committeeTypes.length === 0) throw new Error('the control reader sees no committee type, so CreateCommittee would be refused for its type');
+    await caseCreateCommittee(staffB, control.Provider, target, String(committeeTypes[0].ID), 'not-found');
+    await caseCreateCommittee(applicant, control.Provider, target, String(committeeTypes[0].ID), 'forbidden');
   } catch (e) {
     report('SETUP', '-', false, e instanceof Error ? e.message : String(e));
   } finally {

@@ -10,6 +10,9 @@ export type VersionStatus = mjBizAppsCredentialingProgramVersionEntity['Status']
  * Pure domain rules governing program version lifecycle transitions, activation, draft creation, and deletion.
  */
 export class VersionLifecycleRules {
+    /** The refusal given when a version is activated before its deciding committee is chosen. */
+    public static readonly ChooseCommitteeReason = 'Choose the deciding committee before activating this version.';
+
     /**
      * Validates a status transition. Only Draft -> Active and Active -> Retired are permitted.
      */
@@ -62,7 +65,7 @@ export class VersionLifecycleRules {
         if (input.CommitteeID == null || input.CommitteeID.trim() === '') {
             return {
                 Allowed: false,
-                Reason: 'Choose the deciding committee before activating this version.',
+                Reason: VersionLifecycleRules.ChooseCommitteeReason,
             };
         }
 

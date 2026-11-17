@@ -78,5 +78,15 @@
     "primaryKey": {
       "ID": "D01A58F9-A156-41B6-B1DA-803C020B5D2E"
     }
+  },
+  {
+    "fields": {
+      "Name": "Credentialing: Committee Type Catalog",
+      "Description": "The BizApps Committees committee-type catalog. Program Studio lists it in the New committee form. It names kinds of committee, not any organization's records. The filter is present so a credentialing role holds no unfiltered grant outside this app's schema. Attached to Committees: Types for Credentialing Staff.",
+      "FilterText": "(1 = 1)"
+    },
+    "primaryKey": {
+      "ID": "9215F286-22DE-462B-AF4D-F4D3D9B225B1"
+    }
   }
 ]

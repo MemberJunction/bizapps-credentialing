@@ -29,10 +29,12 @@ const USER_APPLICATIONS_ENTITY = 'MJ: User Applications';
 /** The application organization setup puts in a new staff member's app switcher. */
 const CREDENTIALING_APPLICATION = 'Credentialing';
 const COMMON_ORGANIZATIONS_ENTITY = 'MJ_BizApps_Common: Organizations';
-const COMMITTEES_ENTITY = 'Committees: Committees';
-const COMMITTEE_TYPES_ENTITY = 'Committees: Types';
+/** The committees entity, owned by BizApps Committees. */
+export const COMMITTEES_ENTITY = 'Committees: Committees';
+/** The committee types entity (a catalog), owned by BizApps Committees. */
+export const COMMITTEE_TYPES_ENTITY = 'Committees: Types';
 /** A committee type shipped in BizApps Committees' own seed data. */
-const COMMITTEE_TYPE_NAME = 'Standing Committee';
+export const COMMITTEE_TYPE_NAME = 'Standing Committee';
 
 // Ensure client entity subclasses for dependency apps are registered even when loaded via client harness.
 LoadCommonEntities();

@@ -1,0 +1,58 @@
+:host {
+    display: block;
+}
+
+.cred-committee {
+    display: flex;
+    flex-direction: column;
+    gap: var(--mj-space-3, 0.75rem);
+    max-width: 32rem;
+    padding: var(--mj-space-4, 1rem);
+    border: 1px solid var(--mj-border-default);
+    border-radius: var(--mj-radius-md, 6px);
+    background: var(--mj-bg-surface-sunken, var(--mj-bg-surface));
+    color: var(--mj-text-primary);
+}
+
+.cred-committee__heading {
+    margin: 0;
+    font-size: var(--mj-text-base, 1rem);
+    font-weight: var(--mj-font-semibold, 600);
+}
+
+.cred-committee__intro {
+    margin: 0;
+    font-size: var(--mj-text-sm, 0.875rem);
+    color: var(--mj-text-secondary);
+}
+
+.cred-committee__field {
+    display: flex;
+    flex-direction: column;
+    gap: var(--mj-space-1, 0.25rem);
+
+    label {
+        font-size: var(--mj-text-sm, 0.875rem);
+        font-weight: var(--mj-font-medium, 500);
+    }
+
+    [aria-invalid='true'] {
+        border-color: var(--mj-status-error);
+    }
+}
+
+.cred-committee__label {
+    font-size: var(--mj-text-sm, 0.875rem);
+    font-weight: var(--mj-font-medium, 500);
+}
+
+.cred-committee__actions {
+    display: flex;
+    gap: var(--mj-space-2, 0.5rem);
+}
+
+.cred-committee__error {
+    margin: 0;
+    font-size: var(--mj-text-sm, 0.875rem);
+    color: var(--mj-status-error);
+}

@@ -22,6 +22,8 @@ export interface StudioVersionView {
     ShowRetire: boolean;
     /** Only a Draft can be deleted. */
     ShowDelete: boolean;
+    /** `New committee` (create a committee for the program's organization) is offered: on a Draft only, where the deciding committee can still be chosen. */
+    ShowNewCommittee: boolean;
     SettingsTierEditable: SettingsTierEditable;
 }
 
@@ -35,6 +37,7 @@ export class StudioViewModel {
             ShowActivate: isDraft,
             ShowRetire: isActive,
             ShowDelete: isDraft,
+            ShowNewCommittee: isDraft,
             SettingsTierEditable: {
                 WorkflowToggles: isDraft,
                 PromotionThresholds: isDraft,

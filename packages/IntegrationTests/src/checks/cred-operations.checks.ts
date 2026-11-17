@@ -1,11 +1,16 @@
 /**
- * `cred-operations` — the four credentialing remote operations, called in-process on the server
- * transport with `{ provider, user }`: CreateProgram, CloneVersionToDraft, ReorderVersionTree and
- * CreateOrganization. Every check works on its own scratch program or run-unique names.
+ * `cred-operations` — the five credentialing remote operations, called in-process on the server
+ * transport with `{ provider, user }`: CreateProgram, CloneVersionToDraft, ReorderVersionTree,
+ * CreateOrganization and CreateCommittee. Every check works on its own scratch program or run-unique
+ * names.
  *
  * The program operations act as `StaffA`, who holds only `Credentialing Staff` and a membership of
  * OrgA (where every scratch program is made), so they run under staff's row-filtered permissions;
  * organization setup acts as the world's `Admin`.
+ *
+ * `.16`–`.20` create committees for a scratch program of OrgA as `StaffA` (who holds no Create
+ * permission on committees: the operation writes them itself). Each uses run-unique committee names
+ * and deletes the committees it created when it ends, so OrgA's committee list is left as it was.
  *
  * `.13` and `.14` delete accrediting organizations as the admin: refused with a sentence while the
  * organization has members or programs, deleted (its Common organization kept) once it has neither.
@@ -16,7 +21,7 @@
  * programs check cannot be made to overlap an open create that will commit (docs/dev-instance.md).
  *
  * Server transport only: `.3` writes one column with SQL, `.6` sets a static test seam on the server
- * operation class, and `.7`/`.9`/`.12` need separate provider instances. The wire path is proven by
+ * operation class, and `.7`/`.9`/`.12`/`.20` need separate provider instances. The wire path is proven by
  * `cred-operations-wire` on the client transport.
  *
  * This module imports nothing from `@mj-biz-apps/credentialing-core-entities-server` but types: the
@@ -35,15 +40,19 @@ import {
 } from '@memberjunction/testing-integration/registry';
 import {
     CloneVersionToDraftOperation,
+    CreateCommitteeOperation,
     CreateOrganizationOperation,
     CreateProgramOperation,
     CredentialingEntity,
     CredentialingOperation,
     ReorderVersionTreeOperation,
     type CloneVersionToDraftOutput,
+    type CreateCommitteeInput,
+    type CreateCommitteeOutput,
     type CreateOrganizationOutput,
     type CreateProgramInput,
 } from '@mj-biz-apps/credentialing-core';
+import type { mjBizAppsCommitteesCommitteeEntity } from '@mj-biz-apps/committees-entities';
 import type {
     mjBizAppsCredentialingAccreditingOrganizationEntity,
     mjBizAppsCredentialingOrganizationMembershipEntity,
@@ -52,7 +61,7 @@ import type {
 } from '@mj-biz-apps/credentialing-entities';
 import { Outcome, WithActors } from '../actors.js';
 import { CountRows, FindRows, LoadEntity, LoadUserInfo, Quote, RequireDelete, RequireSave } from '../wire.js';
-import { ADMIN_ROLE, EnsureUser, GetOrLoadWorld, STAFF_ROLE } from '../world/load-world.js';
+import { ADMIN_ROLE, COMMITTEE_TYPE_NAME, COMMITTEE_TYPES_ENTITY, COMMITTEES_ENTITY, EnsureUser, GetOrLoadWorld, STAFF_ROLE } from '../world/load-world.js';
 import { MakeScratchProgram, type ProgramTree } from '../world/program-tree.js';
 import type { CredentialingWorld } from '../world/world.js';
 
@@ -60,6 +69,7 @@ type StandardEntity = mjBizAppsCredentialingStandardEntity;
 type AccreditingOrganizationEntity = mjBizAppsCredentialingAccreditingOrganizationEntity;
 type MembershipEntity = mjBizAppsCredentialingOrganizationMembershipEntity;
 type ProgramEntity = mjBizAppsCredentialingProgramEntity;
+type CommitteeEntity = mjBizAppsCommitteesCommitteeEntity;
 
 const APP_SCHEMA = '__mj_BizAppsCredentialing';
 const NOT_FOUND_SENTENCE = 'Record not found.';
@@ -72,6 +82,8 @@ const BLANK_NOUN_SENTENCE = 'Enter the subject noun.';
 const COMMON_ORGANIZATIONS_ENTITY = 'MJ_BizApps_Common: Organizations';
 const PROGRAMS_FIRST_SENTENCE = "Remove this organization's programs before deleting it.";
 const MEMBERS_FIRST_SENTENCE = "Remove this organization's members before deleting it.";
+const BLANK_COMMITTEE_NAME_SENTENCE = "Enter the committee's name.";
+const COMMITTEE_TYPE_SENTENCE = 'Choose a committee type.';
 /** Rounds of the reorder-against-edit race in `.7`, alternating which write leads. */
 const REORDER_RACE_ROUNDS = 4;
 /** How long the second of two concurrent writes in `.7` starts after the first. */
@@ -87,6 +99,10 @@ function duplicateNameSentence(name: string): string {
 
 function duplicatePrefixSentence(prefix: string): string {
     return `Credential prefix ${prefix} is already used in this organization.`;
+}
+
+function duplicateCommitteeSentence(name: string): string {
+    return `A committee named ${name} already exists for this organization.`;
 }
 
 /** Programs of OrgA whose trimmed name or prefix matches, ignoring case — what a duplicate would add to. */
@@ -368,6 +384,74 @@ async function scratchCounts(ctx: IntegrationCheckContext, org: ScratchOrganizat
 async function adminDelete(organization: AccreditingOrganizationEntity): Promise<{ Deleted: boolean; Message: string }> {
     const deleted = await organization.Delete();
     return { Deleted: deleted, Message: deleted ? '' : organization.LatestResult?.CompleteMessage ?? '' };
+}
+
+/** A committee as stored: its owner, type and the columns the operation sets. */
+type StoredCommittee = Pick<CommitteeEntity, 'ID' | 'Name' | 'TypeID' | 'OrganizationID' | 'Status' | 'IsPublic'>;
+
+const STORED_COMMITTEE_FIELDS: (keyof StoredCommittee)[] = ['ID', 'Name', 'TypeID', 'OrganizationID', 'Status', 'IsPublic'];
+
+/** A run-unique committee name no other check or run uses. */
+function scratchCommitteeName(): string {
+    return `Scratch Committee ${runHex()}`;
+}
+
+/** Every committee, of any organization, whose trimmed name matches ignoring case — read as the context user. */
+function committeesNamed(ctx: IntegrationCheckContext, name: string): Promise<StoredCommittee[]> {
+    return FindRows<StoredCommittee>(ctx, COMMITTEES_ENTITY, `LOWER(LTRIM(RTRIM(Name))) = '${Quote(name.trim().toLowerCase())}'`, STORED_COMMITTEE_FIELDS);
+}
+
+/** How many committees a Common organization owns, read as the context user. */
+function committeesOwnedBy(ctx: IntegrationCheckContext, commonOrganizationID: string): Promise<number> {
+    return CountRows(ctx, COMMITTEES_ENTITY, `OrganizationID = '${Quote(commonOrganizationID)}'`);
+}
+
+/** Whether `asUser` can read the committee through `Committees: Committees` (their row filter applies). */
+async function canReadCommittee(ctx: IntegrationCheckContext, committeeID: string, asUser: UserInfo): Promise<boolean> {
+    const rows = await FindRows<{ ID: string }>(ctx, COMMITTEES_ENTITY, `ID = '${Quote(committeeID)}'`, ['ID'], asUser);
+    return rows.length > 0;
+}
+
+/** The ID of a committee type from BizApps Committees' own seed data. */
+async function seedCommitteeTypeID(ctx: IntegrationCheckContext): Promise<string> {
+    const types = await FindRows<{ ID: string }>(ctx, COMMITTEE_TYPES_ENTITY, `Name = '${Quote(COMMITTEE_TYPE_NAME)}'`, ['ID']);
+    AssertEqual(types.length, 1, `committee types named ${COMMITTEE_TYPE_NAME}`);
+    return types[0].ID;
+}
+
+/** Deletes, as the context user, every committee a check created under `names`, so OrgA's committee list is left as it was. */
+async function removeCommitteesNamed(ctx: IntegrationCheckContext, names: readonly string[]): Promise<void> {
+    for (const name of names) {
+        for (const row of await committeesNamed(ctx, name)) {
+            const committee = await LoadEntity<CommitteeEntity>(ctx, COMMITTEES_ENTITY, row.ID);
+            await RequireDelete(committee, `removing scratch committee ${row.Name}`);
+        }
+    }
+}
+
+/** Calls CreateCommittee as `user` on `provider` (default: the context provider). */
+function createCommittee(
+    ctx: IntegrationCheckContext,
+    input: CreateCommitteeInput,
+    user: UserInfo,
+    provider: IMetadataProvider = ctx.Provider,
+): Promise<RemoteOpResult<CreateCommitteeOutput>> {
+    return new CreateCommitteeOperation().Execute(input, { provider, user });
+}
+
+/** A scratch program of OrgA, a seed committee type and a run-unique name: what a CreateCommittee check starts from. */
+interface CommitteeScratch {
+    Input: CreateCommitteeInput;
+    /** Committees OrgA's Common organization owned before the check created any. */
+    OwnedBefore: number;
+}
+
+async function committeeScratch(ctx: IntegrationCheckContext, world: CredentialingWorld): Promise<CommitteeScratch> {
+    const tree = await MakeScratchProgram(ctx, world, { Sections: 1, StandardsPerSection: 1 }, ctx.User);
+    return {
+        Input: { ProgramID: tree.Program.ID, Name: scratchCommitteeName(), CommitteeTypeID: await seedCommitteeTypeID(ctx) },
+        OwnedBefore: await committeesOwnedBy(ctx, world.OrgA.OrganizationID),
+    };
 }
 
 const checks: NamedCheck[] = [
@@ -756,6 +840,145 @@ const checks: NamedCheck[] = [
             AssertEqual(edited.LatestResult?.CompleteMessage ?? '', BLANK_NOUN_SENTENCE, 'the refusal is the subject noun sentence');
             const stored = await LoadEntity<ProgramEntity>(ctx, CredentialingEntity.Program, tree.Program.ID);
             AssertEqual(stored.SubjectNoun, noun, 'the stored subject noun');
+        },
+    },
+    {
+        Id: 'cred-operations.16',
+        Name: 'CreateCommittee creates one committee owned by the program organization; its staff read it and another organization\'s staff do not',
+        RequiresMutation: true,
+        Fn: async (ctx: IntegrationCheckContext) => {
+            const world = await GetOrLoadWorld(ctx);
+            const scratch = await committeeScratch(ctx, world);
+            const name = scratch.Input.Name;
+            try {
+                const typed = `  ${name.replace(/ /g, '   ')} `;
+                const output = ExpectOutput(await createCommittee(ctx, { ...scratch.Input, Name: typed }, world.StaffA), 'CreateCommittee');
+                AssertEqual(output.Name, name, 'the name returned is the name stored: trimmed, inner whitespace collapsed');
+                const stored = await committeesNamed(ctx, name);
+                AssertEqual(stored.length, 1, 'committees with the name');
+                AssertEqual(stored[0].ID.toLowerCase(), output.CommitteeID.toLowerCase(), 'the committee returned');
+                AssertEqual(stored[0].Name, name, 'its stored name');
+                AssertEqual((stored[0].OrganizationID ?? '').toLowerCase(), world.OrgA.OrganizationID.toLowerCase(), "its owner is the Common organization behind the program's accrediting organization");
+                AssertEqual(stored[0].TypeID.toLowerCase(), scratch.Input.CommitteeTypeID.toLowerCase(), 'its type');
+                AssertEqual(stored[0].Status, 'Active', 'its status');
+                AssertEqual(stored[0].IsPublic, false, 'it is created private');
+                AssertEqual(await committeesOwnedBy(ctx, world.OrgA.OrganizationID), scratch.OwnedBefore + 1, 'committees of the organization');
+                Assert(await canReadCommittee(ctx, output.CommitteeID, world.StaffA), 'staff of the organization read the committee through Committees: Committees');
+                Assert(!(await canReadCommittee(ctx, output.CommitteeID, world.StaffB)), "another organization's staff do not read it");
+            } finally {
+                await removeCommitteesNamed(ctx, [name]);
+            }
+        },
+    },
+    {
+        Id: 'cred-operations.17',
+        Name: 'CreateCommittee with a blank name, an unknown type or a duplicate name (also by case or spaces) gives its sentence and creates nothing',
+        RequiresMutation: true,
+        Fn: async (ctx: IntegrationCheckContext) => {
+            const world = await GetOrLoadWorld(ctx);
+            const scratch = await committeeScratch(ctx, world);
+            const existing = scratchCommitteeName();
+            try {
+                ExpectOutput(await createCommittee(ctx, { ...scratch.Input, Name: existing }, world.StaffA), 'the committee the duplicates collide with');
+                const loud = `  ${existing.toUpperCase().replace(/ /g, '  ')} `;
+                const refusals: Array<[Partial<CreateCommitteeInput>, string]> = [
+                    [{ Name: '' }, BLANK_COMMITTEE_NAME_SENTENCE],
+                    [{ Name: '    ' }, BLANK_COMMITTEE_NAME_SENTENCE],
+                    [{ CommitteeTypeID: randomUUID() }, COMMITTEE_TYPE_SENTENCE],
+                    [{ CommitteeTypeID: '' }, COMMITTEE_TYPE_SENTENCE],
+                    [{ CommitteeTypeID: "x' OR 1=1 --" }, COMMITTEE_TYPE_SENTENCE],
+                    [{ Name: existing }, duplicateCommitteeSentence(existing)],
+                    [{ Name: loud }, duplicateCommitteeSentence(existing.toUpperCase())],
+                ];
+                for (const [change, sentence] of refusals) {
+                    const result = await createCommittee(ctx, { ...scratch.Input, ...change }, world.StaffA);
+                    ExpectRefused(result, sentence, `CreateCommittee with ${JSON.stringify(change)}`);
+                    AssertEqual(result.ErrorMessage, sentence, 'the refusal is the sentence alone');
+                    AssertEqual(result.ResultCode, 'REFUSED', 'ResultCode');
+                }
+                AssertEqual((await committeesNamed(ctx, existing)).length, 1, 'committees with the duplicated name');
+                AssertEqual((await committeesNamed(ctx, scratch.Input.Name)).length, 0, "committees with the refused attempts' own name");
+                AssertEqual(await committeesOwnedBy(ctx, world.OrgA.OrganizationID), scratch.OwnedBefore + 1, 'committees of the organization (only the first was created)');
+            } finally {
+                await removeCommitteesNamed(ctx, [existing, scratch.Input.Name]);
+            }
+        },
+    },
+    {
+        Id: 'cred-operations.18',
+        Name: "CreateCommittee for another organization's program, a random program ID, or by staff with no membership gives Record not found and creates nothing",
+        RequiresMutation: true,
+        Fn: async (ctx: IntegrationCheckContext) => {
+            const world = await GetOrLoadWorld(ctx);
+            const scratch = await committeeScratch(ctx, world);
+            const ownedByB = await committeesOwnedBy(ctx, world.OrgB.OrganizationID);
+            const name = scratch.Input.Name;
+            try {
+                const attempts: Array<[string, CreateCommitteeInput, UserInfo]> = [
+                    ["another organization's program", { ...scratch.Input, ProgramID: world.ProgramB.Program.ID }, world.StaffA],
+                    ['a random program ID', { ...scratch.Input, ProgramID: randomUUID() }, world.StaffA],
+                    ['a program ID that is not a UUID', { ...scratch.Input, ProgramID: "x' OR 1=1 --" }, world.StaffA],
+                    ["OrgA's program as OrgB's staff", scratch.Input, world.StaffB],
+                    ["OrgA's program as staff with no membership", scratch.Input, world.StaffNoMembership],
+                ];
+                for (const [label, input, user] of attempts) {
+                    const result = await createCommittee(ctx, input, user);
+                    ExpectRefused(result, NOT_FOUND_SENTENCE, `CreateCommittee for ${label}`);
+                    AssertEqual(result.ErrorMessage, NOT_FOUND_SENTENCE, `the refusal is the not-found sentence alone (${label})`);
+                    AssertEqual(result.ResultCode, 'REFUSED', `ResultCode (${label})`);
+                }
+                AssertEqual((await committeesNamed(ctx, name)).length, 0, 'committees with the name');
+                AssertEqual(await committeesOwnedBy(ctx, world.OrgA.OrganizationID), scratch.OwnedBefore, 'committees of OrgA');
+                AssertEqual(await committeesOwnedBy(ctx, world.OrgB.OrganizationID), ownedByB, 'committees of OrgB');
+            } finally {
+                await removeCommitteesNamed(ctx, [name]);
+            }
+        },
+    },
+    {
+        Id: 'cred-operations.19',
+        Name: 'CreateCommittee is refused as FORBIDDEN for a caller without Credentialing Staff, and creates nothing',
+        RequiresMutation: true,
+        Fn: async (ctx: IntegrationCheckContext) => {
+            const world = await GetOrLoadWorld(ctx);
+            const scratch = await committeeScratch(ctx, world);
+            const name = scratch.Input.Name;
+            try {
+                for (const [label, user] of [['the admin', world.Admin], ['an applicant', world.ApplicantA], ['a UI-only user', world.UIOnly]] as const) {
+                    Assert(!user.UserRoles.some((r) => r.Role === STAFF_ROLE), `${label} does not hold Credentialing Staff`);
+                    const result = await createCommittee(ctx, scratch.Input, user);
+                    Assert(!result.Success, `CreateCommittee by ${label} is refused`);
+                    AssertEqual(result.ResultCode, 'FORBIDDEN', `ResultCode for ${label}`);
+                }
+                AssertEqual((await committeesNamed(ctx, name)).length, 0, 'committees with the name');
+                AssertEqual(await committeesOwnedBy(ctx, world.OrgA.OrganizationID), scratch.OwnedBefore, 'committees of the organization');
+            } finally {
+                await removeCommitteesNamed(ctx, [name]);
+            }
+        },
+    },
+    {
+        Id: 'cred-operations.20',
+        Name: 'two simultaneous CreateCommittee calls with one name give one committee and one refusal with the duplicate sentence',
+        RequiresMutation: true,
+        Fn: async (ctx: IntegrationCheckContext) => {
+            const world = await GetOrLoadWorld(ctx);
+            const scratch = await committeeScratch(ctx, world);
+            const name = scratch.Input.Name;
+            try {
+                const results = await WithActors(ctx, 2, (actors: IMetadataProvider[]) =>
+                    Promise.all(actors.map((actor) => createCommittee(ctx, scratch.Input, world.StaffA, actor))),
+                );
+                const messages = results.map((r) => `${r.Success ? 'ok' : r.ErrorMessage}`).join(' | ');
+                AssertEqual(results.filter((r) => r.Success).length, 1, `exactly one CreateCommittee succeeds (${messages})`);
+                const loser = results.find((r) => !r.Success);
+                AssertEqual(loser?.ErrorMessage, duplicateCommitteeSentence(name), 'the loser gives the duplicate-name sentence');
+                AssertEqual(loser?.ResultCode, 'REFUSED', 'ResultCode of the loser');
+                AssertEqual((await committeesNamed(ctx, name)).length, 1, 'committees with the name');
+                AssertEqual(await committeesOwnedBy(ctx, world.OrgA.OrganizationID), scratch.OwnedBefore + 1, 'committees of the organization');
+            } finally {
+                await removeCommitteesNamed(ctx, [name]);
+            }
         },
     },
 ];

@@ -28,4 +28,10 @@ describe('StudioViewModel', () => {
         expect(vm.ShowActivate).toBe(false);
         expect(vm.SettingsTierEditable).toEqual({ WorkflowToggles: false, PromotionThresholds: false, RolloutFlags: false });
     });
+
+    it('offers New committee on a Draft only, where the deciding committee can still be chosen', () => {
+        expect(StudioViewModel.For({ Status: 'Draft' }).ShowNewCommittee).toBe(true);
+        expect(StudioViewModel.For({ Status: 'Active' }).ShowNewCommittee).toBe(false);
+        expect(StudioViewModel.For({ Status: 'Retired' }).ShowNewCommittee).toBe(false);
+    });
 });

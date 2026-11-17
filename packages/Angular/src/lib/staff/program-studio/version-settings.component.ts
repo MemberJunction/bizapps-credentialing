@@ -12,14 +12,21 @@
  *
  * The version object is the page's, shared with the version actions; Activate and Retire never save
  * it (see `VersionStatusChange`), so an edit made here is written only by Save settings.
+ *
+ * On a Draft, `New committee` beside the deciding-committee picker opens {@link NewCommitteeFormComponent}
+ * (an organization with no committee could otherwise never activate a version). When a committee is
+ * created this widget emits {@link VersionSettingsComponent.CommitteeCreated}; the page reads the
+ * committees again, and when the new list arrives the committee is chosen in the picker — an unsaved
+ * change like any other, kept only by Save settings.
  */
 import { ChangeDetectorRef, Component, EventEmitter, Input, Output, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { BaseAngularComponent } from '@memberjunction/ng-base-types';
 import { MJButtonDirective, MJDropdownComponent, MJNumericInputComponent, MJSwitchComponent } from '@memberjunction/ng-ui-components';
-import { VersionSettingsRules, type VersionNumberSetting } from '@mj-biz-apps/credentialing-core';
+import { VersionSettingsRules, type CreateCommitteeOutput, type VersionNumberSetting } from '@mj-biz-apps/credentialing-core';
 import type { mjBizAppsCredentialingProgramVersionEntity } from '@mj-biz-apps/credentialing-entities';
-import type { CommitteeRow } from './studio-data';
+import { NewCommitteeFormComponent } from './new-committee-form.component';
+import type { CommitteeRow, CommitteeTypeRow } from './studio-data';
 import { StudioViewModel, type SettingsTierEditable } from './studio-view-model';
 import { StudioMessages } from '../studio-messages';
 
@@ -57,6 +64,13 @@ export const ROLLOUT_FLAGS_SENTENCE = 'These flags change only what happens next
 export const FIXED_ON_ACTIVATION_SENTENCE = 'Fixed once the version is activated.';
 /** The sentence over the rollout flags of a Retired version, which no longer change anything. */
 export const RETIRED_SETTINGS_SENTENCE = 'A retired version cannot be changed.';
+/** The sentence under the deciding-committee picker when the program's organization has no committee. */
+export const NO_COMMITTEE_SENTENCE = "This program's organization has no committee yet, so the version cannot be activated. Create one with New committee.";
+
+/** The status line shown once a committee was created and chosen in the picker. */
+export function CommitteeCreatedSentence(name: string): string {
+    return `${name} was created and selected. Save settings to keep it.`;
+}
 
 const LABELS = VersionSettingsRules.Labels;
 
@@ -84,12 +98,15 @@ function group(tier: SettingsTier, heading: string, frozenNote: string, fields: 
 @Component({
     standalone: true,
     selector: 'bizapps-cred-version-settings',
-    imports: [FormsModule, MJButtonDirective, MJDropdownComponent, MJNumericInputComponent, MJSwitchComponent],
+    imports: [FormsModule, MJButtonDirective, MJDropdownComponent, MJNumericInputComponent, MJSwitchComponent, NewCommitteeFormComponent],
     templateUrl: './version-settings.component.html',
     styleUrls: ['./version-settings.component.scss'],
 })
 export class VersionSettingsComponent extends BaseAngularComponent {
     private readonly cdr = inject(ChangeDetectorRef);
+    private _committees: readonly CommitteeRow[] = [];
+    /** The committee just created, until the list that holds it arrives and it is chosen. */
+    private createdCommittee: CreateCommitteeOutput | null = null;
 
     /** The three tiers, each listing exactly its `VersionSettingsRules` fields, in order. */
     public static readonly Groups: readonly SettingsGroup[] = [
@@ -100,11 +117,24 @@ export class VersionSettingsComponent extends BaseAngularComponent {
 
     /** The version whose settings are shown; edited in place and saved as one record. */
     @Input() Version: mjBizAppsCredentialingProgramVersionEntity | null = null;
-    /** The committees that may decide this version. */
-    @Input() Committees: readonly CommitteeRow[] = [];
+    /** The program the version belongs to; a new committee is created for its organization. */
+    @Input() ProgramID: string | null = null;
+    /** The committees that may decide this version. A list holding the committee just created chooses it. */
+    @Input()
+    set Committees(value: readonly CommitteeRow[]) {
+        this._committees = value ?? [];
+        this.selectCreatedCommittee();
+    }
+    get Committees(): readonly CommitteeRow[] {
+        return this._committees;
+    }
+    /** The committee types a new committee can have. */
+    @Input() CommitteeTypes: readonly CommitteeTypeRow[] = [];
 
     /** Emits the version ID after its settings were saved. */
     @Output() Saved = new EventEmitter<string>();
+    /** A committee was created for the program's organization: the page should read the committees again. */
+    @Output() CommitteeCreated = new EventEmitter<CreateCommitteeOutput>();
     /** A save was refused because the version changed elsewhere: the page should reload what is stored. */
     @Output() ReloadRequested = new EventEmitter<void>();
 
@@ -114,6 +144,20 @@ export class VersionSettingsComponent extends BaseAngularComponent {
     /** The number setting {@link ErrorMessage} is about, or null when it belongs beside the Save button. */
     public ErrorField: VersionNumberSetting | null = null;
     public SavedMessage = '';
+    /** The new-committee form is open. */
+    public IsCommitteeFormOpen = false;
+    /** Says a committee was created and chosen, until the settings are saved or discarded. */
+    public CommitteeMessage = '';
+    public readonly NoCommitteeSentence = NO_COMMITTEE_SENTENCE;
+
+    /**
+     * The committee of `committees` that is the one just created (IDs compared ignoring case), or null
+     * while the list does not hold it yet.
+     */
+    public static CreatedIn(committees: readonly CommitteeRow[], created: Pick<CreateCommitteeOutput, 'CommitteeID'> | null): CommitteeRow | null {
+        const wanted = created?.CommitteeID.toLowerCase();
+        return committees.find((c) => c.ID.toLowerCase() === wanted) ?? null;
+    }
 
     /**
      * The sentence above a tier: that it freezes at activation while it can still be edited, why it is
@@ -163,6 +207,30 @@ export class VersionSettingsComponent extends BaseAngularComponent {
     public get AnyEditable(): boolean {
         const e = this.Editable;
         return e.WorkflowToggles || e.PromotionThresholds || e.RolloutFlags;
+    }
+
+    /** `New committee` exists only where the deciding committee can still be chosen: on a Draft. */
+    public get ShowNewCommittee(): boolean {
+        return this.Version != null && StudioViewModel.For({ Status: this.Version.Status }).ShowNewCommittee;
+    }
+
+    public OpenCommitteeForm(): void {
+        this.IsCommitteeFormOpen = true;
+        this.CommitteeMessage = '';
+        this.cdr.markForCheck();
+    }
+
+    public CloseCommitteeForm(): void {
+        this.IsCommitteeFormOpen = false;
+        this.cdr.markForCheck();
+    }
+
+    /** The form created a committee: close it and ask the page for the list that holds the committee. */
+    public OnCommitteeCreated(created: CreateCommitteeOutput): void {
+        this.IsCommitteeFormOpen = false;
+        this.createdCommittee = created;
+        this.CommitteeCreated.emit(created);
+        this.cdr.markForCheck();
     }
 
     public get CanSave(): boolean {
@@ -240,6 +308,21 @@ export class VersionSettingsComponent extends BaseAngularComponent {
         this.ErrorMessage = '';
         this.ErrorField = null;
         this.SavedMessage = '';
+        this.CommitteeMessage = '';
+    }
+
+    /** Chooses the committee just created once the list holds it, and says so. */
+    private selectCreatedCommittee(): void {
+        const created = this.createdCommittee;
+        const row = VersionSettingsComponent.CreatedIn(this._committees, created);
+        if (created == null || row == null || this.Version == null) {
+            return;
+        }
+        this.createdCommittee = null;
+        this.Version.CommitteeID = row.ID;
+        this.SavedMessage = '';
+        this.CommitteeMessage = CommitteeCreatedSentence(created.Name);
+        this.cdr.markForCheck();
     }
 
     /** Shows a refusal beside the number setting it names; one that means the screen is out of date also reloads. */

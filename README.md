@@ -121,8 +121,8 @@ credentialing role holds MJ's `UI` role.
 |---|---|---|
 | `packages/Entities` | `@mj-biz-apps/credentialing-entities` | CodeGen entity subclasses for the seven tables. |
 | `packages/Actions` | `@mj-biz-apps/credentialing-actions` | MemberJunction Actions; no actions yet (compiling skeleton). |
-| `packages/Core` | `@mj-biz-apps/credentialing-core` | The authoring rules (version lifecycle, settings tiers, standard codes, program ownership) and the contracts of the four remote operations, shared by browser and server. |
-| `packages/CoreEntitiesServer` | `@mj-biz-apps/credentialing-core-entities-server` | Server entity subclasses that enforce the rules on every save and delete, and the server bodies of the remote operations (create program, edit in draft, reorder a version's tree, set up an organization). |
+| `packages/Core` | `@mj-biz-apps/credentialing-core` | The authoring rules (version lifecycle, settings tiers, standard codes, program ownership) and the contracts of the five remote operations, shared by browser and server. |
+| `packages/CoreEntitiesServer` | `@mj-biz-apps/credentialing-core-entities-server` | Server entity subclasses that enforce the rules on every save and delete, and the server bodies of the remote operations (create program, edit in draft, reorder a version's tree, set up an organization, create a committee for a program's organization). |
 | `packages/Server` | `@mj-biz-apps/credentialing-server` | Server bootstrap registered with MJAPI via `LoadBizAppsCredentialingServer`, plus the generated GraphQL resolvers. |
 | `packages/Angular` | `@mj-biz-apps/credentialing-ng` | The Credentialing application in MJExplorer: Program Studio, organization setup and the role areas. |
 | `packages/IntegrationTests` | `@mj-biz-apps/credentialing-integration-tests` (private) | Integration check bundles run by `mj test` (`CRD-*` rows in `metadata-tests/`) and by the GraphQL harness; the sample world used for development. |

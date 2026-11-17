@@ -55,6 +55,23 @@
     color: var(--mj-text-secondary);
 }
 
+.cred-settings__committee {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--mj-space-2, 0.5rem);
+}
+
+.cred-settings__committee-pick {
+    flex: 1 1 10rem;
+    min-width: 0;
+}
+
+.cred-settings__committee-form,
+.cred-settings__committee-status {
+    grid-column: 1 / -1;
+}
+
 .cred-settings__actions {
     display: flex;
     gap: var(--mj-space-2, 0.5rem);

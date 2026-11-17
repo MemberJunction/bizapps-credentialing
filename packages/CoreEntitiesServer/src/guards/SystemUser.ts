@@ -2,12 +2,15 @@ import type { UserInfo } from '@memberjunction/core';
 import { UserCache } from '@memberjunction/generic-database-provider';
 
 /**
- * The server's system user, for the few steps of this app that act as it. There are two, each listed
+ * The server's system user, for the few steps of this app that act as it. There are three, each listed
  * with its reason in `docs/isolation-read-paths.md` ("System-user work"):
  *
  * - `Credentialing.CreateOrganization` writes platform rows the calling admin has no permission on;
  * - deleting an accrediting organization reads whether the organization still has a program, because the
- *   only role that may delete one (`Credentialing Admin`) has no permission on programs.
+ *   only role that may delete one (`Credentialing Admin`) has no permission on programs;
+ * - `Credentialing.CreateCommittee` writes one BizApps Committees committee for the organization of a
+ *   program the calling staff member can read, because staff must not be able to write that entity
+ *   freely; the operation fixes the owning organization itself.
  *
  * Any new use must be added to that list.
  */

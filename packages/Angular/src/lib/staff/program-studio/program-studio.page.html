@@ -70,18 +70,23 @@
                                 <div class="cred-studio__tab" role="tabpanel">
                                     @switch (Tab) {
                                         @case ('Standards') {
-                                            <div class="cred-studio__authoring" [class.cred-studio__authoring--editor]="EditorOpen">
+                                            <div class="cred-studio__authoring">
                                                 <bizapps-cred-version-tree
                                                     [Provider]="Provider"
                                                     [VersionID]="SelectedVersionID"
                                                     [Bundle]="bundle"
                                                     [SelectedStandardID]="SelectedStandardID"
+                                                    [NewStandardSectionID]="NewStandard?.SectionID ?? null"
+                                                    [SavedStandardID]="SavedStandardID"
+                                                    [EditorTemplate]="standardEditor"
                                                     (StandardSelected)="OnStandardSelected($event)"
                                                     (StandardAddRequested)="OnStandardAddRequested($event)"
+                                                    (SettingsRequested)="OnTabChange('Settings')"
                                                     (VersionChanged)="OnVersionChanged($event)"
                                                     (ReloadRequested)="OnReloadRequested()">
                                                 </bizapps-cred-version-tree>
-                                                @if (EditorOpen) {
+                                                <!-- The tree places this inside the section being worked on, under the standard's own row. -->
+                                                <ng-template #standardEditor>
                                                     <bizapps-cred-standard-editor
                                                         [Provider]="Provider"
                                                         [CanAuthor]="View.CanAuthor"
@@ -91,14 +96,17 @@
                                                         (ReloadRequested)="OnReloadRequested()"
                                                         (Closed)="OnEditorClosed()">
                                                     </bizapps-cred-standard-editor>
-                                                }
+                                                </ng-template>
                                             </div>
                                         }
                                         @case ('Settings') {
                                             <bizapps-cred-version-settings
                                                 [Provider]="Provider"
                                                 [Version]="SelectedVersion"
+                                                [ProgramID]="bundle.Program.ID"
                                                 [Committees]="bundle.Committees"
+                                                [CommitteeTypes]="bundle.CommitteeTypes"
+                                                (CommitteeCreated)="OnCommitteeCreated($event)"
                                                 (Saved)="OnReloadRequested()"
                                                 (ReloadRequested)="OnReloadRequested()">
                                             </bizapps-cred-version-settings>

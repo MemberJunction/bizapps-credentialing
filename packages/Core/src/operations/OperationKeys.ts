@@ -11,6 +11,7 @@ export const CredentialingOperation = {
     CloneVersionToDraft: 'Credentialing.CloneVersionToDraft',
     ReorderVersionTree: 'Credentialing.ReorderVersionTree',
     CreateOrganization: 'Credentialing.CreateOrganization',
+    CreateCommittee: 'Credentialing.CreateCommittee',
 } as const;
 
 /** One of the {@link CredentialingOperation} keys. */

@@ -16,7 +16,8 @@
  * elsewhere) stays visible while the page reloads what is stored. The tree reads nothing itself: the
  * page passes the program's loaded rows and reloads them when this widget asks.
  */
-import { ChangeDetectorRef, Component, EventEmitter, Input, Output, inject } from '@angular/core';
+import { NgTemplateOutlet } from '@angular/common';
+import { ChangeDetectorRef, Component, ElementRef, EventEmitter, Input, Output, TemplateRef, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { BaseAngularComponent } from '@memberjunction/ng-base-types';
 import {
@@ -31,6 +32,7 @@ import {
     NOT_FOUND_REASON,
     ReorderVersionTreeOperation,
     StandardAuthoringRules,
+    VersionLifecycleRules,
 } from '@mj-biz-apps/credentialing-core';
 import type { mjBizAppsCredentialingProgramVersionEntity, mjBizAppsCredentialingSectionEntity } from '@mj-biz-apps/credentialing-entities';
 import type { mjBizAppsCredentialingStandardEntity } from '@mj-biz-apps/credentialing-entities';
@@ -59,26 +61,54 @@ interface RunOptions {
 @Component({
     standalone: true,
     selector: 'bizapps-cred-version-tree',
-    imports: [FormsModule, MJButtonDirective, MJDialogComponent, MJDialogActionsComponent],
+    imports: [FormsModule, NgTemplateOutlet, MJButtonDirective, MJDialogComponent, MJDialogActionsComponent],
     templateUrl: './version-tree.component.html',
     styleUrls: ['./version-tree.component.scss'],
 })
 export class VersionTreeComponent extends BaseAngularComponent {
     private readonly cdr = inject(ChangeDetectorRef);
     private readonly confirm = inject(MJConfirmService);
+    private readonly host: ElementRef<HTMLElement> = inject(ElementRef);
 
     /** The version shown. */
     @Input() VersionID = '';
     /** The program's loaded rows; only this version's are shown. */
     @Input() Bundle: ProgramBundle | null = null;
-    /** The standard open in the editor, highlighted in the tree. */
-    @Input() SelectedStandardID: string | null = null;
+    /** The standard open in the editor: its row is highlighted and the editor opens under it. */
+    @Input()
+    set SelectedStandardID(value: string | null) {
+        this.selectedStandardID = value;
+        this.revealEditor();
+    }
+    get SelectedStandardID(): string | null {
+        return this.selectedStandardID;
+    }
+    private selectedStandardID: string | null = null;
+
+    /** The section a new standard is being added to: the editor opens at the end of that section. */
+    @Input()
+    set NewStandardSectionID(value: string | null) {
+        this.newStandardSectionID = value;
+        this.revealEditor();
+    }
+    get NewStandardSectionID(): string | null {
+        return this.newStandardSectionID;
+    }
+    private newStandardSectionID: string | null = null;
+
+    /** The standard saved last: its row says so until another standard is opened. */
+    @Input() SavedStandardID: string | null = null;
+
+    /** The standard editor, owned by the page; the tree only decides where in the tree it appears. */
+    @Input() EditorTemplate: TemplateRef<object> | null = null;
 
     @Output() StandardSelected = new EventEmitter<string>();
     /** Asks the page to open the editor on a new standard in a section. */
     @Output() StandardAddRequested = new EventEmitter<NewStandardTarget>();
     /** The version to show next: a new Draft, this version after a status change, or '' after a delete. */
     @Output() VersionChanged = new EventEmitter<string>();
+    /** Asks the page to show the Settings tab, where the deciding committee is chosen. */
+    @Output() SettingsRequested = new EventEmitter<void>();
     /** Something under this version was written (or refused): reload what is stored. */
     @Output() ReloadRequested = new EventEmitter<void>();
 
@@ -111,6 +141,31 @@ export class VersionTreeComponent extends BaseAngularComponent {
 
     public IsEditingSection(id: string): boolean {
         return this.EditingSection != null && this.EditingSection.IsSaved && this.EditingSection.ID.toLowerCase() === id.toLowerCase();
+    }
+
+    /** Whether the last activation was refused for want of a deciding committee. */
+    public get NeedsCommittee(): boolean {
+        return this.ErrorFor('version') === VersionLifecycleRules.ChooseCommitteeReason;
+    }
+
+    /** Whether this standard is the one just saved. */
+    public WasJustSaved(id: string): boolean {
+        return this.SavedStandardID != null && this.SavedStandardID.toLowerCase() === id.toLowerCase();
+    }
+
+    /** Whether a new standard is being added to this section. */
+    public IsAddingTo(sectionID: string): boolean {
+        return this.NewStandardSectionID != null && this.NewStandardSectionID.toLowerCase() === sectionID.toLowerCase();
+    }
+
+    /** Brings the editor into view once it has been placed, so it is never opened off screen. */
+    private revealEditor(): void {
+        if (this.selectedStandardID == null && this.newStandardSectionID == null) {
+            return;
+        }
+        Promise.resolve().then(() => {
+            setTimeout(() => this.host.nativeElement.querySelector('.cred-tree__editor')?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }));
+        });
     }
 
     public IsSelected(id: string): boolean {

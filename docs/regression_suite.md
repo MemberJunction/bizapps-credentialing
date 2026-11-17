@@ -172,7 +172,8 @@ On `Regression Technician <RUN>`, version `2027 (Draft)`, tab **Sections and sta
 | D10 | In section 1 add a standard with code ` 1.1 ` (spaces). Save. | Refusal beside Code: `Standard code 1.1 is already used in this version.` | Still four standards. |
 | D11 | Change the code to `1.1A`, save; then add another with code `1.1a`. | The first saves as `1.1A`. The second is refused beside Code: `Standard code 1.1a is already used in this version.` | Five standards; one `1.1A`. |
 | D12 | Add a standard with code ` 9.9 ` and a statement. Save. | It shows as `9.9`. | `Code = '9.9'` (no spaces, length 3). |
-| D13 | Open standard `1.2` and change its statement and guidance. Save. | The new text shows after save. | Stored text matches. |
+| D13 | Open standard `1.2` for editing, either with its pencil button (`Edit standard 1.2`) or by clicking its row. Change its statement and guidance. Save. | Both ways open the same editor. On save the editor closes, the row shows the new text, and `Standard 1.2 saved.` appears under the row until another standard is opened. A refused save keeps the editor open with the refusal beside its field. | Stored text matches. |
+| D13a | On a version with many sections (the placeholder program has 12; do not save anything there), scroll down and open a standard in a late section with its pencil; then click another standard's row; then click that same row again; then press `+ Standard` on a section. | The editor always opens **inside the section being worked on**: directly under the standard's own row for an existing standard, at the end of the section's standards for a new one. It is in view without scrolling, only one editor is open at a time, and clicking the open standard's row again closes it. | — |
 | D14 | Open any standard and look at **Evaluation mode**. | It reads `Human Only` with the note `Changes only through the Trust screen.` There is no control that edits it. | — |
 | D15 | In section 1 move `1.2` up one place with the arrow button. | `1.2` is now above `1.1`; the order survives a reload. | `Sequence` of `1.2` is less than that of `1.1`. |
 | D16 | Move section 2 above section 1 with its arrow, then back. | The sections swap and swap back; the order survives a reload each time. | `Section.Sequence` reflects the final order. |
@@ -222,6 +223,7 @@ Same Draft version, tab **Settings**.
 | ID | Steps | Expected | Database check |
 |---|---|---|---|
 | F1 | Look at the page. | Three labelled groups: workflow settings, promotion thresholds, rollout flags. All are editable on a Draft. The deciding committee is a picker. | — |
+| F2a | As a staff member of an organization that has no committee (for example the new staff member of B7), open Settings on a Draft version. | The picker has nothing to choose, and under it the page says: `This program's organization has no committee yet, so the version cannot be activated. Create one with New committee.` A `New committee` button is beside the picker. | — |
 | F2 | Open the committee picker. | It lists only committees of the program's organization (on the test world: `Sample Accrediting Body A Standards Committee`). | — |
 | F3 | Change `Peer reviewers` to `3`, the passive approval window to `21`, turn `Requires screening` on. Save. | A saved message; the values persist after a reload. | `PeerReviewerCount 3`, `PassiveApprovalWindowDays 21`, `RequiresScreening 1`. |
 | F4 | Change a threshold (minimum observations to `40`). Save. | Saved; persists. | `MinimumObservations 40`. |
@@ -230,6 +232,24 @@ Same Draft version, tab **Settings**.
 | F7 | Set `Passive approval window` to `0`; save. Repeat for `Minimum observations` and `Minimum reviewers`. | Each is refused with a sentence beside the setting (`Passive approval window must be at least 1 day.`, `Minimum observations must be at least 1.`, `Minimum reviewers must be at least 1.`), or the control does not accept a value below 1. Never database text. | Unchanged. |
 | F8 | Clear `Peer reviewers per application` entirely; save. | Refused with `Enter a value for Peer reviewers per application.` | Unchanged. |
 | F9 | Change a setting without saving, go to **Sections and standards** and press `Activate` (committee chosen, tree valid). | The version is activated; the unsaved setting is **not** saved. | `Status = Active`; the setting has its stored value. |
+| F10 | On a Draft version press `New committee` beside the deciding-committee picker. Enter `Regression Committee <RUN>`, leave the type as offered, press `Create committee`. | A small form opens with `Committee name`, `Committee type` (a list of the committee types, the first one chosen) and the buttons `Create committee` (primary, left) and `Cancel` (right). Both buttons are disabled while the call is in flight. On success the form closes, the picker shows `Regression Committee <RUN>` selected, and a line says `Regression Committee <RUN> was created and selected. Save settings to keep it.` `Save settings` is enabled. Any other unsaved setting on the page is still there. | One committee of that name, owned by the program's organization, `Active`, not public (query below). The version's `CommitteeID` is unchanged until F10a. |
+| F10a | Press `Save settings`. Reload the page. | `Settings saved.`; after the reload the picker still shows `Regression Committee <RUN>`. | The version's `CommitteeID` is that committee's `ID`. |
+| F10b | Press `New committee`, then `Cancel`. | The form closes; nothing is created, the picker and the other settings are unchanged. | Committee count for the organization unchanged. |
+| F11 | Press `New committee`. Leave the name empty (then try spaces only) and press `Create committee`. | Refusal beside the name: `Enter the committee's name.` The form stays open. | No committee created. |
+| F12 | In the form enter `Regression Committee <RUN>` again and press `Create committee`; then try ` regression   committee <run> ` (other case, extra spaces). | Each is refused beside the name: `A committee named Regression Committee <RUN> already exists for this organization.` for the first, and the same sentence naming `regression committee <run>` (as typed, spaces trimmed and collapsed) for the second. The form stays open; never database text. | Still exactly one committee of that name. |
+| F13 | Open Settings on an **Active** version, then on a **Retired** one. | The deciding committee is shown as text. There is **no** `New committee` button and no form (absent, not disabled). | — |
+| F14 | The whole path, as the staff member of an organization with **no** committee (the new staff member of B7): create a program with a section and a standard; on **Sections and standards** press `Activate`; follow `Choose the committee in Settings`; press `New committee`, create `Regression First Committee <RUN>`; press `Save settings`; go back and press `Activate`. | The first `Activate` is refused with `Choose the deciding committee before activating this version.` Settings says the organization has no committee yet and points at `New committee`. After the committee is created it is selected; after `Save settings` the second `Activate` succeeds and the version becomes Active. | `Status = Active`, `CommitteeID` is the new committee, whose `OrganizationID` is the Common organization of `Regression Body <RUN>`. |
+| F15 | As `staff-b`, open Settings on a Draft version of `Sample Program B` and open the committee picker. | None of the committees created in F10 or F14 is listed (they belong to other organizations). | — |
+
+Database check for F10, F12 and F14 (committees are in the BizApps Committees schema):
+
+```sql
+SELECT c.Name, c.Status, c.IsPublic, t.Name AS Type, o.Name AS Organization
+  FROM __mj_BizAppsCommittees.Committee c
+  JOIN __mj_BizAppsCommittees.[Type] t ON t.ID = c.TypeID
+  LEFT JOIN __mj_BizAppsCommon.Organization o ON o.ID = c.OrganizationID
+ WHERE c.Name LIKE N'Regression%<RUN>';
+```
 
 ---
 
@@ -239,7 +259,7 @@ Same Draft version, tab **Settings**.
 |---|---|---|---|
 | G1 | New program `Regression Empty <RUN>` (prefix `E<RUN>`, version `2027`). Press `Activate`. | Refusal beside Activate: `This version has no standards. Add at least one standard before activating.` | `Status = Draft`. |
 | G2 | In it add section `1 Only` with no standards and section `2 Full` with one standard. Press `Activate`. | Refusal: `Section 1 has no standards. Add a standard or remove the section before activating.` | `Status = Draft`. |
-| G3 | Back on `Regression Technician <RUN>` 2027, with no committee chosen, press `Activate`. | Refusal: `Choose the deciding committee before activating this version.` | `Status = Draft`, `ActivatedAt` null. |
+| G3 | Back on `Regression Technician <RUN>` 2027, with no committee chosen, press `Activate`. | Refusal: `Choose the deciding committee before activating this version.`, with a button `Choose the committee in Settings` that opens the Settings tab on the committee picker. | `Status = Draft`, `ActivatedAt` null. |
 | G4 | In Settings choose the committee and save. Press `Activate` (confirm if asked). | The version becomes `2027 (Active)`. | `Status = Active`, `ActivatedAt` set, `CommitteeID` set. |
 | G5 | On the Active version open **Sections and standards**. | A sentence explains the tree is frozen. There is **no** add, edit, delete or reorder control anywhere in the tree (absent, not disabled). The buttons are `Retire` and `Edit in draft`. | — |
 | G6 | Open a standard on the Active version. | It is shown read-only: text, no inputs, no Save. | — |

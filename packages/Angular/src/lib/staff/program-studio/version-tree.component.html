@@ -34,6 +34,11 @@
         <div aria-live="polite">
             @if (ErrorFor('version')) {
                 <p id="cred-tree-version-error" class="cred-tree__error" role="alert">{{ ErrorFor('version') }}</p>
+                @if (NeedsCommittee) {
+                    <button mjButton Variant="outline" Size="sm" type="button" (click)="SettingsRequested.emit()">
+                        <i class="fa-solid fa-sliders" aria-hidden="true"></i> Choose the committee in Settings
+                    </button>
+                }
             }
         </div>
         @if (!View.CanAuthor) {
@@ -105,7 +110,7 @@
                         @for (standard of node.Standards; track standard.ID; let sFirst = $first; let sLast = $last) {
                             <li class="cred-tree__standard" [class.cred-tree__standard--selected]="IsSelected(standard.ID)">
                                 <div class="cred-tree__standard-row">
-                                    <button type="button" class="cred-tree__standard-open" (click)="SelectStandard(standard)" [attr.aria-current]="IsSelected(standard.ID) ? 'true' : null">
+                                    <button type="button" class="cred-tree__standard-open" (click)="SelectStandard(standard)" [attr.aria-current]="IsSelected(standard.ID) ? 'true' : null" [attr.aria-expanded]="IsSelected(standard.ID)">
                                         <span class="cred-tree__code">{{ standard.Code }}</span>
                                         <span class="cred-tree__statement">{{ standard.Statement }}</span>
                                         <span class="cred-tree__tags">{{ standard.ResponseType }}@if (standard.IsInterpretive) { · Interpretive }@if (standard.IsEligibility) { · Eligibility }</span>
@@ -114,18 +119,32 @@
                                         <span class="cred-tree__buttons" role="group" [attr.aria-label]="'Standard ' + standard.Code + ' actions'">
                                             <button mjButton Variant="icon" Size="sm" type="button" [disabled]="IsBusy || sFirst" (click)="MoveStandard(node, standard, -1)" [AriaLabel]="'Move standard ' + standard.Code + ' up'"><i class="fa-solid fa-arrow-up" aria-hidden="true"></i></button>
                                             <button mjButton Variant="icon" Size="sm" type="button" [disabled]="IsBusy || sLast" (click)="MoveStandard(node, standard, 1)" [AriaLabel]="'Move standard ' + standard.Code + ' down'"><i class="fa-solid fa-arrow-down" aria-hidden="true"></i></button>
+                                            <button mjButton Variant="icon" Size="sm" type="button" [disabled]="IsBusy" (click)="SelectStandard(standard)" [AriaLabel]="'Edit standard ' + standard.Code"><i class="fa-solid fa-pen" aria-hidden="true"></i></button>
                                             <button mjButton Variant="icon" Size="sm" type="button" [disabled]="IsBusy" (click)="DeleteStandard(standard)" [AriaLabel]="'Delete standard ' + standard.Code"><i class="fa-solid fa-trash" aria-hidden="true"></i></button>
                                         </span>
                                     }
                                 </div>
                                 <div aria-live="polite">
+                                    @if (WasJustSaved(standard.ID)) {
+                                        <p class="cred-tree__saved" role="status"><i class="fa-solid fa-circle-check" aria-hidden="true"></i> Standard {{ standard.Code }} saved.</p>
+                                    }
                                     @if (ErrorFor(standard.ID)) {
                                         <p class="cred-tree__error" role="alert">{{ ErrorFor(standard.ID) }}</p>
                                     }
                                 </div>
+                                @if (IsSelected(standard.ID) && EditorTemplate) {
+                                    <div class="cred-tree__editor">
+                                        <ng-container [ngTemplateOutlet]="EditorTemplate"></ng-container>
+                                    </div>
+                                }
                             </li>
                         }
                     </ol>
+                    @if (IsAddingTo(node.Section.ID) && EditorTemplate) {
+                        <div class="cred-tree__editor cred-tree__editor--new">
+                            <ng-container [ngTemplateOutlet]="EditorTemplate"></ng-container>
+                        </div>
+                    }
                 </li>
             }
         </ol>

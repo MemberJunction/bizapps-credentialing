@@ -161,5 +161,20 @@
     "primaryKey": {
       "ID": "4B580B0D-5913-49F9-A401-6D38BCFAA4E3"
     }
+  },
+  {
+    "fields": {
+      "EntityID": "@lookup:MJ: Entities.Name=Committees: Types",
+      "RoleID": "@lookup:MJ: Roles.Name=Credentialing Staff",
+      "Type": "Allow",
+      "CanRead": true,
+      "CanCreate": false,
+      "CanUpdate": false,
+      "CanDelete": false,
+      "ReadRLSFilterID": "@lookup:MJ: Row Level Security Filters.Name=Credentialing: Committee Type Catalog"
+    },
+    "primaryKey": {
+      "ID": "C413425B-837F-4D22-BF26-2B3F2210CEA3"
+    }
   }
 ]

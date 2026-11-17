@@ -207,3 +207,15 @@
     font-size: var(--mj-text-sm, 0.875rem);
     color: var(--mj-status-error);
 }
+
+/* The standard editor, opened in place: under its own row, or at the end of the section for a new standard. */
+.cred-tree__editor {
+    margin: var(--mj-space-2, 0.5rem) 0 var(--mj-space-3, 0.75rem) var(--mj-space-5, 1.5rem);
+    scroll-margin: var(--mj-space-4, 1rem);
+}
+
+.cred-tree__saved {
+    margin: 0 0 var(--mj-space-1, 0.25rem) var(--mj-space-5, 1.5rem);
+    color: var(--mj-status-success);
+    font-size: var(--mj-font-size-sm, 0.875rem);
+}

@@ -2,9 +2,10 @@
  * Program Studio — composes the program list, the wizard, the version tree, the standard editor,
  * the settings and the document requirements, and holds what is selected.
  *
- * It reads a program with everything under it in ONE `RunViews` call ({@link StudioData.LoadProgram})
+ * It reads a program with everything under it in two `RunViews` calls ({@link StudioData.LoadProgram})
  * and passes the rows down; each widget writes its own single records (or calls a remote operation)
- * through `ProviderToUse` and asks the page to reload. A program the user cannot read shows a
+ * through `ProviderToUse` and asks the page to reload. A committee created from the Settings tab is
+ * the one exception: only the committees are read again, so unsaved settings are kept. A program the user cannot read shows a
  * not-found state — as does a program ID that is not a UUID, for which nothing is read — never another
  * organization's program and never an empty tree; a failed load shows a sentence, never database text
  * ({@link StudioMessages}). The page navigates nowhere: it emits {@link SelectionChanged} and its host keeps
@@ -14,15 +15,18 @@
  */
 import { ChangeDetectorRef, Component, EventEmitter, Input, Output, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { LogError } from '@memberjunction/core';
 import { BaseAngularComponent } from '@memberjunction/ng-base-types';
 import { SharedGenericModule } from '@memberjunction/ng-shared-generic';
 import { MJAlertComponent, MJDropdownComponent, MJEmptyStateComponent, MJTabNavComponent, type TabConfig } from '@memberjunction/ng-ui-components';
+import type { CreateCommitteeOutput } from '@mj-biz-apps/credentialing-core';
 import type { mjBizAppsCredentialingProgramVersionEntity } from '@mj-biz-apps/credentialing-entities';
 import { DocumentRequirementsComponent } from './document-requirements.component';
 import { ProgramListComponent } from './program-list.component';
 import { ProgramWizardComponent, type WizardOrganization } from './program-wizard.component';
 import { StandardEditorComponent, type NewStandardTarget } from './standard-editor.component';
-import { StudioData, type ProgramBundle } from './studio-data';
+import { StudioData, type CommitteeRow, type ProgramBundle } from './studio-data';
+import { StudioTree } from './studio-tree';
 import { StudioUrl } from './studio-url';
 import { StudioViewModel, type StudioVersionView } from './studio-view-model';
 import { VersionSettingsComponent } from './version-settings.component';
@@ -110,6 +114,8 @@ export class ProgramStudioPage extends BaseAngularComponent {
     public SelectedVersionID: string | null = null;
     public SelectedStandardID: string | null = null;
     public NewStandard: NewStandardTarget | null = null;
+    /** The standard saved last, until another is opened: its row shows "Saved". */
+    public SavedStandardID: string | null = null;
     public Tab: StudioTab = 'Standards';
     public ListRefresh = 0;
     public IsRefreshing = false;
@@ -134,10 +140,6 @@ export class ProgramStudioPage extends BaseAngularComponent {
 
     public get VersionChoices(): { ID: string; Text: string }[] {
         return (this.Bundle?.Versions ?? []).map((v) => ({ ID: v.ID, Text: `${v.Label} (${v.Status})` }));
-    }
-
-    public get EditorOpen(): boolean {
-        return this.SelectedStandardID != null || this.NewStandard != null;
     }
 
     // ---- Events from the widgets ---------------------------------------------------------------
@@ -183,22 +185,43 @@ export class ProgramStudioPage extends BaseAngularComponent {
         await this.reload(this.SelectedVersionID);
     }
 
+    /**
+     * A committee was created for the program's organization: read the committees again and nothing
+     * else, so the version objects — and any unsaved settings on them — stay as they are. Should that
+     * read fail, the committee the server returned is added to the list already shown.
+     */
+    public async OnCommitteeCreated(created: CreateCommitteeOutput): Promise<void> {
+        const bundle = this.Bundle;
+        if (bundle == null) {
+            return;
+        }
+        const committees = await this.committeesAfterCreate(bundle, created);
+        if (this.Bundle === bundle) {
+            this.Bundle = { ...bundle, Committees: committees };
+            this.cdr.markForCheck();
+        }
+    }
+
     public OnStandardSelected(standardID: string): void {
         this.NewStandard = null;
-        this.SelectedStandardID = standardID;
+        this.SavedStandardID = null;
+        this.SelectedStandardID = StudioTree.ToggleSelection(this.SelectedStandardID, standardID);
         this.cdr.markForCheck();
     }
 
     public OnStandardAddRequested(target: NewStandardTarget): void {
         this.SelectedStandardID = null;
+        this.SavedStandardID = null;
         this.NewStandard = target;
         this.cdr.markForCheck();
     }
 
+    /** A standard was saved: the editor closes and the row, now showing the stored text, says so. */
     public async OnStandardSaved(standardID: string): Promise<void> {
-        this.NewStandard = null;
-        this.SelectedStandardID = standardID;
+        this.closeEditor();
         await this.reload(this.SelectedVersionID);
+        this.SavedStandardID = standardID;
+        this.cdr.markForCheck();
     }
 
     public OnEditorClosed(): void {
@@ -268,6 +291,17 @@ export class ProgramStudioPage extends BaseAngularComponent {
         return token;
     }
 
+    private async committeesAfterCreate(bundle: ProgramBundle, created: CreateCommitteeOutput): Promise<CommitteeRow[]> {
+        const row = { ID: created.CommitteeID, Name: created.Name };
+        try {
+            const committees = await StudioData.ForProvider(this.ProviderToUse).Committees(bundle.CommonOrganizationID);
+            return StudioData.WithCommittee(committees, row);
+        } catch (e) {
+            LogError(e instanceof Error ? e.message : String(e));
+            return StudioData.WithCommittee(bundle.Committees, row);
+        }
+    }
+
     private selectVersion(versionID: string): void {
         const picked = StudioViewModel.PickVersion(this.Bundle?.Versions ?? [], versionID);
         if (picked == null || picked.ID === this.SelectedVersionID) {
@@ -282,6 +316,7 @@ export class ProgramStudioPage extends BaseAngularComponent {
     private closeEditor(): void {
         this.SelectedStandardID = null;
         this.NewStandard = null;
+        this.SavedStandardID = null;
     }
 
     /** Tells the host what is open, when a program is loaded (see {@link StudioUrl.SelectionAfterLoad}). */

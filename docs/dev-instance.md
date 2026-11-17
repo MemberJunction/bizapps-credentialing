@@ -302,6 +302,7 @@ How MJ v6.2.2 evaluates them (read from source, then confirmed by `CRD-05`):
 | `Credentialing: Own Workspace Items` | MJ: Workspace Items (shell) | `(WorkspaceID IN (SELECT w.ID FROM [__mj].[vwWorkspaces] w WHERE w.UserID = TRY_CAST('{{UserID}}' AS UNIQUEIDENTIFIER)))` |
 | `Credentialing: Shell Empty` | shell entities a role must not read | `(1 = 0)` |
 | `Credentialing: Resource Type Catalog` | MJ: Resource Types (shell) | `(1 = 1)` — type names, not records; present so no grant outside the schema is unfiltered |
+| `Credentialing: Committee Type Catalog` | `Committees: Types` | `(1 = 1)` — the kinds of committee, a catalog shared by every organization; present for the same reason |
 
 `<membership>` is `SELECT m.AccreditingOrganizationID FROM [__mj_BizAppsCredentialing].[vwOrganizationMemberships] m WHERE m.UserID = TRY_CAST('{{UserID}}' AS UNIQUEIDENTIFIER)`.
 The view names are the ones CodeGen created (`SELECT name FROM sys.views WHERE schema_id =
@@ -322,7 +323,8 @@ Grants (`Type: Allow`; every granted operation of a filtered row carries the fil
 |---|---|---|
 | Credentialing Staff | Programs, Program Versions, Sections, Standards, Document Requirements | CRUD, filtered |
 | Credentialing Staff | Accrediting Organizations, Organization Memberships | Read, filtered |
-| Credentialing Staff | Committees: Committees | Read, `Credentialing: Staff Committees` |
+| Credentialing Staff | Committees: Committees | Read, `Credentialing: Staff Committees` (no Create: `Credentialing.CreateCommittee` writes the row itself) |
+| Credentialing Staff | Committees: Types | Read, `Credentialing: Committee Type Catalog` (the New committee form lists them) |
 | Credentialing Admin | Accrediting Organizations, Organization Memberships | CRUD, unfiltered |
 | Committee, Reviewer, Applicant | the seven entities | none |
 | all five | the shell baseline below | filtered |
@@ -549,7 +551,9 @@ every step below is the one that worked.
    `git checkout`/`git restore` for this**: it would also discard any metadata edit not yet committed.
    Proof (B1 verification): with a hand edit to three role descriptions in `metadata/roles/.roles.json`,
    a push wrote 3 `sync` blocks and dropped 7 files' final newlines; after the script, `git diff` held
-   only the hand edit. On a fresh database the push reports `created: 100, updated: 1`.
+   only the hand edit. On a fresh database the push reported `created: 100, updated: 1`; two records
+   were added since (the committee-type catalog filter and its permission row: `created: 2,
+   unchanged: 101` on this instance), so a fresh push now creates 102.
 6. Ensure `admin@memberjunction.org` has the `MJ: User Applications` row for `Credentialing` (either via `corepack pnpm run dev:owner` in `bizapps-credentialing/` when no browser is needed — idempotent via entity objects — or in Explorer via **Application launcher → Configure… → Available Applications → Add Credentialing → Save Changes**):
    ```sh
    corepack pnpm run dev:owner     # Granted MJ: User Applications 'Credentialing' to 'admin@memberjunction.org'.
@@ -688,7 +692,7 @@ A user API key (`mj_sk_…`, `x-api-key` header) is not used by this harness.
 ```sh
 MJ_INTEGRATION_TEST=1 RUN_MUTATION_TESTS=1 corepack pnpm mj test run --name "CRD-02 - Version rules"   # 12 checks
 MJ_INTEGRATION_TEST=1 RUN_MUTATION_TESTS=1 corepack pnpm mj test run --name "CRD-03 - Standard rules"  # 12 checks
-MJ_INTEGRATION_TEST=1 RUN_MUTATION_TESTS=1 corepack pnpm mj test run --name "CRD-04 - Operations"     # 15 checks
+MJ_INTEGRATION_TEST=1 RUN_MUTATION_TESTS=1 corepack pnpm mj test run --name "CRD-04 - Operations"     # 20 checks
 MJ_INTEGRATION_TEST=1 RUN_MUTATION_TESTS=1 corepack pnpm mj test run --name "CRD-05 - Isolation"      # 9 checks
 MJ_INTEGRATION_TEST=1 RUN_MUTATION_TESTS=1 corepack pnpm mj test run --name "CRD-06 - World"          # 2 checks
 corepack pnpm run test:integration cred-operations-wire                                               # 3 checks, GraphQL
@@ -722,7 +726,7 @@ the package barrel.
 `cred-operations` is server only for three reasons: `.3` writes one `EvaluationMode` with SQL
 (the provider's `ExecuteSQL`, which GraphQL does not have), `.6` sets the static test seam
 `CloneVersionToDraftServerOperation.FailAfterStandards` (it exists only in the server process, reached
-through the class factory registration), and `.7` and `.9` need separate provider instances. The
+through the class factory registration), and `.7`, `.9`, `.12` and `.20` need separate provider instances. The
 program operations act as the world's `StaffA` (`staff.a@example.test`: only `Credentialing Staff`, a
 membership of OrgA, where every scratch program is made), so they run under staff's row-filtered
 permissions; organization setup acts as the world's `admin@example.test` (`Credentialing Admin`).
@@ -748,6 +752,18 @@ provider instances (membership delete starting 40–150 ms after the create) spl
 refused, organization deleted" and "program created, delete refused with the programs sentence", and
 passed exactly the same with the delete's lock turned into a no-op (negative control, two runs), so it
 could not fail and was not kept.
+
+`cred-operations.16`–`.20` call `Credentialing.CreateCommittee` as `StaffA` for a scratch program of
+OrgA: one committee, owned by OrgA's Common organization, `Active` and private, readable by `StaffA`
+through `Committees: Committees` and not by `StaffB` (`.16`); a blank name, an unknown or malformed
+type and a duplicate name (also by case or spaces) each give their sentence and create nothing (`.17`);
+another organization's program, a random program ID and a caller with no membership each give `Record
+not found.` (`.18`); a caller without `Credentialing Staff` gets `FORBIDDEN` (`.19`); two simultaneous
+calls with one name on separate provider instances give one committee and one refusal with the
+duplicate sentence (`.20`). Each check deletes the committees it created (as the context user), so
+OrgA's committee list is left as it was. Negative control for `.20` (the operation's
+`AuthoringLock.ForOrganization` call removed, then restored): it failed in two runs of two with
+`exactly one CreateCommittee succeeds (ok | ok) — expected 1, got 2`; with the lock, 20/20.
 
 `cred-operations-wire` proves the browser path: the shared contract classes of
 `@mj-biz-apps/credentialing-core`, called with no provider (as a browser calls them) or with a second
@@ -804,8 +820,8 @@ transport was not needed for these checks.
 
 ## Remote operations (Task 7 discovery, MJ v6.2.2 source)
 
-The four multi-record writes (`Credentialing.CreateProgram`, `.CloneVersionToDraft`,
-`.ReorderVersionTree`, `.CreateOrganization`) are hand-written, code-only remote operations: a
+The five server-side writes (`Credentialing.CreateProgram`, `.CloneVersionToDraft`,
+`.ReorderVersionTree`, `.CreateOrganization`, `.CreateCommittee`) are hand-written, code-only remote operations: a
 contract class per operation in `packages/Core/src/operations` (key and types, no body) and a server
 subclass per operation in `packages/CoreEntitiesServer/src/operations`. They have no
 `MJ: Remote Operations` metadata row; `RemoteOperationEngineBase.IsInvokable` returns
@@ -821,7 +837,7 @@ import order" rule of `mj/packages/MJCore/src/generic/baseRemotableOperation.ts:
 `mj/packages/RecordCloning/engine/src/operations.ts:432-455` and
 `mj/packages/MJCoreEntities/src/custom/operations/AuthorizationCheckOperation.ts:27`. The one
 requirement is that the server package is loaded in the process: `LoadBizAppsCredentialingEntitiesServer()`
-references the four classes so tree-shaking keeps them. Without it the key still resolves — to the
+references the five classes so tree-shaking keeps them. Without it the key still resolves — to the
 contract, whose default `InternalExecute` throws — and the caller gets `EXECUTION_ERROR`
 `Remote operation '<key>' has no server implementation…` (seen in the failing-first run of `CRD-04`,
 before the server package was rebuilt).
@@ -859,6 +875,26 @@ roles from that cache only (`mj/packages/MJServer/src/auth/localDevAuth.ts:307-3
 pick the grant up from the cache's shared-store notice, its staleness check
 (`cacheSettings.userCacheCheckIntervalSeconds`, default 300) or a restart.
 
+**Creating a committee writes as the system user.** `Credentialing.CreateCommittee` exists because a
+version cannot be activated without a deciding committee, the picker lists only committees of the
+program's organization, and `Credentialing Staff` cannot open the Committees application (no `UI`
+role). Its input is `{ ProgramID, Name, CommitteeTypeID }`: the program is read as the caller
+(`Record not found.` otherwise), the accrediting organization's authoring lock is taken, the
+organization is read as the caller for its Common `OrganizationID`, and then — as the system user — the
+type and the name are checked and the `Committees: Committees` row is saved (`docs/isolation-read-paths.md`,
+"System-user work"). Column values, read from `bizapps-committees/migrations/B202602151200__v1.0__Committees_Baseline.sql`
+and the Committees application's own use of them: `Status` `Active` (the column default); `IsPublic`
+**0**, not the column default of 1 — in BizApps Committees a private committee is locked for a user who
+is neither Committees staff nor a member of it (`command-center.component.ts`, `applyLockState`), and a
+committee that decides credentialing applications should not be open to every Committees user until
+someone chooses that; `Description`, `ParentCommitteeID`, `CharterDocumentURL`, `MissionStatement`,
+`FormationDate` and `DissolutionDate` stay NULL. The change history of the new row names the system
+user, not the staff member who asked for it. Measured over GraphQL as `staff.a@example.test`: the
+call succeeds, the committee is read back through `Committees: Committees` with `IsPublic` false and
+`Organization` `Sample Accrediting Body A`, `staff.b` reads zero rows for its ID, the same name in upper
+case is refused with the duplicate sentence, and a direct entity Create on `Committees: Committees` by
+staff is still refused for want of permission.
+
 **`mj sync validate` does not exit.** `corepack pnpm exec mj sync validate --dir=metadata` prints the
 report (`✓ Validation passed!`) and then stays running; run it under `timeout` and read the report.
 `mj sync push` exits normally.
@@ -882,7 +918,10 @@ running `cred-operations-wire`.
 **Loading.** Program Studio reads the program list in one `RunViews` call, then a program in two:
 (1) the program, its versions (entity objects, because settings and status are saved from them) and
 the accrediting organizations the user can read; (2) every version's sections, standards and document
-requirements, and the committees owned by the program's Common organization. Display rows are
+requirements, the committees owned by the program's Common organization, and the committee types (a
+catalog the New committee form lists; it rides in the second call, so the page still makes two).
+After a committee is created from the Settings tab the page reads the committees alone again (one
+`RunViews` call with one view) and keeps the version objects, so unsaved settings survive. Display rows are
 `simple` with named `Fields`. Measured in the browser on the 12-section placeholder program: opening
 it from the list issues exactly two `RunViewsQuery` requests (the other requests in that window are
 Explorer's own workspace save and cache-invalidation check).

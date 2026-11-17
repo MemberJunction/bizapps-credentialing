@@ -77,10 +77,6 @@
     grid-template-columns: minmax(0, 1fr);
     gap: var(--mj-space-4, 1rem);
     align-items: start;
-
-    &--editor {
-        grid-template-columns: minmax(0, 1fr) minmax(20rem, 28rem);
-    }
 }
 
 @media (max-width: 64rem) {
@@ -92,9 +88,5 @@
         max-height: 16rem;
         border-right: 0;
         border-bottom: 1px solid var(--mj-border-default);
-    }
-
-    .cred-studio__authoring--editor {
-        grid-template-columns: minmax(0, 1fr);
     }
 }

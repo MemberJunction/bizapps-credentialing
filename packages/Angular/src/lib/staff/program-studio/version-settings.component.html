@@ -32,18 +32,42 @@
                                 }
                                 @if (s.Kind === 'committee') {
                                     <span class="cred-settings__label" [id]="InputID(s.Field) + '-label'">{{ s.Label }}</span>
-                                    <mj-dropdown
-                                        [AriaLabelledBy]="InputID(s.Field) + '-label'"
-                                        [Data]="CommitteeChoices"
-                                        TextField="Name"
-                                        ValueField="ID"
-                                        [ValuePrimitive]="true"
-                                        Placeholder="Choose a committee"
-                                        [(ngModel)]="Version.CommitteeID">
-                                    </mj-dropdown>
+                                    <div class="cred-settings__committee">
+                                        <mj-dropdown
+                                            class="cred-settings__committee-pick"
+                                            [AriaLabelledBy]="InputID(s.Field) + '-label'"
+                                            [Data]="CommitteeChoices"
+                                            TextField="Name"
+                                            ValueField="ID"
+                                            [ValuePrimitive]="true"
+                                            Placeholder="Choose a committee"
+                                            [(ngModel)]="Version.CommitteeID">
+                                        </mj-dropdown>
+                                        @if (ShowNewCommittee) {
+                                            <button mjButton Variant="outline" type="button" [disabled]="IsCommitteeFormOpen" [attr.aria-expanded]="IsCommitteeFormOpen ? 'true' : 'false'"
+                                                (click)="OpenCommitteeForm()">
+                                                New committee
+                                            </button>
+                                        }
+                                    </div>
                                     @if (Committees.length === 0) {
-                                        <p class="cred-settings__hint">No committee of this program's organization is available to you.</p>
+                                        <p class="cred-settings__hint">{{ NoCommitteeSentence }}</p>
                                     }
+                                    @if (ShowNewCommittee && IsCommitteeFormOpen) {
+                                        <bizapps-cred-new-committee-form
+                                            class="cred-settings__committee-form"
+                                            [Provider]="Provider"
+                                            [ProgramID]="ProgramID"
+                                            [CommitteeTypes]="CommitteeTypes"
+                                            (Created)="OnCommitteeCreated($event)"
+                                            (Cancelled)="CloseCommitteeForm()">
+                                        </bizapps-cred-new-committee-form>
+                                    }
+                                    <div class="cred-settings__committee-status" aria-live="polite">
+                                        @if (CommitteeMessage) {
+                                            <p class="cred-settings__saved" role="status">{{ CommitteeMessage }}</p>
+                                        }
+                                    </div>
                                 }
                             } @else {
                                 <span class="cred-settings__label">{{ s.Label }}</span>

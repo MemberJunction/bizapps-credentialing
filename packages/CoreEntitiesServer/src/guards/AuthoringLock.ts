@@ -14,8 +14,10 @@ const LOCK_TIMEOUT_MS = 15000;
  *
  * - `cred-accrediting-organization:<id>` — taken by a `Program` create, by a `Program` update that
  *   changes `Name` or `CredentialPrefix`, so the names and prefixes unique within an organization are
- *   checked and written as one step, and by an `AccreditingOrganization` delete, so its "no programs"
- *   check and the delete are one step against a program being created.
+ *   checked and written as one step, by an `AccreditingOrganization` delete, so its "no programs"
+ *   check and the delete are one step against a program being created, and by
+ *   `Credentialing.CreateCommittee`, so its "no committee of this name in the organization" check and
+ *   the committee insert are one step.
  * - `cred-program:<id>` — taken by every `ProgramVersion` write, before the version lock.
  * - `cred-version:<id>` — taken by writes of an existing `ProgramVersion`, and by every `Section`,
  *   `Standard` and `DocumentRequirement` write.
@@ -30,8 +32,10 @@ const LOCK_TIMEOUT_MS = 15000;
  * `Credentialing.CreateProgram` saves the program (organization lock) and then its first version
  * (program lock, and no version lock for a new version) in one transaction: organization → program.
  * `CloneVersionToDraft` and `ReorderVersionTree` save no `Program`, so they never take the
- * organization lock. `CreateOrganization`'s `cred-org:<name>` lock is a separate resource held by a
- * body that writes no program, version or tree row.
+ * organization lock. `CreateCommittee` takes only the organization lock, first (it reads the program
+ * before it, which takes no lock), and then saves one BizApps Committees row, which takes none of
+ * these locks: organization, and nothing after it. `CreateOrganization`'s `cred-org:<name>` lock is a
+ * separate resource held by a body that writes no program, version or tree row.
  *
  * The lock is `@LockOwner = 'Transaction'`: SQL Server releases it when the surrounding transaction
  * commits or rolls back, so there is no unlock call. It must be taken inside

@@ -32,6 +32,14 @@ export type RequirementErrorField = 'Name' | 'Form';
 export type StandardErrorField = 'Code' | 'Statement' | 'IsInterpretive' | 'Form';
 
 export class StudioTree {
+    /**
+     * The standard open after `clicked` is chosen: choosing the open standard again closes it,
+     * the way an accordion row does. IDs are compared without regard to case.
+     */
+    public static ToggleSelection(current: string | null, clicked: string): string | null {
+        return current != null && current.toLowerCase() === clicked.toLowerCase() ? null : clicked;
+    }
+
     /** The version's sections in order, each with its standards in order. */
     public static Build(versionID: string, sections: readonly SectionRow[], standards: readonly StandardRow[]): TreeSection[] {
         const id = versionID.toLowerCase();

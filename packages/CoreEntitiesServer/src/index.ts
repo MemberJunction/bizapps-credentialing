@@ -19,6 +19,7 @@ import { ProgramVersionEntityServer } from './ProgramVersionEntityServer.js';
 import { SectionEntityServer } from './SectionEntityServer.js';
 import { StandardEntityServer } from './StandardEntityServer.js';
 import { CloneVersionToDraftServerOperation } from './operations/CloneVersionToDraftServerOperation.js';
+import { CreateCommitteeServerOperation } from './operations/CreateCommitteeServerOperation.js';
 import { CreateOrganizationServerOperation } from './operations/CreateOrganizationServerOperation.js';
 import { CreateProgramServerOperation } from './operations/CreateProgramServerOperation.js';
 import { ReorderVersionTreeServerOperation } from './operations/ReorderVersionTreeServerOperation.js';
@@ -48,6 +49,7 @@ export { VersionTree } from './guards/VersionTree.js';
 export { BLANK_LABEL_REASON } from './ProgramVersionEntityServer.js';
 export { OperationSupport } from './operations/OperationSupport.js';
 export { CreateProgramServerOperation } from './operations/CreateProgramServerOperation.js';
+export { CreateCommitteeServerOperation } from './operations/CreateCommitteeServerOperation.js';
 export { CloneVersionToDraftServerOperation, CLONE_SOURCE_STATUS_REASON } from './operations/CloneVersionToDraftServerOperation.js';
 export { ReorderVersionTreeServerOperation } from './operations/ReorderVersionTreeServerOperation.js';
 export {
@@ -79,8 +81,9 @@ export function LoadBizAppsCredentialingEntitiesServer(): void {
         CloneVersionToDraftServerOperation,
         ReorderVersionTreeServerOperation,
         CreateOrganizationServerOperation,
+        CreateCommitteeServerOperation,
     ];
-    if (anchor.length !== 7 || operations.length !== 4) {
+    if (anchor.length !== 7 || operations.length !== 5) {
         throw new Error('credentialing server entity subclasses or operations missing');
     }
 }

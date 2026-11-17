@@ -96,3 +96,15 @@ describe('StudioViewModel.PickVersion', () => {
         expect(StudioViewModel.PickVersion([], null)).toBeNull();
     });
 });
+
+describe('StudioTree.ToggleSelection', () => {
+    it('opens the clicked standard when none is open', () => {
+        expect(StudioTree.ToggleSelection(null, 'A1')).toBe('A1');
+    });
+    it('switches to another standard', () => {
+        expect(StudioTree.ToggleSelection('A1', 'B2')).toBe('B2');
+    });
+    it('closes the standard that is already open, whatever the case of its ID', () => {
+        expect(StudioTree.ToggleSelection('ab-12', 'AB-12')).toBeNull();
+    });
+});

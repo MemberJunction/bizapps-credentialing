@@ -5,8 +5,8 @@
  * ACTS AS THE SYSTEM USER. The writes land in three places the calling admin has, and should have, no
  * permission on: BizApps Common's `Organization`, `MJ: User Roles` and `MJ: User Applications`. So
  * once {@link Authorize} has established that the caller holds `Credentialing Admin`, every read and
- * write of the body runs as the system user ({@link SystemUser}). It is one of the two places in the
- * app's product code that do, and the only one that writes; `docs/isolation-read-paths.md` lists both.
+ * write of the body runs as the system user ({@link SystemUser}). It is one of the three places in the
+ * app's product code that do, and one of the two that write; `docs/isolation-read-paths.md` lists them.
  *
  * Idempotent by construction: every row is found before it is created, under an application lock on
  * the organization's name, so a second call with the same input — even one running at the same
