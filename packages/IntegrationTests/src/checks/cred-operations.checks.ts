@@ -7,8 +7,16 @@
  * OrgA (where every scratch program is made), so they run under staff's row-filtered permissions;
  * organization setup acts as the world's `Admin`.
  *
+ * `.13` and `.14` delete accrediting organizations as the admin: refused with a sentence while the
+ * organization has members or programs, deleted (its Common organization kept) once it has neither.
+ * The delete's lock ordering against a program create is covered by the unit tests
+ * (`AccreditingOrganizationDelete.test.ts`), not raced here: a create needs its author's membership
+ * until its version is inserted (the platform re-checks the row filter on each save), and the admin
+ * can delete the organization only after deleting that membership, so through the public paths the
+ * programs check cannot be made to overlap an open create that will commit (docs/dev-instance.md).
+ *
  * Server transport only: `.3` writes one column with SQL, `.6` sets a static test seam on the server
- * operation class, and `.7`/`.9` need separate provider instances. The wire path is proven by
+ * operation class, and `.7`/`.9`/`.12` need separate provider instances. The wire path is proven by
  * `cred-operations-wire` on the client transport.
  *
  * This module imports nothing from `@mj-biz-apps/credentialing-core-entities-server` but types: the
@@ -36,14 +44,20 @@ import {
     type CreateOrganizationOutput,
     type CreateProgramInput,
 } from '@mj-biz-apps/credentialing-core';
-import type { mjBizAppsCredentialingStandardEntity } from '@mj-biz-apps/credentialing-entities';
+import type {
+    mjBizAppsCredentialingAccreditingOrganizationEntity,
+    mjBizAppsCredentialingOrganizationMembershipEntity,
+    mjBizAppsCredentialingStandardEntity,
+} from '@mj-biz-apps/credentialing-entities';
 import { Outcome, WithActors } from '../actors.js';
-import { CountRows, FindRows, LoadEntity, Quote, RequireSave } from '../wire.js';
+import { CountRows, FindRows, LoadEntity, LoadUserInfo, Quote, RequireDelete, RequireSave } from '../wire.js';
 import { ADMIN_ROLE, EnsureUser, GetOrLoadWorld, STAFF_ROLE } from '../world/load-world.js';
 import { MakeScratchProgram, type ProgramTree } from '../world/program-tree.js';
 import type { CredentialingWorld } from '../world/world.js';
 
 type StandardEntity = mjBizAppsCredentialingStandardEntity;
+type AccreditingOrganizationEntity = mjBizAppsCredentialingAccreditingOrganizationEntity;
+type MembershipEntity = mjBizAppsCredentialingOrganizationMembershipEntity;
 
 const APP_SCHEMA = '__mj_BizAppsCredentialing';
 const NOT_FOUND_SENTENCE = 'Record not found.';
@@ -51,6 +65,8 @@ const STALE_SENTENCE = 'This record was changed by someone else. Reload it and t
 const TREE_EDIT_SENTENCE = 'Sections and standards can only be edited on a Draft version. Use "Edit in draft" to create one.';
 const BLANK_LABEL_SENTENCE = 'Enter a label for this version.';
 const COMMON_ORGANIZATIONS_ENTITY = 'MJ_BizApps_Common: Organizations';
+const PROGRAMS_FIRST_SENTENCE = "Remove this organization's programs before deleting it.";
+const MEMBERS_FIRST_SENTENCE = "Remove this organization's members before deleting it.";
 /** Rounds of the reorder-against-edit race in `.7`, alternating which write leads. */
 const REORDER_RACE_ROUNDS = 4;
 /** How long the second of two concurrent writes in `.7` starts after the first. */
@@ -293,6 +309,60 @@ async function reorderAgainstEdit(ctx: IntegrationCheckContext, world: Credentia
         AssertEqual(stored.Statement, target.Statement, 'a refused edit leaves the original Statement');
         return 'stale';
     });
+}
+
+/** A run-unique organization set up by the world's admin, with its new staff member holding their role. */
+interface ScratchOrganization {
+    Name: string;
+    Output: CreateOrganizationOutput;
+    Staff: UserInfo;
+    CommonOrganizationID: string;
+}
+
+async function scratchOrganization(ctx: IntegrationCheckContext, world: CredentialingWorld): Promise<ScratchOrganization> {
+    const hex = runHex();
+    const staffUser = await newStaffUser(ctx, hex);
+    const name = `Deletion Body ${hex}`;
+    const output = ExpectOutput(
+        await new CreateOrganizationOperation().Execute({ Name: name, FirstStaffEmail: staffUser.Email }, { provider: ctx.Provider, user: world.Admin }),
+        'CreateOrganization',
+    );
+    const rows = await FindRows<{ OrganizationID: string }>(ctx, CredentialingEntity.AccreditingOrganization, `ID = '${Quote(output.AccreditingOrganizationID)}'`, ['OrganizationID']);
+    AssertEqual(rows.length, 1, 'the new accrediting organization exists');
+    // Reloaded after setup, so the staff member carries the Credentialing Staff role it granted.
+    return { Name: name, Output: output, Staff: await LoadUserInfo(ctx, staffUser.Email), CommonOrganizationID: rows[0].OrganizationID };
+}
+
+/** A CreateProgram input in `organizationID` with a run-unique name and prefix. */
+function programInputIn(organizationID: string): CreateProgramInput {
+    const hex = runHex();
+    return {
+        AccreditingOrganizationID: organizationID,
+        Name: `Deletion ${hex}`,
+        ProgramType: 'Certification',
+        SubjectType: 'Person',
+        SubjectNoun: 'professional',
+        CredentialPrefix: `D${hex.toUpperCase()}`,
+        Description: null,
+        FirstVersionLabel: '2027',
+    };
+}
+
+/** Rows of a scratch organization, read as the context user. */
+async function scratchCounts(ctx: IntegrationCheckContext, org: ScratchOrganization): Promise<{ Accrediting: number; Common: number; Programs: number; Memberships: number }> {
+    const id = `'${Quote(org.Output.AccreditingOrganizationID)}'`;
+    return {
+        Accrediting: await CountRows(ctx, CredentialingEntity.AccreditingOrganization, `ID = ${id}`),
+        Common: await CountRows(ctx, COMMON_ORGANIZATIONS_ENTITY, `ID = '${Quote(org.CommonOrganizationID)}'`),
+        Programs: await CountRows(ctx, CredentialingEntity.Program, `AccreditingOrganizationID = ${id}`),
+        Memberships: await CountRows(ctx, CredentialingEntity.OrganizationMembership, `AccreditingOrganizationID = ${id}`),
+    };
+}
+
+/** The admin's delete of a scratch organization: whether it succeeded and the message when it did not. */
+async function adminDelete(organization: AccreditingOrganizationEntity): Promise<{ Deleted: boolean; Message: string }> {
+    const deleted = await organization.Delete();
+    return { Deleted: deleted, Message: deleted ? '' : organization.LatestResult?.CompleteMessage ?? '' };
 }
 
 const checks: NamedCheck[] = [
@@ -603,6 +673,49 @@ const checks: NamedCheck[] = [
             AssertEqual(loser?.ErrorMessage, duplicateNameSentence(first.Name), 'the loser gives the duplicate-name sentence');
             AssertEqual(await programsLike(ctx, world, 'Name', first.Name), 1, 'programs with the name');
             AssertEqual(await programsLike(ctx, world, 'CredentialPrefix', second.CredentialPrefix) + await programsLike(ctx, world, 'CredentialPrefix', first.CredentialPrefix), 1, 'programs with either prefix');
+        },
+    },
+    {
+        Id: 'cred-operations.13',
+        Name: 'deleting an organization with a member is refused with a sentence; without one it is deleted and its Common organization stays',
+        RequiresMutation: true,
+        Fn: async (ctx: IntegrationCheckContext) => {
+            const world = await GetOrLoadWorld(ctx);
+            const org = await scratchOrganization(ctx, world);
+            const organization = await LoadEntity<AccreditingOrganizationEntity>(ctx, CredentialingEntity.AccreditingOrganization, org.Output.AccreditingOrganizationID, world.Admin);
+            const refused = await adminDelete(organization);
+            Assert(!refused.Deleted, 'deleting an organization that has a member is refused');
+            AssertEqual(refused.Message, MEMBERS_FIRST_SENTENCE, 'the refusal is the members sentence');
+            AssertEqual(JSON.stringify(await scratchCounts(ctx, org)), JSON.stringify({ Accrediting: 1, Common: 1, Programs: 0, Memberships: 1 }), 'rows after the refused delete');
+
+            const membership = await LoadEntity<MembershipEntity>(ctx, CredentialingEntity.OrganizationMembership, org.Output.MembershipID, world.Admin);
+            await RequireDelete(membership, 'the admin deleting the membership');
+            const again = await LoadEntity<AccreditingOrganizationEntity>(ctx, CredentialingEntity.AccreditingOrganization, org.Output.AccreditingOrganizationID, world.Admin);
+            const deleted = await adminDelete(again);
+            Assert(deleted.Deleted, `the admin deletes the organization once it has no member (${deleted.Message})`);
+            AssertEqual(JSON.stringify(await scratchCounts(ctx, org)), JSON.stringify({ Accrediting: 0, Common: 1, Programs: 0, Memberships: 0 }), 'rows after the delete: the Common organization remains');
+
+            const late = await new CreateProgramOperation().Execute(programInputIn(org.Output.AccreditingOrganizationID), { provider: ctx.Provider, user: org.Staff });
+            ExpectRefused(late, NOT_FOUND_SENTENCE, 'CreateProgram in the deleted organization');
+            AssertEqual(late.ErrorMessage, NOT_FOUND_SENTENCE, 'the refusal is the not-found sentence alone');
+            AssertEqual((await scratchCounts(ctx, org)).Programs, 0, 'programs of the deleted organization');
+        },
+    },
+    {
+        Id: 'cred-operations.14',
+        Name: 'deleting an organization that has a program is refused with the programs sentence and deletes nothing',
+        RequiresMutation: true,
+        Fn: async (ctx: IntegrationCheckContext) => {
+            const world = await GetOrLoadWorld(ctx);
+            const org = await scratchOrganization(ctx, world);
+            ExpectOutput(await new CreateProgramOperation().Execute(programInputIn(org.Output.AccreditingOrganizationID), { provider: ctx.Provider, user: org.Staff }), 'CreateProgram as the staff member');
+            const before = await scratchCounts(ctx, org);
+            AssertEqual(JSON.stringify(before), JSON.stringify({ Accrediting: 1, Common: 1, Programs: 1, Memberships: 1 }), 'rows before the delete');
+            const organization = await LoadEntity<AccreditingOrganizationEntity>(ctx, CredentialingEntity.AccreditingOrganization, org.Output.AccreditingOrganizationID, world.Admin);
+            const refused = await adminDelete(organization);
+            Assert(!refused.Deleted, 'deleting an organization that has a program is refused');
+            AssertEqual(refused.Message, PROGRAMS_FIRST_SENTENCE, 'the refusal is the programs sentence (checked before the members)');
+            AssertEqual(JSON.stringify(await scratchCounts(ctx, org)), JSON.stringify(before), 'nothing was deleted');
         },
     },
 ];

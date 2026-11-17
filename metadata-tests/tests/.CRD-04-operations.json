@@ -5,7 +5,7 @@
     "Description": "Verify the server-side operations that span several records: creating a program with its first version, copying a version into a new draft, reordering a version's tree and setting up an organization, each as one unit of work that leaves nothing behind when refused, including under concurrent calls.",
     "InputDefinition": {},
     "ExpectedOutcomes": {
-      "summary": "All twelve cred-operations checks pass on scratch programs and run-unique organizations; the sample program is left unchanged."
+      "summary": "All fourteen cred-operations checks pass on scratch programs and run-unique organizations, including organization deletes refused while members or programs exist; the sample program is left unchanged."
     },
     "Configuration": {
       "tier": "deterministic",

@@ -5,8 +5,8 @@
  * ACTS AS THE SYSTEM USER. The writes land in three places the calling admin has, and should have, no
  * permission on: BizApps Common's `Organization`, `MJ: User Roles` and `MJ: User Applications`. So
  * once {@link Authorize} has established that the caller holds `Credentialing Admin`, every read and
- * write of the body runs as the system user. This is the only place in the app's product code that
- * does; `docs/isolation-read-paths.md` lists it.
+ * write of the body runs as the system user ({@link SystemUser}). It is one of the two places in the
+ * app's product code that do, and the only one that writes; `docs/isolation-read-paths.md` lists both.
  *
  * Idempotent by construction: every row is found before it is created, under an application lock on
  * the organization's name, so a second call with the same input — even one running at the same
@@ -38,6 +38,7 @@ import type {
     mjBizAppsCredentialingOrganizationMembershipEntity,
 } from '@mj-biz-apps/credentialing-entities';
 import { AuthoringLock } from '../guards/AuthoringLock.js';
+import { SystemUser } from '../guards/SystemUser.js';
 import { OperationSupport } from './OperationSupport.js';
 
 const USERS_ENTITY = 'MJ: Users';
@@ -99,7 +100,7 @@ export class CreateOrganizationServerOperation extends CreateOrganizationOperati
         if (email.length === 0) {
             OperationSupport.Refuse(STAFF_EMAIL_REQUIRED_REASON);
         }
-        const system = this.systemUser();
+        const system = SystemUser.Get('Organization setup');
         const output = await OperationSupport.InTransaction(provider, async () => {
             await AuthoringLock.ForOrganizationName(name, provider, system);
             const context = await this.loadContext(name, email, provider, system);
@@ -109,15 +110,6 @@ export class CreateOrganizationServerOperation extends CreateOrganizationOperati
         });
         await this.refreshUserCache();
         return output;
-    }
-
-    /** The system user from the server's user cache; organization setup cannot run without it. */
-    private systemUser(): UserInfo {
-        const system = UserCache.Instance.GetSystemUser();
-        if (system == null) {
-            throw new Error('Organization setup needs the system user, and the server user cache does not hold it.');
-        }
-        return system;
     }
 
     /** The staff user, the Credentialing Staff role, the Credentialing application and any accrediting organization of this name, in one RunViews call. */

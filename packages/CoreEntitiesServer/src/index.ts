@@ -23,7 +23,11 @@ import { CreateOrganizationServerOperation } from './operations/CreateOrganizati
 import { CreateProgramServerOperation } from './operations/CreateProgramServerOperation.js';
 import { ReorderVersionTreeServerOperation } from './operations/ReorderVersionTreeServerOperation.js';
 
-export { AccreditingOrganizationEntityServer } from './AccreditingOrganizationEntityServer.js';
+export {
+    AccreditingOrganizationEntityServer,
+    ORGANIZATION_HAS_MEMBERS_REASON,
+    ORGANIZATION_HAS_PROGRAMS_REASON,
+} from './AccreditingOrganizationEntityServer.js';
 export { DocumentRequirementEntityServer } from './DocumentRequirementEntityServer.js';
 export { OrganizationMembershipEntityServer } from './OrganizationMembershipEntityServer.js';
 export { ProgramEntityServer } from './ProgramEntityServer.js';
@@ -31,6 +35,7 @@ export { ProgramVersionEntityServer } from './ProgramVersionEntityServer.js';
 export { SectionEntityServer } from './SectionEntityServer.js';
 export { StandardEntityServer } from './StandardEntityServer.js';
 export { AuthoringLock } from './guards/AuthoringLock.js';
+export { SystemUser } from './guards/SystemUser.js';
 export { LockedWrite, STALE_RECORD_REASON, type WriteKind } from './guards/LockedWrite.js';
 export {
     ParentVersionLoader,

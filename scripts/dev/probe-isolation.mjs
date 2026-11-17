@@ -192,7 +192,12 @@ async function gqlRefusal(session, gql, variables) {
  * @returns {Promise<Target>}
  */
 async function readTarget(staffA) {
-  const programs = await requireRows(staffA, CredentialingEntity.Program, `Name = '${quote(SAMPLE_PROGRAM_NAME)}'`, []);
+  // Every field named: over GraphQL an empty field list returns only the ID.
+  const programFields = (staffA.Entities.find((e) => e.Name === CredentialingEntity.Program)?.Fields ?? []).map((f) => f.Name);
+  if (!programFields.includes('AccreditingOrganizationID')) {
+    throw new Error(`the ${CredentialingEntity.Program} metadata has no AccreditingOrganizationID field`);
+  }
+  const programs = await requireRows(staffA, CredentialingEntity.Program, `Name = '${quote(SAMPLE_PROGRAM_NAME)}'`, programFields);
   if (programs.length !== 1) {
     throw new Error(`staff-a reads ${programs.length} programs named ${SAMPLE_PROGRAM_NAME}; load the world first`);
   }
@@ -487,6 +492,32 @@ async function caseInviteRows(persona, controlInvites) {
   });
 }
 
+/**
+ * P11: an actor deletes accrediting body A (the sample program's organization) over GraphQL. Only
+ * `Credentialing Admin` may delete an accrediting organization, so the attempt must be refused for
+ * want of permission (or as not found, for a caller who cannot read the organization), and body A
+ * must still exist, as the admin reads it.
+ */
+async function caseDeleteOrganization(persona, admin, target) {
+  await probeCase('P11', persona.Name, async () => {
+    const organizationID = String(target.Program.AccreditingOrganizationID);
+    const refusal = await gqlRefusal(
+      persona.Provider,
+      'mutation ($id: String!, $options: DeleteOptionsInput!) { DeletemjBizAppsCredentialingAccreditingOrganization(ID: $id, options___: $options) { ID } }',
+      { id: organizationID, options: { SkipEntityAIActions: false, SkipEntityActions: false, ReplayOnly: false, IsParentEntityDelete: false } },
+    );
+    const still = await requireRows(admin.Provider, CredentialingEntity.AccreditingOrganization, `ID = '${quote(organizationID)}'`, ['ID']);
+    const problems = [];
+    if (refusal == null) problems.push('the Delete mutation SUCCEEDED');
+    else if (!/permission|Record not found/i.test(refusal)) problems.push(`the Delete was refused for another reason than permission: "${refusal}"`);
+    if (still.length !== 1) problems.push(`the admin reads ${still.length} rows of accrediting body A after the attempt`);
+    return {
+      passed: problems.length === 0,
+      detail: problems.length ? problems.join('; ') : `Delete of accrediting body A refused ("${refusal}"); the organization still exists`,
+    };
+  });
+}
+
 // ── run ──────────────────────────────────────────────────────────────────────────────────────────
 
 /**
@@ -527,6 +558,8 @@ async function main() {
     const controlInvites = await requireRows(control.Provider, 'MJ: Magic Link Invites', '', ['ID']);
     await caseInviteRows(applicant, controlInvites.length);
     await caseInviteRows(staffB, controlInvites.length);
+    await caseDeleteOrganization(staffB, admin, target);
+    await caseDeleteOrganization(applicant, admin, target);
   } catch (e) {
     report('SETUP', '-', false, e instanceof Error ? e.message : String(e));
   } finally {

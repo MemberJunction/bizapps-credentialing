@@ -688,7 +688,7 @@ A user API key (`mj_sk_…`, `x-api-key` header) is not used by this harness.
 ```sh
 MJ_INTEGRATION_TEST=1 RUN_MUTATION_TESTS=1 corepack pnpm mj test run --name "CRD-02 - Version rules"   # 11 checks
 MJ_INTEGRATION_TEST=1 RUN_MUTATION_TESTS=1 corepack pnpm mj test run --name "CRD-03 - Standard rules"  # 10 checks
-MJ_INTEGRATION_TEST=1 RUN_MUTATION_TESTS=1 corepack pnpm mj test run --name "CRD-04 - Operations"     # 12 checks
+MJ_INTEGRATION_TEST=1 RUN_MUTATION_TESTS=1 corepack pnpm mj test run --name "CRD-04 - Operations"     # 14 checks
 MJ_INTEGRATION_TEST=1 RUN_MUTATION_TESTS=1 corepack pnpm mj test run --name "CRD-05 - Isolation"      # 9 checks
 MJ_INTEGRATION_TEST=1 RUN_MUTATION_TESTS=1 corepack pnpm mj test run --name "CRD-06 - World"          # 2 checks
 corepack pnpm run test:integration cred-operations-wire                                               # 3 checks, GraphQL
@@ -729,6 +729,25 @@ permissions; organization setup acts as the world's `admin@example.test` (`Crede
 `cred-operations-wire.2` signs in as `staff.a@example.test` too. (Task 7's stand-in
 `operations.staff@example.test`, which held `Developer` beside `Credentialing Staff`, is no longer
 used; its `Developer` grant was removed from the dev database.)
+
+`cred-operations.13` and `.14` delete run-unique accrediting organizations (made by `CreateOrganization`
+with a run-unique staff user) as the admin: refused with `Remove this organization's members before
+deleting it.` while the membership exists, deleted once the admin has deleted it (the BizApps Common
+organization stays), then a program create into the deleted organization is refused with
+`Record not found.`; and refused with `Remove this organization's programs before deleting it.` when
+the organization has a program. The delete takes the organization's authoring lock, so its programs
+check cannot interleave with a program create; **no integration check races the two**, and the unit
+tests (`AccreditingOrganizationDelete.test.ts`) cover the ordering instead. Measured why: a create
+needs its author's membership until its version is saved (MJ re-checks the staff row filter on the
+program insert and on the version insert: deleting the membership mid-create gave `Access denied for
+new MJ_BizApps_Credentialing: Programs record` or `… Program Versions record`, and the create rolled
+back), and the admin can delete the organization only after deleting that membership. So an open
+create that will commit is past its last membership check, and commits a few milliseconds later,
+before the admin's membership delete and organization delete can both run. A ten-round race on two
+provider instances (membership delete starting 40–150 ms after the create) split between "create
+refused, organization deleted" and "program created, delete refused with the programs sentence", and
+passed exactly the same with the delete's lock turned into a no-op (negative control, two runs), so it
+could not fail and was not kept.
 
 `cred-operations-wire` proves the browser path: the shared contract classes of
 `@mj-biz-apps/credentialing-core`, called with no provider (as a browser calls them) or with a second

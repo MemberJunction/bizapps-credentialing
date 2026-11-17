@@ -12,17 +12,21 @@ const LOCK_TIMEOUT_MS = 15000;
  * rows it read in between. Every write able to break one of those rules takes the same lock first, so
  * the check and the write that follows it run as one step:
  *
- * - `cred-accrediting-organization:<id>` — taken by a `Program` create, and by a `Program` update
- *   that changes `Name` or `CredentialPrefix`, so the names and prefixes unique within an organization
- *   are checked and written as one step.
+ * - `cred-accrediting-organization:<id>` — taken by a `Program` create, by a `Program` update that
+ *   changes `Name` or `CredentialPrefix`, so the names and prefixes unique within an organization are
+ *   checked and written as one step, and by an `AccreditingOrganization` delete, so its "no programs"
+ *   check and the delete are one step against a program being created.
  * - `cred-program:<id>` — taken by every `ProgramVersion` write, before the version lock.
  * - `cred-version:<id>` — taken by writes of an existing `ProgramVersion`, and by every `Section`,
  *   `Standard` and `DocumentRequirement` write.
  *
  * Lock order is always organization → program → version, so two writers cannot deadlock. Confirmed
- * from every writer in this package: `Program` saves take only the organization lock; `ProgramVersion`
+ * from every writer in this package: `Program` saves take only the organization lock; an
+ * `AccreditingOrganization` delete takes only the organization lock, first, and deletes nothing but
+ * its own row (it refuses while programs or members exist, so it cascades into no child); `ProgramVersion`
  * saves take program then version; `Section`, `Standard` and `DocumentRequirement` writes take only
- * the version lock; no writer takes a program or version lock and then saves a `Program`.
+ * the version lock; no writer takes a program or version lock and then saves a `Program` or deletes
+ * an `AccreditingOrganization`.
  * `Credentialing.CreateProgram` saves the program (organization lock) and then its first version
  * (program lock, and no version lock for a new version) in one transaction: organization → program.
  * `CloneVersionToDraft` and `ReorderVersionTree` save no `Program`, so they never take the
