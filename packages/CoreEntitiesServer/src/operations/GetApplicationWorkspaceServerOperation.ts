@@ -8,7 +8,6 @@
 import { BaseRemotableOperation, RunView, type IMetadataProvider, type RunViewParams, type UserInfo } from '@memberjunction/core';
 import { EscapeSQLString, RegisterClass } from '@memberjunction/global';
 import {
-    APPLICANT_RESPONSIBILITY_SENTENCE,
     CREDENTIALING_APPLICANT_ROLE,
     CREDENTIALING_STAFF_ROLE,
     CredentialingEntity,
@@ -16,16 +15,22 @@ import {
     GetApplicationWorkspaceOperation,
     type ApplicationWorkspace,
     type GetApplicationWorkspaceInput,
-    type ResponseStatus,
-    type SelfAssessment,
-    type WorkspaceCitation,
-    type WorkspaceExplanation,
     type WorkspaceSection,
     type WorkspaceStandard,
 } from '@mj-biz-apps/credentialing-core';
 import { SubjectAccess, type ApplicationAccess } from '../guards/SubjectAccess.js';
 import { SystemUser } from '../guards/SystemUser.js';
 import { OperationSupport } from './OperationSupport.js';
+import {
+    BuildWorkspaceResponse,
+    CITATION_WORKSPACE_FIELDS,
+    EXTRACTION_WORKSPACE_FIELDS,
+    RESPONSE_WORKSPACE_FIELDS,
+    ToIsoString,
+    type RawCitationRow,
+    type RawExtractionRow,
+    type RawResponseRow,
+} from './ResponseWorkspaceHelper.js';
 
 interface RawSectionRow {
     ID: string;
@@ -54,78 +59,7 @@ interface RawResponseSourceRow {
     Mode: string;
 }
 
-interface RawResponseRow {
-    ID: string;
-    StandardID: string;
-    Status: ResponseStatus;
-    ResponseText: string | null;
-    SelfAssessment: SelfAssessment | null;
-    AuthorType: 'Human' | 'Agent';
-    ConfirmedAt: Date | string | null;
-    __mj_UpdatedAt: Date | string;
-    SourceType: string | null;
-    SourceLabel: string | null;
-    SourceReference: string | null;
-    SourceRetrievedAt: Date | string | null;
-    IsStale: boolean;
-}
-
-interface RawCitationRow {
-    ID: string;
-    StandardResponseID: string;
-    EvidenceDocumentID: string;
-    ExtractionID: string | null;
-    SourceLabel: string;
-    PageReference: string | null;
-    Excerpt: string;
-    StartOffset: number;
-    EndOffset: number;
-}
-
-interface RawExtractionRow {
-    ID: string;
-    Value: string;
-    Reasoning: string | null;
-}
-
 const STANDARD_RESPONSES_VIEW = '[__mj_BizAppsCredentialing].[vwStandardResponses]';
-
-function toIsoString(value: Date | string | null | undefined): string | null {
-    if (value == null) return null;
-    if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value.toISOString();
-    const trimmed = String(value).trim();
-    return trimmed.length > 0 ? trimmed : null;
-}
-
-function firstSentence(text: string | null | undefined): string {
-    const trimmed = (text ?? '').trim();
-    if (trimmed.length === 0) return '';
-    const match = trimmed.match(/^.+?[.!?](?=\s|$)/);
-    return match ? match[0].trim() : trimmed;
-}
-
-function buildExplanation(
-    response: RawResponseRow,
-    citations: RawCitationRow[],
-    extractionsById: ReadonlyMap<string, RawExtractionRow>,
-): WorkspaceExplanation | null {
-    const extractionID = response.SourceReference ?? citations.find((c) => c.ExtractionID != null)?.ExtractionID ?? null;
-    const extraction = extractionID != null ? extractionsById.get(extractionID.toLowerCase()) : undefined;
-    if (response.AuthorType !== 'Agent' && extraction == null && response.SourceReference == null) {
-        return null;
-    }
-    const what =
-        firstSentence(extraction?.Value ?? response.ResponseText) ||
-        (response.SourceLabel ? `Passage located in ${response.SourceLabel}.` : 'Suggested from your uploaded document.');
-    const why =
-        (extraction?.Reasoning ?? '').trim() ||
-        (response.SourceLabel ? `Supported by ${response.SourceLabel}.` : 'Extracted from your uploaded evidence.');
-    return {
-        What: what,
-        Why: why,
-        How: `Read from your uploaded document by the assistant. ${APPLICANT_RESPONSIBILITY_SENTENCE}`,
-    };
-}
 
 @RegisterClass(BaseRemotableOperation, CredentialingOperation.GetApplicationWorkspace)
 export class GetApplicationWorkspaceServerOperation extends GetApplicationWorkspaceOperation {
@@ -194,45 +128,21 @@ export class GetApplicationWorkspaceServerOperation extends GetApplicationWorksp
                     {
                         EntityName: CredentialingEntity.StandardResponse,
                         ExtraFilter: `ApplicationID = '${applicationID}'`,
-                        Fields: [
-                            'ID',
-                            'StandardID',
-                            'Status',
-                            'ResponseText',
-                            'SelfAssessment',
-                            'AuthorType',
-                            'ConfirmedAt',
-                            '__mj_UpdatedAt',
-                            'SourceType',
-                            'SourceLabel',
-                            'SourceReference',
-                            'SourceRetrievedAt',
-                            'IsStale',
-                        ],
+                        Fields: RESPONSE_WORKSPACE_FIELDS,
                         ResultType: 'simple',
                         SkipTotalRowCount: true,
                     },
                     {
                         EntityName: CredentialingEntity.ResponseCitation,
                         ExtraFilter: `StandardResponseID IN (SELECT r.ID FROM ${STANDARD_RESPONSES_VIEW} r WHERE r.ApplicationID = '${applicationID}')`,
-                        Fields: [
-                            'ID',
-                            'StandardResponseID',
-                            'EvidenceDocumentID',
-                            'ExtractionID',
-                            'SourceLabel',
-                            'PageReference',
-                            'Excerpt',
-                            'StartOffset',
-                            'EndOffset',
-                        ],
+                        Fields: CITATION_WORKSPACE_FIELDS,
                         ResultType: 'simple',
                         SkipTotalRowCount: true,
                     },
                     {
                         EntityName: CredentialingEntity.Extraction,
                         ExtraFilter: `SubjectID = '${subjectID}' AND IsSuperseded = 0`,
-                        Fields: ['ID', 'Value', 'Reasoning'],
+                        Fields: EXTRACTION_WORKSPACE_FIELDS,
                         ResultType: 'simple',
                         SkipTotalRowCount: true,
                     },
@@ -330,7 +240,7 @@ export class GetApplicationWorkspaceServerOperation extends GetApplicationWorksp
                 OrganizationName: access.Program.AccreditingOrganization,
                 SubjectNoun: access.Program.SubjectNoun,
                 Status: access.Application.Status,
-                SubmittedAt: toIsoString(access.Application.SubmittedAt),
+                SubmittedAt: ToIsoString(access.Application.SubmittedAt),
                 ConfirmedCount: confirmedCount,
                 StandardCount: rawStandards.length,
                 RequiresGoverningBodyAttestation: Boolean(access.Version.RequiresGoverningBodyAttestation),
@@ -348,44 +258,22 @@ export class GetApplicationWorkspaceServerOperation extends GetApplicationWorksp
         extractionsById: ReadonlyMap<string, RawExtractionRow>,
     ): WorkspaceStandard {
         const respCitations = resp ? (citationsByResponse.get(resp.ID.toLowerCase()) ?? []) : [];
-        const citations: WorkspaceCitation[] = respCitations.map((c) => ({
-            CitationID: c.ID,
-            EvidenceDocumentID: c.EvidenceDocumentID,
-            SourceLabel: c.SourceLabel,
-            PageReference: c.PageReference ?? null,
-            Excerpt: c.Excerpt,
-            StartOffset: c.StartOffset,
-            EndOffset: c.EndOffset,
-        }));
-
         const response: WorkspaceStandard['Response'] = resp
-            ? {
-                  ResponseID: resp.ID,
-                  Status: resp.Status,
-                  ResponseText: resp.ResponseText ?? null,
-                  SelfAssessment: resp.SelfAssessment ?? null,
-                  AuthorType: resp.AuthorType,
-                  ConfirmedAt: toIsoString(resp.ConfirmedAt),
-                  UpdatedAt: toIsoString(resp.__mj_UpdatedAt) ?? '',
-                  SourceType: resp.SourceType ?? null,
-                  SourceLabel: resp.SourceLabel ?? null,
-                  SourceRetrievedAt: toIsoString(resp.SourceRetrievedAt),
-                  IsStale: Boolean(resp.IsStale),
-                  Explanation: buildExplanation(resp, respCitations, extractionsById),
-                  Citations: citations,
-              }
+            ? BuildWorkspaceResponse(resp, respCitations, extractionsById)
             : {
                   ResponseID: '',
                   Status: 'Empty',
                   ResponseText: null,
                   SelfAssessment: null,
                   AuthorType: 'Human',
+                  ConfirmedByName: null,
                   ConfirmedAt: null,
                   UpdatedAt: '',
                   SourceType: null,
                   SourceLabel: null,
                   SourceRetrievedAt: null,
                   IsStale: false,
+                  ReopenReason: null,
                   Explanation: null,
                   Citations: [],
               };

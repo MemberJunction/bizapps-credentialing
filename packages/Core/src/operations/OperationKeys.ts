@@ -16,6 +16,10 @@ export const CredentialingOperation = {
     ReissueInvitation: 'Credentialing.ReissueInvitation',
     GetMySubjects: 'Credentialing.GetMySubjects',
     GetApplicationWorkspace: 'Credentialing.GetApplicationWorkspace',
+    SaveResponse: 'Credentialing.SaveResponse',
+    ConfirmResponse: 'Credentialing.ConfirmResponse',
+    ReopenResponse: 'Credentialing.ReopenResponse',
+    WithdrawApplication: 'Credentialing.WithdrawApplication',
 } as const;
 
 /** One of the {@link CredentialingOperation} keys. */
@@ -47,3 +51,12 @@ export const INVITATION_FAILED_NOTE = 'The applicant was added, but the invitati
 
 /** Fixed final sentence of `Explanation.How` on every AI-assisted standard response. */
 export const APPLICANT_RESPONSIBILITY_SENTENCE = 'You are responsible for this answer once you confirm it.';
+
+/** Refusal when a non-applicant tries to confirm an answer. */
+export const ONLY_APPLICANT_CONFIRM_REASON = 'Only the applicant can confirm an answer.';
+
+/** Refusal when a non-applicant tries to save an applicant's answer. */
+export const ONLY_APPLICANT_EDIT_REASON = 'Only the applicant can edit an answer.';
+
+/** Refusal when an invalid self-assessment value is supplied. */
+export const INVALID_SELF_ASSESSMENT_REASON = 'Choose Met, Partially met or Not met.';

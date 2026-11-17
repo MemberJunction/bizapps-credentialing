@@ -55,5 +55,6 @@ export * from './checks/cred-isolation.checks.js';
 export * from './checks/cred-world.checks.js';
 export * from './checks/cred-subject-isolation.checks.js';
 export * from './checks/cred-invite.checks.js';
+export * from './checks/cred-responses.checks.js';
 
 export function LoadCredentialingIntegrationTests(): void {}

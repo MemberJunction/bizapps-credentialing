@@ -1,0 +1,256 @@
+<article class="cred-card" [attr.aria-labelledby]="'cred-std-heading-' + Standard.StandardID">
+    <header class="cred-card__header">
+        <div class="cred-card__code-row">
+            <h3 [id]="'cred-std-heading-' + Standard.StandardID" class="cred-card__code">
+                {{ Standard.Code }}
+            </h3>
+            @if (Standard.IsEligibility) {
+                <span class="cred-card__badge cred-card__badge--eligibility">Eligibility</span>
+            }
+            @if (Standard.IsNewForVersion) {
+                <span class="cred-card__badge cred-card__badge--new">NEW</span>
+            }
+        </div>
+        <div class="cred-card__status-row">
+            <span class="cred-card__state">{{ StateLabel }}</span>
+            @if (Standard.Response.IsStale) {
+                <span class="cred-card__badge cred-card__badge--stale">Needs review (source changed)</span>
+            }
+        </div>
+    </header>
+
+    <p class="cred-card__statement">{{ Standard.Statement }}</p>
+
+    @if (Standard.Guidance) {
+        <details class="cred-card__guidance">
+            <summary class="cred-card__guidance-toggle">Guidance</summary>
+            <p class="cred-card__guidance-body">{{ Standard.Guidance }}</p>
+        </details>
+    }
+
+    <p class="cred-card__intake">{{ IntakeModeLine }}</p>
+
+    @if (Standard.Response.ReopenReason && Standard.Response.Status !== 'Confirmed') {
+        <div class="cred-card__reopen-note" role="note">
+            Reopened by staff: {{ Standard.Response.ReopenReason }}
+        </div>
+    }
+
+    @if (Standard.Response.SourceLabel) {
+        <p class="cred-card__provenance">
+            Drafted from {{ Standard.Response.SourceLabel }}
+            @if (Standard.Response.SourceRetrievedAt) {
+                · {{ FormatDate(Standard.Response.SourceRetrievedAt) }}
+            }
+        </p>
+    }
+
+    @if (Standard.Response.Citations.length > 0) {
+        <div class="cred-card__citations">
+            <span class="cred-card__label">Sources:</span>
+            <ul class="cred-card__citation-list">
+                @for (citation of Standard.Response.Citations; track citation.CitationID) {
+                    <li class="cred-card__citation-chip">
+                        {{ citation.SourceLabel }}
+                        @if (citation.PageReference) {
+                            ({{ citation.PageReference }})
+                        }
+                    </li>
+                }
+            </ul>
+        </div>
+    }
+
+    @if (Standard.Response.Explanation; as explanation) {
+        <details class="cred-card__explanation">
+            <summary class="cred-card__guidance-toggle">How the assistant drafted this</summary>
+            <dl class="cred-card__explanation-dl">
+                <dt>What</dt>
+                <dd>{{ explanation.What }}</dd>
+                <dt>Why</dt>
+                <dd>{{ explanation.Why }}</dd>
+                <dt>How</dt>
+                <dd>{{ explanation.How }}</dd>
+            </dl>
+        </details>
+    }
+
+    @if (ErrorMessage) {
+        <mj-alert Variant="error" [Message]="ErrorMessage" [Dismissible]="true" (Dismissed)="ErrorMessage = ''"></mj-alert>
+    }
+
+    @if (IsEditing) {
+        <div class="cred-card__editor">
+            <div class="cred-card__field">
+                <label [for]="'cred-answer-input-' + Standard.StandardID" class="cred-card__field-label">
+                    Answer
+                </label>
+                <textarea
+                    [id]="'cred-answer-input-' + Standard.StandardID"
+                    class="cred-card__textarea"
+                    rows="5"
+                    [disabled]="IsSaving"
+                    [(ngModel)]="DraftText"></textarea>
+            </div>
+
+            <fieldset class="cred-card__fieldset" [disabled]="IsSaving">
+                <legend class="cred-card__field-label">Self-assessment</legend>
+                <div class="cred-card__radios">
+                    @for (opt of SelfAssessmentOptions; track opt.Value) {
+                        <label class="cred-card__radio-label">
+                            <input
+                                type="radio"
+                                [name]="'cred-self-' + Standard.StandardID"
+                                [value]="opt.Value"
+                                [(ngModel)]="DraftSelfAssessment" />
+                            <span>{{ opt.Label }}</span>
+                        </label>
+                    }
+                    <label class="cred-card__radio-label">
+                        <input
+                            type="radio"
+                            [name]="'cred-self-' + Standard.StandardID"
+                            [value]="null"
+                            [(ngModel)]="DraftSelfAssessment" />
+                        <span>Not selected</span>
+                    </label>
+                </div>
+            </fieldset>
+
+            <div class="cred-card__actions">
+                <button
+                    mjButton
+                    Variant="primary"
+                    type="button"
+                    [disabled]="IsSaving || Actions.SaveDisabled"
+                    (click)="SaveDraft()">
+                    {{ IsSaving ? 'Saving...' : 'Save draft' }}
+                </button>
+                <button
+                    mjButton
+                    Variant="outline"
+                    type="button"
+                    [disabled]="IsSaving"
+                    (click)="CancelEdit()">
+                    Cancel
+                </button>
+                <button
+                    mjButton
+                    Variant="outline"
+                    type="button"
+                    [disabled]="true">
+                    Read and confirm
+                </button>
+            </div>
+            @if (Actions.SaveDisabledReason) {
+                <p class="cred-card__hint">{{ Actions.SaveDisabledReason }}</p>
+            }
+            @if (Actions.ConfirmDisabledReason) {
+                <p class="cred-card__hint">{{ Actions.ConfirmDisabledReason }}</p>
+            }
+        </div>
+    } @else {
+        <div class="cred-card__answer-view">
+            <div class="cred-card__answer-block">
+                <span class="cred-card__field-label">Your answer</span>
+                @if (Standard.Response.ResponseText) {
+                    <p class="cred-card__answer-text">{{ Standard.Response.ResponseText }}</p>
+                } @else {
+                    <p class="cred-card__answer-empty">No written answer yet.</p>
+                }
+            </div>
+            <div class="cred-card__self-view">
+                <span class="cred-card__field-label">Self-assessment:</span>
+                <span>{{ FormatSelfAssessment(Standard.Response.SelfAssessment) }}</span>
+            </div>
+        </div>
+
+        @if (Actions.IsApplicationLocked) {
+            <p class="cred-card__locked-note">{{ Actions.ApplicationLockedReason }}</p>
+        } @else if (Actions.IsConfirmed) {
+            <div class="cred-card__confirmed-box">
+                <p class="cred-card__confirmed-stamp">
+                    Confirmed by {{ Standard.Response.ConfirmedByName || 'applicant' }} on {{ FormatDate(Standard.Response.ConfirmedAt) }}
+                </p>
+                <p class="cred-card__locked-note">{{ Actions.ConfirmedLockedSentence }}</p>
+            </div>
+        } @else {
+            <div class="cred-card__actions-wrap">
+                <div class="cred-card__actions">
+                    @if (Actions.ShowEditButton) {
+                        <button
+                            mjButton
+                            Variant="outline"
+                            type="button"
+                            (click)="StartEdit()">
+                            Edit answer
+                        </button>
+                    }
+                    @if (Actions.ShowConfirmButton) {
+                        <button
+                            #confirmTrigger
+                            mjButton
+                            Variant="primary"
+                            type="button"
+                            [disabled]="Actions.ConfirmDisabled"
+                            (click)="OpenConfirmDialog()">
+                            Read and confirm
+                        </button>
+                    }
+                </div>
+                @if (Actions.ConfirmDisabled && Actions.ConfirmDisabledReason) {
+                    <p class="cred-card__hint">{{ Actions.ConfirmDisabledReason }}</p>
+                }
+            </div>
+        }
+    }
+
+    <dialog
+        #confirmDialog
+        class="cred-card__dialog"
+        [attr.aria-labelledby]="'cred-confirm-title-' + Standard.StandardID"
+        (cancel)="OnDialogCancel($event)"
+        (keydown)="OnDialogKeydown($event)">
+        <div class="cred-card__dialog-body">
+            <h3 [id]="'cred-confirm-title-' + Standard.StandardID" class="cred-card__dialog-title">
+                Confirm answer for {{ Standard.Code }}
+            </h3>
+            <p class="cred-card__dialog-statement">{{ Standard.Statement }}</p>
+
+            <div class="cred-card__dialog-summary">
+                <div class="cred-card__field-label">Answer</div>
+                @if (Standard.Response.ResponseText) {
+                    <p class="cred-card__answer-text">{{ Standard.Response.ResponseText }}</p>
+                } @else {
+                    <p class="cred-card__answer-empty">No written answer.</p>
+                }
+
+                <div class="cred-card__field-label">Self-assessment</div>
+                <p class="cred-card__dialog-self">{{ FormatSelfAssessment(Standard.Response.SelfAssessment) }}</p>
+            </div>
+
+            @if (ConfirmErrorMessage) {
+                <mj-alert Variant="error" [Message]="ConfirmErrorMessage"></mj-alert>
+            }
+
+            <div class="cred-card__dialog-actions">
+                <button
+                    mjButton
+                    Variant="primary"
+                    type="button"
+                    [disabled]="IsConfirming"
+                    (click)="ConfirmAnswer()">
+                    {{ IsConfirming ? 'Confirming...' : 'Confirm this answer' }}
+                </button>
+                <button
+                    mjButton
+                    Variant="outline"
+                    type="button"
+                    [disabled]="IsConfirming"
+                    (click)="CloseConfirmDialog()">
+                    Cancel
+                </button>
+            </div>
+        </div>
+    </dialog>
+</article>

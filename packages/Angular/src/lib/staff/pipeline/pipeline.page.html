@@ -67,11 +67,12 @@
                         <th scope="col">Status</th>
                         <th scope="col">Submitted</th>
                         <th scope="col">Contacts</th>
+                        <th scope="col">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
                     @for (row of Page.Items; track row.ID) {
-                        <tr>
+                        <tr [class.cred-pipeline__row--selected]="SelectedApplication?.ID === row.ID">
                             <td class="cred-pipeline__subject">{{ row.SubjectName }}</td>
                             <td>
                                 <span class="cred-pipeline__program">{{ row.ProgramName }}</span>
@@ -107,6 +108,16 @@
                                     </ul>
                                 }
                             </td>
+                            <td>
+                                <button
+                                    mjButton
+                                    Variant="outline"
+                                    Size="sm"
+                                    type="button"
+                                    (click)="OpenDetail(row)">
+                                    View answers
+                                </button>
+                            </td>
                         </tr>
                     }
                 </tbody>
@@ -128,6 +139,86 @@
                 </div>
             </div>
         }
+    }
+
+    @if (SelectedApplication; as selected) {
+        <section class="cred-pipeline__detail" aria-label="Application details">
+            <header class="cred-pipeline__detail-header">
+                <div>
+                    <h2 class="cred-pipeline__detail-title">
+                        {{ selected.SubjectName }} — {{ selected.ProgramName }} ({{ selected.VersionLabel }})
+                    </h2>
+                    @if (DetailWorkspace; as detail) {
+                        <p class="cred-pipeline__subtitle">
+                            Status: {{ FormatStatus(detail.Application.Status) }} · {{ detail.Application.ConfirmedCount }} of {{ detail.Application.StandardCount }} confirmed
+                        </p>
+                    }
+                </div>
+                <div class="cred-pipeline__detail-actions">
+                    @if (DetailWorkspace && CanWithdraw(DetailWorkspace.Application.Status)) {
+                        <button mjButton Variant="outline" Size="sm" type="button" (click)="OpenWithdrawDialog()">
+                            Withdraw
+                        </button>
+                    }
+                    <button mjButton Variant="outline" Size="sm" type="button" (click)="CloseDetail()">
+                        Close
+                    </button>
+                </div>
+            </header>
+
+            @if (DetailLoading) {
+                <mj-loading Text="Loading answers..."></mj-loading>
+            } @else if (DetailError) {
+                <mj-alert Variant="error" Title="Could not load answers" [Message]="DetailError"></mj-alert>
+            } @else if (DetailWorkspace; as detail) {
+                @if (detail.Application.WithdrawalReason) {
+                    <mj-alert Variant="warning" [Message]="'Withdrawal reason: ' + detail.Application.WithdrawalReason"></mj-alert>
+                }
+
+                @for (section of detail.Sections; track section.SectionID) {
+                    <div class="cred-pipeline__detail-section">
+                        <h3 class="cred-pipeline__detail-section-title">{{ section.Number }}. {{ section.Name }}</h3>
+                        <ul class="cred-pipeline__detail-standards">
+                            @for (std of section.Standards; track std.StandardID) {
+                                <li class="cred-pipeline__detail-card">
+                                    <div class="cred-pipeline__detail-std-head">
+                                        <strong>{{ std.Code }}</strong>
+                                        <span class="cred-pipeline__status">{{ FormatResponseState(std.Response.Status) }}</span>
+                                    </div>
+                                    <p class="cred-pipeline__detail-statement">{{ std.Statement }}</p>
+                                    @if (std.Response.ResponseText) {
+                                        <p class="cred-pipeline__detail-answer">{{ std.Response.ResponseText }}</p>
+                                    } @else {
+                                        <p class="cred-pipeline__muted">No written answer.</p>
+                                    }
+                                    <p class="cred-pipeline__muted">
+                                        Self-assessment: {{ std.Response.SelfAssessment ?? 'Not selected' }}
+                                        @if (std.Response.ConfirmedByName && std.Response.ConfirmedAt) {
+                                            · Confirmed by {{ std.Response.ConfirmedByName }} on {{ FormatSubmittedDate(std.Response.ConfirmedAt) }}
+                                        }
+                                    </p>
+                                    @if (std.Response.ReopenReason) {
+                                        <p class="cred-pipeline__muted">Reopen reason: {{ std.Response.ReopenReason }}</p>
+                                    }
+                                    @if (CanReopen(detail.Application.Status, std.Response.Status)) {
+                                        <div class="cred-pipeline__detail-std-actions">
+                                            <button
+                                                mjButton
+                                                Variant="outline"
+                                                Size="sm"
+                                                type="button"
+                                                (click)="OpenReopenDialog(std)">
+                                                Reopen answer
+                                            </button>
+                                        </div>
+                                    }
+                                </li>
+                            }
+                        </ul>
+                    </div>
+                }
+            }
+        </section>
     }
 
     <bizapps-cred-invite-wizard
@@ -164,6 +255,60 @@
         </div>
         <mj-dialog-actions>
             <button mjButton Variant="primary" type="button" (click)="CloseReissueDialog()">Done</button>
+        </mj-dialog-actions>
+    </mj-dialog>
+
+    <mj-dialog [Visible]="ReopenDialogOpen" Title="Reopen answer" Size="md" (Close)="CloseReopenDialog()">
+        <div class="cred-pipeline__reissue-body">
+            @if (ReopenTarget) {
+                <p class="cred-pipeline__subtitle">
+                    Reopening <strong>{{ ReopenTarget.Code }}</strong> returns it to Drafted so the applicant can edit and confirm again.
+                </p>
+            }
+            <label for="cred-pipeline-reopen-reason" class="cred-pipeline__filter-label">Reason</label>
+            <textarea
+                id="cred-pipeline-reopen-reason"
+                class="mj-input cred-pipeline__textarea"
+                rows="3"
+                [disabled]="IsReopening"
+                [(ngModel)]="ReopenReason"></textarea>
+            @if (ReopenError) {
+                <mj-alert Variant="error" [Message]="ReopenError"></mj-alert>
+            }
+        </div>
+        <mj-dialog-actions>
+            <button mjButton Variant="primary" type="button" [disabled]="IsReopening" (click)="ConfirmReopen()">
+                {{ IsReopening ? 'Reopening...' : 'Reopen answer' }}
+            </button>
+            <button mjButton Variant="outline" type="button" [disabled]="IsReopening" (click)="CloseReopenDialog()">
+                Cancel
+            </button>
+        </mj-dialog-actions>
+    </mj-dialog>
+
+    <mj-dialog [Visible]="WithdrawDialogOpen" Title="Withdraw application" Size="md" (Close)="CloseWithdrawDialog()">
+        <div class="cred-pipeline__reissue-body">
+            <p class="cred-pipeline__subtitle">
+                Withdrawing closes this application and records your reason.
+            </p>
+            <label for="cred-pipeline-withdraw-reason" class="cred-pipeline__filter-label">Reason</label>
+            <textarea
+                id="cred-pipeline-withdraw-reason"
+                class="mj-input cred-pipeline__textarea"
+                rows="3"
+                [disabled]="IsWithdrawing"
+                [(ngModel)]="WithdrawReason"></textarea>
+            @if (WithdrawError) {
+                <mj-alert Variant="error" [Message]="WithdrawError"></mj-alert>
+            }
+        </div>
+        <mj-dialog-actions>
+            <button mjButton Variant="primary" type="button" [disabled]="IsWithdrawing" (click)="ConfirmWithdraw()">
+                {{ IsWithdrawing ? 'Withdrawing...' : 'Withdraw' }}
+            </button>
+            <button mjButton Variant="outline" type="button" [disabled]="IsWithdrawing" (click)="CloseWithdrawDialog()">
+                Cancel
+            </button>
         </mj-dialog-actions>
     </mj-dialog>
 </div>

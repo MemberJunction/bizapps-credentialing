@@ -68,6 +68,11 @@ describe('Credentialing Integration Test Bundles', () => {
         expect(ids).toEqual(Array.from({ length: 12 }, (_, i) => `cred-subject-isolation.${i + 1}`));
     });
 
+    it('registers the cred-responses bundle with its twelve checks', () => {
+        const ids = IntegrationCheckRegistry.Instance.GetBundle('cred-responses').map((c) => c.Id);
+        expect(ids).toEqual(Array.from({ length: 12 }, (_, i) => `cred-responses.${i + 1}`));
+    });
+
     it('marks every rule, operation, isolation and world seeding check as mutating', () => {
         const checks = [
             ...IntegrationCheckRegistry.Instance.GetBundle('cred-version-rules'),

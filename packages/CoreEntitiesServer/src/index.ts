@@ -40,6 +40,10 @@ import { ReissueInvitationServerOperation } from './operations/ReissueInvitation
 import { ReorderVersionTreeServerOperation } from './operations/ReorderVersionTreeServerOperation.js';
 import { GetMySubjectsServerOperation } from './operations/GetMySubjectsServerOperation.js';
 import { GetApplicationWorkspaceServerOperation } from './operations/GetApplicationWorkspaceServerOperation.js';
+import { SaveResponseServerOperation } from './operations/SaveResponseServerOperation.js';
+import { ConfirmResponseServerOperation } from './operations/ConfirmResponseServerOperation.js';
+import { ReopenResponseServerOperation } from './operations/ReopenResponseServerOperation.js';
+import { WithdrawApplicationServerOperation } from './operations/WithdrawApplicationServerOperation.js';
 
 export {
     AccreditingOrganizationEntityServer,
@@ -116,6 +120,10 @@ export { ReissueInvitationServerOperation } from './operations/ReissueInvitation
 export { INTERNAL_ACCOUNT_REASON, INVITATION_LINK_FAILED_NOTE } from './operations/InvitationSupport.js';
 export { GetMySubjectsServerOperation } from './operations/GetMySubjectsServerOperation.js';
 export { GetApplicationWorkspaceServerOperation } from './operations/GetApplicationWorkspaceServerOperation.js';
+export { SaveResponseServerOperation } from './operations/SaveResponseServerOperation.js';
+export { ConfirmResponseServerOperation } from './operations/ConfirmResponseServerOperation.js';
+export { ReopenResponseServerOperation } from './operations/ReopenResponseServerOperation.js';
+export { WithdrawApplicationServerOperation } from './operations/WithdrawApplicationServerOperation.js';
 
 /**
  * Bootstrap / anti-tree-shaking anchor, called by the server bootstrap. Referencing the classes keeps
@@ -154,8 +162,12 @@ export function LoadBizAppsCredentialingEntitiesServer(): void {
         ReissueInvitationServerOperation,
         GetMySubjectsServerOperation,
         GetApplicationWorkspaceServerOperation,
+        SaveResponseServerOperation,
+        ConfirmResponseServerOperation,
+        ReopenResponseServerOperation,
+        WithdrawApplicationServerOperation,
     ];
-    if (anchor.length !== 17 || operations.length !== 9) {
+    if (anchor.length !== 17 || operations.length !== 13) {
         throw new Error('credentialing server entity subclasses or operations missing');
     }
 }

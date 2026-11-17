@@ -34,12 +34,14 @@ export interface WorkspaceStandardResponse {
     ResponseText: string | null;
     SelfAssessment: SelfAssessment | null;
     AuthorType: 'Human' | 'Agent';
+    ConfirmedByName: string | null;
     ConfirmedAt: string | null;
     UpdatedAt: string;
     SourceType: string | null;
     SourceLabel: string | null;
     SourceRetrievedAt: string | null;
     IsStale: boolean;
+    ReopenReason: string | null;
     Explanation: WorkspaceExplanation | null;
     Citations: WorkspaceCitation[];
 }

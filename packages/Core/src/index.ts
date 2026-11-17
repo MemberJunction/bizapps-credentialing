@@ -36,3 +36,7 @@ export * from './operations/InviteApplicantOperation.js';
 export * from './operations/ReissueInvitationOperation.js';
 export * from './operations/GetMySubjectsOperation.js';
 export * from './operations/GetApplicationWorkspaceOperation.js';
+export * from './operations/SaveResponseOperation.js';
+export * from './operations/ConfirmResponseOperation.js';
+export * from './operations/ReopenResponseOperation.js';
+export * from './operations/WithdrawApplicationOperation.js';

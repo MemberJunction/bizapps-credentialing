@@ -1,0 +1,35 @@
+<nav class="cred-rail" aria-label="Application sections">
+    <h2 class="cred-rail__heading">Sections</h2>
+    <ul class="cred-rail__list">
+        @for (section of Sections; track section.SectionID) {
+            @let counts = CountsFor(section);
+            <li>
+                <button
+                    type="button"
+                    class="cred-rail__item"
+                    [class.cred-rail__item--active]="IsActive(section.SectionID)"
+                    [attr.aria-current]="IsActive(section.SectionID) ? 'true' : null"
+                    (click)="SelectSection(section.SectionID)">
+                    <div class="cred-rail__row">
+                        <span class="cred-rail__title">{{ section.Number }}. {{ section.Name }}</span>
+                        @if (counts.HasNew) {
+                            <span class="cred-rail__new">NEW</span>
+                        }
+                    </div>
+                    <div class="cred-rail__meta">
+                        <span class="cred-rail__counts">{{ counts.Confirmed }}/{{ counts.Total }}</span>
+                    </div>
+                    <div
+                        class="cred-rail__track"
+                        role="progressbar"
+                        [attr.aria-label]="section.Number + ' ' + section.Name + ' progress'"
+                        aria-valuemin="0"
+                        [attr.aria-valuemax]="counts.Total"
+                        [attr.aria-valuenow]="counts.Confirmed">
+                        <div class="cred-rail__fill" [style.width.%]="counts.Percent"></div>
+                    </div>
+                </button>
+            </li>
+        }
+    </ul>
+</nav>

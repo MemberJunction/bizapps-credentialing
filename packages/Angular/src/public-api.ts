@@ -73,6 +73,33 @@ export {
     APPLICANT_NOT_AVAILABLE_MESSAGE,
     type ApplicantViewResolution,
 } from './lib/applicant/my-applications/my-applications-model';
+export {
+    StandardsRunnerPage,
+    type RunnerNavigationState,
+} from './lib/applicant/standards-runner/standards-runner.page';
+export { SectionRailComponent } from './lib/applicant/standards-runner/section-rail.component';
+export { StandardCardComponent } from './lib/applicant/standards-runner/standard-card.component';
+export {
+    ParseRunnerFilter,
+    MatchesRunnerFilter,
+    IntakeSentence,
+    ResponseStateLabel,
+    SectionCounts,
+    ApplicationCounts,
+    ResolveCardActions,
+    ResolveRunnerSelection,
+    ApplyResponseUpdate,
+    RUNNER_FILTER_OPTIONS,
+    CANNOT_PREFILL_BANNER,
+    CONFIRMED_LOCKED_SENTENCE,
+    SAVE_DRAFT_BEFORE_CONFIRMING_REASON,
+    NO_CHANGES_TO_SAVE_REASON,
+    type RunnerFilter,
+    type RunnerFilterOption,
+    type SectionProgressSummary,
+    type CardActions,
+    type RunnerSelection,
+} from './lib/applicant/standards-runner/runner-model';
 
 /**
  * Bootstrap function named by mj-app.json packages.client[0].startupExport.
