@@ -102,6 +102,25 @@ export class AreaNav {
         return AreaNav.ItemsFor(standing).some((item) => item.DriverClass.toLowerCase() === wanted);
     }
 
+    /**
+     * The nav item label an open tab of `driverClass` should carry after the standing changed, or null
+     * when it already carries it (or the area is gone, or the tab has no nav item name). Organization
+     * setup's item is `Set up organization` while there is no organization and `New organization`
+     * after, both driven by the same resource: the tab that created the first organization must
+     * become the `New organization` item.
+     */
+    public static RetargetTab(currentNavItemName: string | null, driverClass: string, standing: Standing): string | null {
+        if (!currentNavItemName) {
+            return null;
+        }
+        const wanted = driverClass.trim().toLowerCase();
+        const item = AreaNav.ItemsFor(standing).find((i) => i.DriverClass.toLowerCase() === wanted);
+        if (!item || item.Label === currentNavItemName) {
+            return null;
+        }
+        return item.Label;
+    }
+
     /** What the Staff area shows for this user. */
     public static StaffState(standing: Standing): StaffState {
         if (AreaNav.holds(standing, CredentialingRole.Admin) && standing.OrganizationCount === 0) {

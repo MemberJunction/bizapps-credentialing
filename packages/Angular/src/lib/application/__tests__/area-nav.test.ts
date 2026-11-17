@@ -149,3 +149,26 @@ describe('AreaNav.CanOpen', () => {
         expect(AreaNav.CanOpen(standing([CredentialingRole.Applicant]), R.ApplicantHome.toLowerCase())).toBe(true);
     });
 });
+
+describe('AreaNav.RetargetTab', () => {
+    const admin = CredentialingRole.Admin;
+
+    it('a Set up organization tab becomes New organization once the first organization exists', () => {
+        const after = standing([admin], [], 1);
+        expect(AreaNav.RetargetTab('Set up organization', CredentialingResource.OrganizationSetup, after)).toBe('New organization');
+    });
+
+    it('a tab that already carries the current label needs no change', () => {
+        expect(AreaNav.RetargetTab('New organization', CredentialingResource.OrganizationSetup, standing([admin], [], 1))).toBeNull();
+        expect(AreaNav.RetargetTab('Set up organization', CredentialingResource.OrganizationSetup, standing([admin], [], 0))).toBeNull();
+    });
+
+    it('nothing changes when the standing no longer shows the area, or for a tab without a nav item name', () => {
+        expect(AreaNav.RetargetTab('Set up organization', CredentialingResource.OrganizationSetup, standing([CredentialingRole.Staff], [ORG_A]))).toBeNull();
+        expect(AreaNav.RetargetTab(null, CredentialingResource.OrganizationSetup, standing([admin], [], 1))).toBeNull();
+    });
+
+    it('matches the driver class without regard to case', () => {
+        expect(AreaNav.RetargetTab('Set up organization', CredentialingResource.OrganizationSetup.toLowerCase(), standing([admin], [], 2))).toBe('New organization');
+    });
+});

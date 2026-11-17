@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import type { RunViewParams, RunViewResult } from '@memberjunction/core';
 import { CredentialingEntity } from '@mj-biz-apps/credentialing-core';
-import { CredentialingRole } from '../../application/area-nav';
+import { AreaNav, CredentialingResource, CredentialingRole } from '../../application/area-nav';
 import { StandingDataSource, StandingService, StandingUser } from '../standing.service';
 
 const ORG_A = { ID: 'A1111111-1111-1111-1111-111111111111', Name: 'Organization A' };
@@ -81,6 +81,32 @@ describe('StandingService', () => {
         expect(source.Calls).toHaveLength(1);
         await new StandingService(source).Reload();
         expect(source.Calls).toHaveLength(2);
+    });
+
+    it('after the first organization is created, Reload gives the standing whose nav item is New organization', async () => {
+        // The database answers 0 organizations, then 1 once the admin has set one up.
+        let total = 0;
+        const source: StandingDataSource & { Calls: number } = {
+            CurrentUser: user('U8', [CredentialingRole.Admin]),
+            Calls: 0,
+            async RunViews<T>(params: RunViewParams[]): Promise<RunViewResult<T>[]> {
+                this.Calls++;
+                return params.map(() => count(total) as RunViewResult<T>);
+            },
+        };
+        const before = await new StandingService(source).Load();
+        expect(AreaNav.ItemsFor(before).map((i) => i.Label)).toEqual(['Set up organization']);
+
+        total = 1;
+        // Cached: a plain Load still answers from the first read.
+        expect((await new StandingService(source).Load()).OrganizationCount).toBe(0);
+        const after = await new StandingService(source).Reload();
+        expect(after.OrganizationCount).toBe(1);
+        expect(AreaNav.ItemsFor(after).map((i) => i.Label)).toEqual(['New organization']);
+        // The tab that created it is retargeted to the new item; a later Load sees the reloaded standing.
+        expect(AreaNav.RetargetTab('Set up organization', CredentialingResource.OrganizationSetup, after)).toBe('New organization');
+        expect((await new StandingService(source).Load()).OrganizationCount).toBe(1);
+        expect(source.Calls).toBe(2);
     });
 
     it('rejects when a view fails, and does not cache the failure', async () => {

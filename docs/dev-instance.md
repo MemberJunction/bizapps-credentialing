@@ -157,7 +157,7 @@ when `Credentialing` exists in `__mj.Application`, it also ensures the
 | Dependency `corepack pnpm run mj:migrate` | Each sibling repo root (`bizapps-common/`, `bizapps-tasks/`, `bizapps-committees/`) | `.env` at each sibling repo root | Leaf-first order (`common` -> `tasks` -> `committees`); **Attempt A worked** (see below) |
 | App `corepack pnpm run mj:migrate` | `bizapps-credentialing/` | `bizapps-credentialing/.env` | Creates `__mj_BizAppsCredentialing` and inserts `__mj.SchemaInfo` |
 | App `corepack pnpm run mj:codegen` | `bizapps-credentialing/` | `bizapps-credentialing/.env` | Resolves `bizapps-credentialing/mj.config.cjs` + `.env` |
-| App `corepack pnpm exec mj sync push --dir=metadata --ci` | `bizapps-credentialing/` | `bizapps-credentialing/.env` | Strip any written `sync` blocks before committing |
+| App `corepack pnpm exec mj sync push --dir=metadata --ci` | `bizapps-credentialing/` | `bizapps-credentialing/.env` | Then `corepack pnpm run metadata:strip-sync` (removes the `sync` blocks the push wrote; see "Rebuild from nothing", step 5) |
 
 ## Dependency App Database Setup (Attempt A)
 
@@ -532,26 +532,34 @@ every step below is the one that worked.
    On the first run `dev:owner` prints `Application 'Credentialing' not yet in metadata; skipping MJ:
    User Applications` — expected; step 6 adds the row.
 5. From `bizapps-credentialing/` (using `bizapps-credentialing/.env`), migrate and push app metadata,
-   then restore the metadata files:
+   then remove the `sync` blocks the push wrote:
    ```sh
    corepack pnpm run mj:migrate
    corepack pnpm exec mj sync push --dir=metadata --ci
-   git checkout -- metadata
+   corepack pnpm run metadata:strip-sync
    ```
-   The push writes a `sync` block (`lastModified`, `checksum`) into every record file it touches and
-   changes the trailing newline; that is its only change (checked with `git diff` — nothing else
-   differs), and `sync` blocks are never committed. On a fresh database the push reports
-   `created: 100, updated: 1`.
+   The push writes a `sync` block (`lastModified`, `checksum`) into every record it creates or changes
+   (`PushService`, `mj/packages/MetadataSync/src/services/PushService.ts`, "Sync metadata handling";
+   nested `relatedEntities` records too) and rewrites record files as `JSON.stringify(data, null, 2)`
+   with no trailing newline (`JsonWriteHelper`). `sync` blocks are never committed.
+   `scripts/dev/strip-sync-blocks.mjs` (`metadata:strip-sync`) removes exactly that: the `sync`
+   property of every record object (an object with `fields`) under `metadata/` and `metadata-tests/`,
+   writing 2-space JSON with the final newline the committed file has; files the push only re-wrote get
+   just their final newline back, and `.mj-sync.json` files are never touched. **Do not use
+   `git checkout`/`git restore` for this**: it would also discard any metadata edit not yet committed.
+   Proof (B1 verification): with a hand edit to three role descriptions in `metadata/roles/.roles.json`,
+   a push wrote 3 `sync` blocks and dropped 7 files' final newlines; after the script, `git diff` held
+   only the hand edit. On a fresh database the push reports `created: 100, updated: 1`.
 6. Ensure `admin@memberjunction.org` has the `MJ: User Applications` row for `Credentialing` (either via `corepack pnpm run dev:owner` in `bizapps-credentialing/` when no browser is needed — idempotent via entity objects — or in Explorer via **Application launcher → Configure… → Available Applications → Add Credentialing → Save Changes**):
    ```sh
    corepack pnpm run dev:owner     # Granted MJ: User Applications 'Credentialing' to 'admin@memberjunction.org'.
    ```
 7. From `bizapps-credentialing/`, build this app's packages, push the integration test rows
-   (`MJ: Tests`) and restore their files the same way, then confirm CodeGen has nothing to change:
+   (`MJ: Tests`) and strip their `sync` blocks the same way, then confirm CodeGen has nothing to change:
    ```sh
    corepack pnpm run build:packages
    corepack pnpm exec mj sync push --dir=metadata-tests --ci     # created: 7
-   git checkout -- metadata-tests
+   corepack pnpm run metadata:strip-sync
    corepack pnpm run mj:codegen                                  # 520 entities
    git status --short                                            # nothing under migrations/ or src/generated/
    ```
@@ -587,6 +595,13 @@ every step below is the one that worked.
 11. Set `MJ_API_KEY` in `bizapps-credentialing/.env` for the client-transport harness. It is
    MJAPI's **system** API key — the same value as `MJ_API_KEY` in `mj/.env` — not a user
    `mj_sk_…` key (see "Running tests" below). No key is created in Explorer or in the database.
+   Generate it as 32 random bytes in hex and write the same value to both files without printing it
+   (MJ's installer does not generate this key; any secret string works, MJAPI compares it with
+   `x-mj-api-key`); restart MJAPI afterwards. To rotate it, repeat this and rerun
+   `corepack pnpm run test:integration`:
+   ```sh
+   K=$(openssl rand -hex 32)   # then MJ_API_KEY=$K in mj/.env and bizapps-credentialing/.env
+   ```
 
 Steps 9–11 are one-time `.env` settings; on a rebuild of an instance that already has them, check
 that each is present and non-empty (`grep -c '^MJ_MAGIC_LINK_PRIVATE_KEY=.' mj/.env`) and move on.
@@ -873,4 +888,38 @@ error caught`, then the sentence); those console errors are expected for a refus
 **URL.** The open program and version are `?programId=…&versionId=…`; the resource writes them with
 `UpdateQueryParams` when the page emits `SelectionChanged` and applies them in `OnQueryParamsChanged`.
 A `programId` the user cannot read shows `Program not found` (`This program does not exist, or you do
-not have access to it.`), the same as an ID that does not exist.
+not have access to it.`), the same as an ID that does not exist, and the URL keeps the pasted IDs.
+
+The page emits after **every** load that found the program (`StudioUrl.SelectionAfterLoad`,
+`packages/Angular/src/lib/staff/program-studio/studio-url.ts`), not only after a click. Why: on a full
+page load of a URL without query params (for example `/app/credentialing/Program%20Studio`), MJ v6.2.2
+restores the saved tab with its own saved `queryParams` ("a bare deep link to an open tab keeps that
+tab's saved state", `mj/packages/Angular/Explorer/explorer-core/src/lib/shell/deep-link-workspace.ts`)
+and does not write the URL while starting from a URL (`ShellComponent.syncUrlWithWorkspace` returns
+while `urlBasedNavigation` is set). The resource received the restored program through
+`GetQueryParams`/`OnQueryParamsChanged`, so the address bar stayed bare. Writing the selection back with
+`UpdateQueryParams` updates the tab configuration; `WorkspaceStateManager.UpdateConfiguration` always
+publishes, and the shell then rebuilds the URL (`buildResourceUrl`). Measured: the bare URL becomes
+`?programId=…&versionId=…` of the restored program; selecting a version, Edit in draft and deleting a
+draft each leave the URL naming what is shown; a reload keeps URL, program and version; the copied URL
+opened in a fresh browser context as staff-a shows that program and version even when the user's saved
+workspace holds another version; as staff-b it shows `Program not found`.
+
+## Organization setup and the nav bar
+
+MJ v6.2.2 has no call by which an application tells the shell its nav items changed (no such method on
+`BaseApplication`, `mj/packages/Angular/Explorer/base-application/src/lib/base-application.ts`). The nav
+bar calls `GetNavItems()` again on every `WorkspaceStateManager.Configuration` emission
+(`AppNavComponent.ngOnInit`, `explorer-core/src/lib/shell/components/header/app-nav.component.ts:146-157`).
+So after `Credentialing.CreateOrganization` succeeds, `CredentialingOrganizationSetupResource` reloads
+the cached standing (`StandingService.Reload`) and retargets **its own tab** to the item the new standing
+shows (`AreaNav.RetargetTab`): `WorkspaceStateManager.UpdateTabTitle` and
+`UpdateTabConfiguration(tabId, { navItemName })`. That configuration change rebuilds the nav bar from the
+reloaded standing and makes the shell rewrite the URL to `/app/credentialing/New%20organization`. The
+component is kept (the tab container's content signature, `getTabContentSignature`, does not include
+`navItemName`), so the success sentence stays. Measured on this database (organizations already exist):
+the admin opened `/app/credentialing/Set%20up%20organization`, created `Sample Accrediting Body C`, and the
+URL and browser title became `New organization` without a reload, with the success sentence on screen.
+The 0 → 1 transition itself (the label changing from `Set up organization`) is proven by unit test
+(`standing.service.test.ts`, "after the first organization is created …"); it was not re-run in the
+browser because this database has organizations and none is rebuilt for it.

@@ -7,7 +7,9 @@
  * through `ProviderToUse` and asks the page to reload. A program the user cannot read shows a
  * not-found state, never another organization's program and never an empty tree; a failed load
  * shows its error. The page navigates nowhere: it emits {@link SelectionChanged} and its host keeps
- * the URL in step.
+ * the URL in step. It emits after every load that found the program — also when the program came in
+ * through the inputs (a pasted link, or a tab Explorer restored with its saved params while the URL
+ * carried none), so the address bar always names what is open ({@link StudioUrl}).
  */
 import { ChangeDetectorRef, Component, EventEmitter, Input, Output, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
@@ -20,6 +22,7 @@ import { ProgramListComponent } from './program-list.component';
 import { ProgramWizardComponent, type WizardOrganization } from './program-wizard.component';
 import { StandardEditorComponent, type NewStandardTarget } from './standard-editor.component';
 import { StudioData, type ProgramBundle } from './studio-data';
+import { StudioUrl } from './studio-url';
 import { StudioViewModel, type StudioVersionView } from './studio-view-model';
 import { VersionSettingsComponent } from './version-settings.component';
 import { VersionTreeComponent } from './version-tree.component';
@@ -77,7 +80,7 @@ export class ProgramStudioPage extends BaseAngularComponent {
             return;
         }
         if (this._programID?.toLowerCase() !== id.toLowerCase()) {
-            void this.openProgram(id, this.requestedVersionID, false);
+            void this.openProgram(id, this.requestedVersionID);
         }
     }
     get ProgramID(): string | null {
@@ -89,7 +92,7 @@ export class ProgramStudioPage extends BaseAngularComponent {
     set VersionID(value: string | null) {
         this.requestedVersionID = value?.trim() || null;
         if (this.requestedVersionID && this.Bundle) {
-            this.selectVersion(this.requestedVersionID, false);
+            this.selectVersion(this.requestedVersionID);
         }
     }
     get VersionID(): string | null {
@@ -139,7 +142,7 @@ export class ProgramStudioPage extends BaseAngularComponent {
     // ---- Events from the widgets ---------------------------------------------------------------
 
     public OnProgramSelected(programID: string): void {
-        void this.openProgram(programID, null, true);
+        void this.openProgram(programID, null);
     }
 
     public OnNewProgramRequested(): void {
@@ -154,12 +157,12 @@ export class ProgramStudioPage extends BaseAngularComponent {
 
     public OnProgramCreated(created: { ProgramID: string; VersionID: string }): void {
         this.ListRefresh++;
-        void this.openProgram(created.ProgramID, created.VersionID, true);
+        void this.openProgram(created.ProgramID, created.VersionID);
     }
 
     public OnVersionPicked(versionID: string | null): void {
         if (versionID) {
-            this.selectVersion(versionID, true);
+            this.selectVersion(versionID);
         }
     }
 
@@ -172,7 +175,7 @@ export class ProgramStudioPage extends BaseAngularComponent {
     public async OnVersionChanged(versionID: string): Promise<void> {
         this.closeEditor();
         await this.reload(versionID || null);
-        this.emitSelection();
+        this.publishSelection();
     }
 
     public async OnReloadRequested(): Promise<void> {
@@ -204,7 +207,7 @@ export class ProgramStudioPage extends BaseAngularComponent {
 
     // ---- Loading ---------------------------------------------------------------------------------
 
-    private async openProgram(programID: string, versionID: string | null, emit: boolean): Promise<void> {
+    private async openProgram(programID: string, versionID: string | null): Promise<void> {
         this._programID = programID;
         this.Mode = 'Program';
         this.LoadState = 'Loading';
@@ -212,9 +215,9 @@ export class ProgramStudioPage extends BaseAngularComponent {
         this.Tab = 'Standards';
         this.closeEditor();
         this.cdr.markForCheck();
-        await this.load(versionID);
-        if (emit) {
-            this.emitSelection();
+        const token = await this.load(versionID);
+        if (token === this.loadToken) {
+            this.publishSelection();
         }
     }
 
@@ -230,21 +233,22 @@ export class ProgramStudioPage extends BaseAngularComponent {
         }
     }
 
-    private async load(versionID: string | null): Promise<void> {
+    /** Loads the open program; returns the load's token (a later load supersedes it). */
+    private async load(versionID: string | null): Promise<number> {
         const programID = this._programID;
         if (programID == null) {
-            return;
+            return this.loadToken;
         }
         const token = ++this.loadToken;
         try {
             const result = await StudioData.ForProvider(this.ProviderToUse).LoadProgram(programID);
             if (token !== this.loadToken) {
-                return;
+                return token;
             }
             if (!result.Found) {
                 this.Bundle = null;
                 this.LoadState = 'NotFound';
-                return;
+                return token;
             }
             this.Bundle = result.Bundle;
             this.SelectedVersionID = StudioViewModel.PickVersion(result.Bundle.Versions, versionID)?.ID ?? null;
@@ -260,9 +264,10 @@ export class ProgramStudioPage extends BaseAngularComponent {
                 this.cdr.markForCheck();
             }
         }
+        return token;
     }
 
-    private selectVersion(versionID: string, emit: boolean): void {
+    private selectVersion(versionID: string): void {
         const picked = StudioViewModel.PickVersion(this.Bundle?.Versions ?? [], versionID);
         if (picked == null || picked.ID === this.SelectedVersionID) {
             return;
@@ -270,9 +275,7 @@ export class ProgramStudioPage extends BaseAngularComponent {
         this.SelectedVersionID = picked.ID;
         this.closeEditor();
         this.cdr.markForCheck();
-        if (emit) {
-            this.emitSelection();
-        }
+        this.publishSelection();
     }
 
     private closeEditor(): void {
@@ -280,7 +283,11 @@ export class ProgramStudioPage extends BaseAngularComponent {
         this.NewStandard = null;
     }
 
-    private emitSelection(): void {
-        this.SelectionChanged.emit({ ProgramID: this._programID, VersionID: this.SelectedVersionID });
+    /** Tells the host what is open, when a program is loaded (see {@link StudioUrl.SelectionAfterLoad}). */
+    private publishSelection(): void {
+        const selection = StudioUrl.SelectionAfterLoad(this.LoadState === 'Loaded', this._programID, this.SelectedVersionID);
+        if (selection) {
+            this.SelectionChanged.emit(selection);
+        }
     }
 }

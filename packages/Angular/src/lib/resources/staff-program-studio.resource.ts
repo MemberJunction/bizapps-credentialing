@@ -6,8 +6,10 @@
  * organization, instead of an empty screen. A member gets `<bizapps-cred-program-studio>`.
  *
  * The open program and version round-trip through the URL as `programId` / `versionId`: the page's
- * `SelectionChanged` is written with `UpdateQueryParams`, and back/forward or a pasted link reaches
- * the page through `OnQueryParamsChanged`.
+ * `SelectionChanged` — emitted after every load that found the program, including one that came from
+ * a restored tab's saved params — is written with `UpdateQueryParams`, and back/forward or a pasted
+ * link reaches the page through `OnQueryParamsChanged` ({@link StudioUrl} explains the restored-tab
+ * case).
  */
 import { Component } from '@angular/core';
 import { ResourceData } from '@memberjunction/core-entities';
@@ -17,10 +19,10 @@ import { SharedGenericModule } from '@memberjunction/ng-shared-generic';
 import { MJAlertComponent, MJEmptyStateComponent } from '@memberjunction/ng-ui-components';
 import { CredentialingResource, type StaffOrganization, type Standing } from '../application/area-nav';
 import { ProgramStudioPage, type StudioSelection } from '../staff/program-studio/program-studio.page';
+import { PROGRAM_STUDIO_PARAMS, StudioUrl } from '../staff/program-studio/studio-url';
 import { CredentialingAreaResource } from './credentialing-area-resource';
 
-/** The query parameters Program Studio keeps in the URL. */
-export const PROGRAM_STUDIO_PARAMS = { Program: 'programId', Version: 'versionId' } as const;
+export { PROGRAM_STUDIO_PARAMS };
 
 @RegisterClass(BaseResourceComponent, 'CredentialingProgramStudioResource')
 @Component({
@@ -83,7 +85,7 @@ export class CredentialingProgramStudioResource extends CredentialingAreaResourc
     public OnSelectionChanged(selection: StudioSelection): void {
         this.ProgramParam = selection.ProgramID;
         this.VersionParam = selection.VersionID;
-        this.UpdateQueryParams({ [PROGRAM_STUDIO_PARAMS.Program]: selection.ProgramID, [PROGRAM_STUDIO_PARAMS.Version]: selection.VersionID });
+        this.UpdateQueryParams(StudioUrl.ToParams(selection));
     }
 
     /** Back/forward or a pasted link changed the URL: show what it names. */
@@ -93,8 +95,9 @@ export class CredentialingProgramStudioResource extends CredentialingAreaResourc
     }
 
     private applyParams(params: Record<string, string>): void {
-        this.VersionParam = params[PROGRAM_STUDIO_PARAMS.Version] || null;
-        this.ProgramParam = params[PROGRAM_STUDIO_PARAMS.Program] || null;
+        const selection = StudioUrl.FromParams(params);
+        this.VersionParam = selection.VersionID;
+        this.ProgramParam = selection.ProgramID;
     }
 
     async GetResourceDisplayName(_data: ResourceData): Promise<string> {
