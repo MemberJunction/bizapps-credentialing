@@ -2,16 +2,19 @@
  * The documents a version asks applicants for (FRD FR-2.7): name, whether it is required, and
  * whether the applicant may mark it restricted. Authoring is Draft-only; on any other version the
  * list renders as read-only text and no authoring control exists. Each add, edit and delete is a
- * single-record write; a refusal is shown verbatim beside the row or form that caused it.
+ * single-record write; a refusal is shown beside the field, row or form that caused it, as
+ * {@link StudioMessages} words it. A blank name is refused here first, with the server's sentence. A
+ * refusal that means the screen is out of date stays visible, closes the form and reloads the list.
  */
 import { ChangeDetectorRef, Component, EventEmitter, Input, Output, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { BaseAngularComponent } from '@memberjunction/ng-base-types';
 import { MJButtonDirective, MJConfirmService, MJDropdownComponent, MJSwitchComponent } from '@memberjunction/ng-ui-components';
-import { CredentialingEntity } from '@mj-biz-apps/credentialing-core';
+import { CredentialingEntity, NOT_FOUND_REASON, StandardAuthoringRules } from '@mj-biz-apps/credentialing-core';
 import type { mjBizAppsCredentialingDocumentRequirementEntity } from '@mj-biz-apps/credentialing-entities';
 import type { RequirementRow } from './studio-data';
-import { StudioTree } from './studio-tree';
+import { StudioTree, type RequirementErrorField } from './studio-tree';
+import { StudioMessages, type StudioMessageKind } from '../studio-messages';
 
 type RequirementEntity = mjBizAppsCredentialingDocumentRequirementEntity;
 
@@ -69,6 +72,12 @@ export class DocumentRequirementsComponent extends BaseAngularComponent {
         return this.ErrorTarget != null && this.ErrorTarget.toLowerCase() === target.toLowerCase() ? this.ErrorMessage : '';
     }
 
+    /** The refusal for one field of the open form (`target` is `new` or the requirement's ID), or ''. */
+    public FieldErrorFor(target: ErrorTarget, field: RequirementErrorField): string {
+        const message = this.ErrorFor(target);
+        return message && StudioTree.RequirementFieldFor(message) === field ? message : '';
+    }
+
     public async StartAdd(): Promise<void> {
         await this.run('new', async () => {
             const requirement = await this.newEntity();
@@ -80,13 +89,17 @@ export class DocumentRequirementsComponent extends BaseAngularComponent {
     }
 
     public async StartEdit(row: RequirementRow): Promise<void> {
-        await this.run(row.ID, async () => {
-            const requirement = await this.newEntity();
-            if (!(await requirement.Load(row.ID))) {
-                throw new Error('Record not found.');
-            }
-            this.Editing = requirement;
-        });
+        await this.run(
+            row.ID,
+            async () => {
+                const requirement = await this.newEntity();
+                if (!(await requirement.Load(row.ID))) {
+                    throw new Error(NOT_FOUND_REASON);
+                }
+                this.Editing = requirement;
+            },
+            'load',
+        );
     }
 
     public CancelEdit(): void {
@@ -101,6 +114,10 @@ export class DocumentRequirementsComponent extends BaseAngularComponent {
         }
         const target: ErrorTarget = requirement.IsSaved ? requirement.ID : 'new';
         await this.run(target, async () => {
+            const text = StandardAuthoringRules.CheckDocumentRequirementText({ Name: requirement.Name });
+            if (!text.Allowed) {
+                throw new Error(text.Reason);
+            }
             if (!(await requirement.Save())) {
                 throw new Error(requirement.LatestResult?.CompleteMessage || 'The document requirement was not saved.');
             }
@@ -116,7 +133,7 @@ export class DocumentRequirementsComponent extends BaseAngularComponent {
         await this.run(row.ID, async () => {
             const requirement = await this.newEntity();
             if (!(await requirement.Load(row.ID))) {
-                throw new Error('Record not found.');
+                throw new Error(NOT_FOUND_REASON);
             }
             if (!(await requirement.Delete())) {
                 throw new Error(requirement.LatestResult?.CompleteMessage || 'The document requirement was not deleted.');
@@ -129,8 +146,11 @@ export class DocumentRequirementsComponent extends BaseAngularComponent {
         return this.ProviderToUse.GetEntityObject<RequirementEntity>(CredentialingEntity.DocumentRequirement, this.ProviderToUse.CurrentUser);
     }
 
-    /** Runs one write, showing a refusal or failure beside `target`. */
-    private async run(target: ErrorTarget, work: () => Promise<void>): Promise<void> {
+    /**
+     * Runs one action, showing a refusal or failure beside `target`. A refusal that means the screen is
+     * out of date keeps its message, closes the form and asks the page to reload what is stored.
+     */
+    private async run(target: ErrorTarget, work: () => Promise<void>, kind: StudioMessageKind = 'save'): Promise<void> {
         if (this.IsBusy) {
             return;
         }
@@ -140,8 +160,12 @@ export class DocumentRequirementsComponent extends BaseAngularComponent {
         try {
             await work();
         } catch (e) {
-            this.ErrorMessage = e instanceof Error ? e.message : String(e);
+            this.ErrorMessage = StudioMessages.FromError(e, kind);
             this.ErrorTarget = target;
+            if (StudioMessages.MeansStaleView(this.ErrorMessage)) {
+                this.Editing = null;
+                this.Changed.emit();
+            }
         } finally {
             this.IsBusy = false;
             this.cdr.markForCheck();

@@ -88,6 +88,7 @@
                                                         [StandardID]="SelectedStandardID"
                                                         [NewStandard]="NewStandard"
                                                         (Saved)="OnStandardSaved($event)"
+                                                        (ReloadRequested)="OnReloadRequested()"
                                                         (Closed)="OnEditorClosed()">
                                                     </bizapps-cred-standard-editor>
                                                 }
@@ -98,7 +99,8 @@
                                                 [Provider]="Provider"
                                                 [Version]="SelectedVersion"
                                                 [Committees]="bundle.Committees"
-                                                (Saved)="OnReloadRequested()">
+                                                (Saved)="OnReloadRequested()"
+                                                (ReloadRequested)="OnReloadRequested()">
                                             </bizapps-cred-version-settings>
                                         }
                                         @case ('Documents') {

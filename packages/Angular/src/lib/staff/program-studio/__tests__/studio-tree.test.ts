@@ -65,6 +65,17 @@ describe('StudioTree helpers', () => {
         expect(StudioTree.SectionFieldFor('Section number 1 is already used in this version.')).toBe('Number');
         expect(StudioTree.SectionFieldFor("Remove this section's standards before deleting it.")).toBe('Form');
     });
+
+    it('places each required-text refusal beside the field it names', () => {
+        expect(StudioTree.StandardFieldFor("Enter the standard's code.")).toBe('Code');
+        expect(StudioTree.StandardFieldFor("Enter the standard's statement.")).toBe('Statement');
+        expect(StudioTree.SectionFieldFor("Enter the section's number.")).toBe('Number');
+        expect(StudioTree.SectionFieldFor("Enter the section's name.")).toBe('Name');
+        expect(StudioTree.SectionFieldFor('Sections and standards can only be edited on a Draft version. Use "Edit in draft" to create one.')).toBe('Form');
+        expect(StudioTree.RequirementFieldFor("Enter the document's name.")).toBe('Name');
+        expect(StudioTree.RequirementFieldFor('A document requirement named Charter already exists in this version.')).toBe('Name');
+        expect(StudioTree.RequirementFieldFor('This record was changed by someone else. Reload it and try again.')).toBe('Form');
+    });
 });
 
 describe('StudioViewModel.PickVersion', () => {

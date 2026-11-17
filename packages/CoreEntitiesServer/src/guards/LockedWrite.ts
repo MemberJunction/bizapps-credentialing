@@ -11,10 +11,7 @@ import {
     type UserInfo,
 } from '@memberjunction/core';
 import { IsValidUUID } from '@memberjunction/global';
-import { NOT_FOUND_REASON, type RuleResult } from '@mj-biz-apps/credentialing-core';
-
-/** The refusal given when the row changed after it was loaded (or after the caller's client read it). */
-export const STALE_RECORD_REASON = 'This record was changed by someone else. Reload it and try again.';
+import { NOT_FOUND_REASON, STALE_RECORD_REASON, type RuleResult } from '@mj-biz-apps/credentialing-core';
 
 /** What kind of write a result records. */
 export type WriteKind = 'create' | 'update' | 'delete';
@@ -99,6 +96,11 @@ export class LockedWrite {
     public static LoadedString(entity: BaseEntity, fieldName: string): string | null {
         const old: unknown = entity.GetFieldByName(fieldName)?.OldValue;
         return typeof old === 'string' ? old : null;
+    }
+
+    /** Text as it is stored: without surrounding spaces, and empty rather than missing. */
+    public static Trimmed(value: string | null | undefined): string {
+        return (value ?? '').trim();
     }
 
     /** Adds a refusal to a validation result. */

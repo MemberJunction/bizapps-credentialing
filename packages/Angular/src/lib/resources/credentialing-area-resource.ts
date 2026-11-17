@@ -14,6 +14,7 @@ import { ChangeDetectorRef, Directive, OnInit, inject } from '@angular/core';
 import { BaseResourceComponent } from '@memberjunction/ng-shared';
 import { AreaNav, type Standing } from '../application/area-nav';
 import { StandingService } from '../shared/standing.service';
+import { StudioMessages } from '../staff/studio-messages';
 
 /** What a guarded resource is showing. */
 export type AreaResourceState = 'Loading' | 'NotAvailable' | 'Error' | 'Open';
@@ -57,7 +58,7 @@ export abstract class CredentialingAreaResource extends BaseResourceComponent im
             await this.OnOpen(standing);
             this.State = 'Open';
         } catch (e) {
-            this.ErrorMessage = e instanceof Error ? e.message : String(e);
+            this.ErrorMessage = StudioMessages.FromError(e, 'load');
             this.State = 'Error';
         } finally {
             this.cdr.markForCheck();

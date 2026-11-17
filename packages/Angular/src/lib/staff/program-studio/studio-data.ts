@@ -13,7 +13,7 @@
  * loaded as an entity object only when it is opened for editing.
  */
 import { RunView, type IMetadataProvider, type RunViewParams, type RunViewResult } from '@memberjunction/core';
-import { EscapeSQLString } from '@memberjunction/global';
+import { EscapeSQLString, IsValidUUID } from '@memberjunction/global';
 import { CredentialingEntity } from '@mj-biz-apps/credentialing-core';
 import type {
     mjBizAppsCredentialingAccreditingOrganizationEntity,
@@ -100,8 +100,14 @@ export class StudioData {
         return result.Results;
     }
 
-    /** The program and everything under it, in two calls. A program the user cannot read is not found. */
+    /**
+     * The program and everything under it, in two calls. A program the user cannot read is not found;
+     * neither is an ID that is not a UUID, for which nothing is read at all.
+     */
     public async LoadProgram(programID: string): Promise<ProgramLoad> {
+        if (!IsValidUUID(programID)) {
+            return { Found: false };
+        }
         const first = await this.source.RunViews<BundleRow>(StudioData.ProgramParams(programID));
         StudioData.throwIfFailed(first);
         const [program, versions, organizations] = first;

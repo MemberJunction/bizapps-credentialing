@@ -32,7 +32,11 @@
                 <div class="cred-docs__field">
                     <label [for]="'cred-doc-name-' + target">Name</label>
                     <input [id]="'cred-doc-name-' + target" name="name" type="text" class="mj-input" autocomplete="off" [(ngModel)]="Editing.Name"
-                        [attr.aria-invalid]="ErrorFor(target) ? 'true' : null" [attr.aria-describedby]="ErrorFor(target) ? 'cred-doc-error-' + target : null" />
+                        [attr.aria-invalid]="FieldErrorFor(target, 'Name') ? 'true' : null"
+                        [attr.aria-describedby]="FieldErrorFor(target, 'Name') ? 'cred-doc-name-error-' + target : (FieldErrorFor(target, 'Form') ? 'cred-doc-error-' + target : null)" />
+                    @if (FieldErrorFor(target, 'Name')) {
+                        <p [id]="'cred-doc-name-error-' + target" class="cred-docs__error" role="alert">{{ FieldErrorFor(target, 'Name') }}</p>
+                    }
                 </div>
                 <div class="cred-docs__field">
                     <label [for]="'cred-doc-description-' + target">Description</label>
@@ -51,8 +55,8 @@
                     <button mjButton Variant="outline" Size="sm" type="button" [disabled]="IsBusy" (click)="CancelEdit()">Cancel</button>
                 </div>
                 <div aria-live="polite">
-                    @if (ErrorFor(target)) {
-                        <p [id]="'cred-doc-error-' + target" class="cred-docs__error" role="alert">{{ ErrorFor(target) }}</p>
+                    @if (FieldErrorFor(target, 'Form')) {
+                        <p [id]="'cred-doc-error-' + target" class="cred-docs__error" role="alert">{{ FieldErrorFor(target, 'Form') }}</p>
                     }
                 </div>
             </form>
@@ -60,9 +64,9 @@
             <button mjButton Variant="outline" Size="sm" type="button" [disabled]="IsBusy || Editing !== null" (click)="StartAdd()">
                 <i class="fa-solid fa-plus" aria-hidden="true"></i> Add document requirement
             </button>
-            @if (ErrorFor('new')) {
-                <p class="cred-docs__error" role="alert">{{ ErrorFor('new') }}</p>
-            }
         }
+    }
+    @if (!Editing && ErrorFor('new')) {
+        <p class="cred-docs__error" role="alert">{{ ErrorFor('new') }}</p>
     }
 </section>

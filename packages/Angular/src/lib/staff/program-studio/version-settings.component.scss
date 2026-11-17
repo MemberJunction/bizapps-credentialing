@@ -66,6 +66,10 @@
     color: var(--mj-status-error);
 }
 
+.cred-settings__error--field {
+    grid-column: 2;
+}
+
 .cred-settings__saved {
     margin: 0;
     font-size: var(--mj-text-sm, 0.875rem);
@@ -75,5 +79,9 @@
 @media (max-width: 40rem) {
     .cred-settings__rows {
         grid-template-columns: 1fr;
+    }
+
+    .cred-settings__error--field {
+        grid-column: 1;
     }
 }

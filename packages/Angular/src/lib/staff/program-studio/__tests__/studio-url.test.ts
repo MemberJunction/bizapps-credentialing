@@ -15,6 +15,12 @@ describe('StudioUrl', () => {
         expect(StudioUrl.FromParams({})).toEqual({ ProgramID: null, VersionID: null });
     });
 
+    it('treats a version that is not a UUID as absent, and keeps such a program so the page shows it as not found', () => {
+        expect(StudioUrl.FromParams({ programId: PROGRAM, versionId: 'not-a-uuid' })).toEqual({ ProgramID: PROGRAM, VersionID: null });
+        expect(StudioUrl.FromParams({ programId: PROGRAM, versionId: `${VERSION}' OR 1=1 --` })).toEqual({ ProgramID: PROGRAM, VersionID: null });
+        expect(StudioUrl.FromParams({ programId: 'not-a-uuid', versionId: VERSION })).toEqual({ ProgramID: 'not-a-uuid', VersionID: VERSION });
+    });
+
     it('writes both parameters for an open program and version', () => {
         expect(StudioUrl.ToParams({ ProgramID: PROGRAM, VersionID: VERSION })).toEqual({ programId: PROGRAM, versionId: VERSION });
     });

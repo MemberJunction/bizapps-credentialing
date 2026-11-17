@@ -5,8 +5,9 @@
  * It reads a program with everything under it in ONE `RunViews` call ({@link StudioData.LoadProgram})
  * and passes the rows down; each widget writes its own single records (or calls a remote operation)
  * through `ProviderToUse` and asks the page to reload. A program the user cannot read shows a
- * not-found state, never another organization's program and never an empty tree; a failed load
- * shows its error. The page navigates nowhere: it emits {@link SelectionChanged} and its host keeps
+ * not-found state — as does a program ID that is not a UUID, for which nothing is read — never another
+ * organization's program and never an empty tree; a failed load shows a sentence, never database text
+ * ({@link StudioMessages}). The page navigates nowhere: it emits {@link SelectionChanged} and its host keeps
  * the URL in step. It emits after every load that found the program — also when the program came in
  * through the inputs (a pasted link, or a tab Explorer restored with its saved params while the URL
  * carried none), so the address bar always names what is open ({@link StudioUrl}).
@@ -15,7 +16,7 @@ import { ChangeDetectorRef, Component, EventEmitter, Input, Output, inject } fro
 import { FormsModule } from '@angular/forms';
 import { BaseAngularComponent } from '@memberjunction/ng-base-types';
 import { SharedGenericModule } from '@memberjunction/ng-shared-generic';
-import { MJAlertComponent, MJButtonDirective, MJDropdownComponent, MJEmptyStateComponent, MJTabNavComponent, type TabConfig } from '@memberjunction/ng-ui-components';
+import { MJAlertComponent, MJDropdownComponent, MJEmptyStateComponent, MJTabNavComponent, type TabConfig } from '@memberjunction/ng-ui-components';
 import type { mjBizAppsCredentialingProgramVersionEntity } from '@mj-biz-apps/credentialing-entities';
 import { DocumentRequirementsComponent } from './document-requirements.component';
 import { ProgramListComponent } from './program-list.component';
@@ -26,6 +27,7 @@ import { StudioUrl } from './studio-url';
 import { StudioViewModel, type StudioVersionView } from './studio-view-model';
 import { VersionSettingsComponent } from './version-settings.component';
 import { VersionTreeComponent } from './version-tree.component';
+import { StudioMessages } from '../studio-messages';
 
 /** What the page selects; the host mirrors it in the URL. */
 export interface StudioSelection {
@@ -47,7 +49,6 @@ export const PROGRAM_NOT_FOUND_MESSAGE = 'This program does not exist, or you do
         FormsModule,
         SharedGenericModule,
         MJAlertComponent,
-        MJButtonDirective,
         MJDropdownComponent,
         MJEmptyStateComponent,
         MJTabNavComponent,
@@ -256,7 +257,7 @@ export class ProgramStudioPage extends BaseAngularComponent {
         } catch (e) {
             if (token === this.loadToken) {
                 this.Bundle = null;
-                this.LoadError = e instanceof Error ? e.message : String(e);
+                this.LoadError = StudioMessages.FromError(e, 'load');
                 this.LoadState = 'Error';
             }
         } finally {

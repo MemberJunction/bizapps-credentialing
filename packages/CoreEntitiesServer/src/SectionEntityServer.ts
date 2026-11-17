@@ -1,7 +1,7 @@
 /**
  * Server-side subclass of Section — a section is edited only on a Draft version the caller can read,
- * stays in its version, has a number unique within its version (trimmed, ignoring case; stored
- * trimmed), and is deleted only once it holds no standards. Writes run under the version's authoring
+ * stays in its version, has a number and a name that hold text (both stored trimmed), has a number
+ * unique within its version (trimmed, ignoring case), and is deleted only once it holds no standards. Writes run under the version's authoring
  * lock (guards/AuthoringLock.ts), so the number check and the write it guards are one step and two
  * simultaneous saves of the same number give one row and one refusal with the sentence.
  */
@@ -15,7 +15,7 @@ import {
     type IMetadataProvider,
 } from '@memberjunction/core';
 import { RegisterClass, UUIDsEqual } from '@memberjunction/global';
-import { CredentialingEntity } from '@mj-biz-apps/credentialing-core';
+import { CredentialingEntity, StandardAuthoringRules } from '@mj-biz-apps/credentialing-core';
 import { mjBizAppsCredentialingSectionEntity } from '@mj-biz-apps/credentialing-entities';
 import { LockedWrite } from './guards/LockedWrite.js';
 import { VersionTree } from './guards/VersionTree.js';
@@ -30,9 +30,7 @@ export class SectionEntityServer extends mjBizAppsCredentialingSectionEntity {
     }
 
     public override async Save(options?: EntitySaveOptions): Promise<boolean> {
-        if (this.Number != null && this.Number !== this.Number.trim()) {
-            this.Number = this.Number.trim();
-        }
+        this.normalizeText();
         return LockedWrite.Run(this, this.IsSaved ? 'update' : 'create', async () => {
             await this.AcquireAuthoringLocks();
             return super.Save(options);
@@ -66,6 +64,16 @@ export class SectionEntityServer extends mjBizAppsCredentialingSectionEntity {
         return result;
     }
 
+    /** Stores the number and the name trimmed; missing text becomes empty, which the text rule refuses. */
+    private normalizeText(): void {
+        if ((!this.IsSaved || LockedWrite.AnyChanged(this, ['Number'])) && this.Number !== LockedWrite.Trimmed(this.Number)) {
+            this.Number = LockedWrite.Trimmed(this.Number);
+        }
+        if ((!this.IsSaved || LockedWrite.AnyChanged(this, ['Name'])) && this.Name !== LockedWrite.Trimmed(this.Name)) {
+            this.Name = LockedWrite.Trimmed(this.Name);
+        }
+    }
+
     /** Takes the version lock, the version resolved as the caller (none when it is unreadable). */
     protected async AcquireAuthoringLocks(): Promise<void> {
         const versionID = this.IsSaved ? LockedWrite.LoadedString(this, 'ProgramVersionID') : this.ProgramVersionID;
@@ -86,15 +94,16 @@ export class SectionEntityServer extends mjBizAppsCredentialingSectionEntity {
         if (edit != null) {
             return edit;
         }
+        if (!this.IsSaved || LockedWrite.AnyChanged(this, ['Number', 'Name'])) {
+            const text = LockedWrite.ReasonOf(StandardAuthoringRules.CheckSectionText({ Number: this.Number, Name: this.Name }));
+            if (text != null) return text;
+        }
         return !this.IsSaved || LockedWrite.AnyChanged(this, ['Number']) ? this.numberRefusal() : null;
     }
 
     /** Another section of this version with the same number (trimmed, ignoring case), read as the caller in one RunView. */
     private async numberRefusal(): Promise<string | null> {
-        const number = (this.Number ?? '').trim();
-        if (number.length === 0) {
-            return null;
-        }
+        const number = LockedWrite.Trimmed(this.Number);
         const res = await RunView.FromMetadataProvider(this.provider).RunView<{ ID: string; Number: string }>(
             { EntityName: CredentialingEntity.Section, ExtraFilter: `ProgramVersionID = '${this.ProgramVersionID}'`, Fields: ['ID', 'Number'], ResultType: 'simple' },
             this.ActiveUser,

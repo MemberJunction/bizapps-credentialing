@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import type { IMetadataProvider } from '@memberjunction/core';
+import type { BaseEntity, IMetadataProvider } from '@memberjunction/core';
 import {
     Assert,
     AssertEqual,
@@ -10,6 +10,7 @@ import {
 import { CredentialingEntity } from '@mj-biz-apps/credentialing-core';
 import type { StandardEntityServer } from '@mj-biz-apps/credentialing-core-entities-server';
 import type {
+    mjBizAppsCredentialingDocumentRequirementEntity,
     mjBizAppsCredentialingSectionEntity,
     mjBizAppsCredentialingStandardEntity,
 } from '@mj-biz-apps/credentialing-entities';
@@ -20,11 +21,32 @@ import { MakeScratchProgram, type ProgramTree } from '../world/program-tree.js';
 
 type SectionEntity = mjBizAppsCredentialingSectionEntity;
 type StandardEntity = mjBizAppsCredentialingStandardEntity;
+type RequirementEntity = mjBizAppsCredentialingDocumentRequirementEntity;
 
 const TREE_EDIT_SENTENCE = 'Sections and standards can only be edited on a Draft version. Use "Edit in draft" to create one.';
 const NOT_FOUND_SENTENCE = 'Record not found.';
 const STALE_SENTENCE = 'This record was changed by someone else. Reload it and try again.';
 const EVALUATION_MODE_SENTENCE = 'Evaluation mode cannot be edited here. It changes only through the Trust screen.';
+const BLANK_CODE_SENTENCE = "Enter the standard's code.";
+const BLANK_STATEMENT_SENTENCE = "Enter the standard's statement.";
+const BLANK_SECTION_NUMBER_SENTENCE = "Enter the section's number.";
+const BLANK_SECTION_NAME_SENTENCE = "Enter the section's name.";
+const BLANK_DOCUMENT_NAME_SENTENCE = "Enter the document's name.";
+
+/** Saves the entity and throws unless the save is refused with exactly `sentence` — no platform text beside it. */
+async function expectSaveRefusedWith(entity: BaseEntity, sentence: string): Promise<void> {
+    await ExpectSaveRefused(entity, sentence);
+    AssertEqual(entity.LatestResult?.CompleteMessage ?? '', sentence, 'the refusal is the sentence alone');
+}
+
+/** A new document requirement of `versionID` as the context user. */
+async function newRequirement(ctx: IntegrationCheckContext, versionID: string, name: string): Promise<RequirementEntity> {
+    const requirement = await ctx.Provider.GetEntityObject<RequirementEntity>(CredentialingEntity.DocumentRequirement, ctx.User);
+    requirement.NewRecord();
+    requirement.ProgramVersionID = versionID;
+    requirement.Name = name;
+    return requirement;
+}
 
 function duplicateCodeSentence(code: string): string {
     return `Standard code ${code} is already used in this version.`;
@@ -281,6 +303,77 @@ const checks: NamedCheck[] = [
                 Assert(loser.Message.includes(duplicateSectionSentence('7')), `loser gives the duplicate-number sentence, got "${loser.Message}"`);
             });
             AssertEqual(await CountRows(ctx, CredentialingEntity.Section, `ProgramVersionID = '${Quote(versionID)}' AND Number = '7'`), 1, 'sections numbered 7');
+        },
+    },
+    {
+        Id: 'cred-standard-rules.11',
+        Name: "a standard's blank code or statement is refused with its sentence, on a create and on an edit; the statement is stored trimmed",
+        RequiresMutation: true,
+        Fn: async (ctx: IntegrationCheckContext) => {
+            const world = await GetOrLoadWorld(ctx);
+            const tree = await MakeScratchProgram(ctx, world, { Sections: 1, StandardsPerSection: 1 }, ctx.User);
+            const sectionID = tree.Sections[0].Section.ID;
+            const inVersion = `ProgramVersionID = '${Quote(tree.Version.ID)}'`;
+
+            for (const blank of ['', '    ']) {
+                await expectSaveRefusedWith(await newStandard(ctx, sectionID, blank), BLANK_CODE_SENTENCE);
+                const unstated = await newStandard(ctx, sectionID, '1.8');
+                unstated.Statement = blank;
+                await expectSaveRefusedWith(unstated, BLANK_STATEMENT_SENTENCE);
+            }
+            AssertEqual(await CountRows(ctx, CredentialingEntity.Standard, inVersion), 1, 'standards after the refused creates');
+
+            const padded = await newStandard(ctx, sectionID, '1.9');
+            padded.Statement = '  A padded statement.  ';
+            await RequireSave(padded, 'adding a standard with a padded statement');
+            const stored = await loadStandard(ctx, padded.ID);
+            AssertEqual(stored.Statement, 'A padded statement.', 'the statement is stored trimmed');
+
+            stored.Statement = '    ';
+            await expectSaveRefusedWith(stored, BLANK_STATEMENT_SENTENCE);
+            const recoded = await loadStandard(ctx, padded.ID);
+            recoded.Code = '  ';
+            await expectSaveRefusedWith(recoded, BLANK_CODE_SENTENCE);
+            const after = await loadStandard(ctx, padded.ID);
+            AssertEqual(after.Statement, 'A padded statement.', 'the stored statement after the refused edit');
+            AssertEqual(after.Code, '1.9', 'the stored code after the refused edit');
+        },
+    },
+    {
+        Id: 'cred-standard-rules.12',
+        Name: "a section's blank number or name and a document requirement's blank name are refused with their sentences; names are stored trimmed",
+        RequiresMutation: true,
+        Fn: async (ctx: IntegrationCheckContext) => {
+            const world = await GetOrLoadWorld(ctx);
+            const tree = await MakeScratchProgram(ctx, world, { Sections: 1, StandardsPerSection: 1 }, ctx.User);
+            const versionID = tree.Version.ID;
+            const inVersion = `ProgramVersionID = '${Quote(versionID)}'`;
+
+            for (const blank of ['', '    ']) {
+                await expectSaveRefusedWith(await newSection(ctx, versionID, blank), BLANK_SECTION_NUMBER_SENTENCE);
+                const unnamed = await newSection(ctx, versionID, '8');
+                unnamed.Name = blank;
+                await expectSaveRefusedWith(unnamed, BLANK_SECTION_NAME_SENTENCE);
+                await expectSaveRefusedWith(await newRequirement(ctx, versionID, blank), BLANK_DOCUMENT_NAME_SENTENCE);
+            }
+            AssertEqual(await CountRows(ctx, CredentialingEntity.Section, inVersion), 1, 'sections after the refused creates');
+            AssertEqual(await CountRows(ctx, CredentialingEntity.DocumentRequirement, inVersion), 0, 'document requirements after the refused creates');
+
+            const section = await newSection(ctx, versionID, '9');
+            section.Name = '  A padded name  ';
+            await RequireSave(section, 'adding a section with a padded name');
+            AssertEqual((await loadSection(ctx, section.ID)).Name, 'A padded name', 'the section name is stored trimmed');
+            const renamed = await loadSection(ctx, section.ID);
+            renamed.Name = '   ';
+            await expectSaveRefusedWith(renamed, BLANK_SECTION_NAME_SENTENCE);
+            AssertEqual((await loadSection(ctx, section.ID)).Name, 'A padded name', 'the stored section name after the refused edit');
+
+            const requirement = await newRequirement(ctx, versionID, '  Charter  ');
+            await RequireSave(requirement, 'adding a document requirement with a padded name');
+            const stored = await LoadEntity<RequirementEntity>(ctx, CredentialingEntity.DocumentRequirement, requirement.ID);
+            AssertEqual(stored.Name, 'Charter', 'the document requirement name is stored trimmed');
+            stored.Name = '  ';
+            await expectSaveRefusedWith(stored, BLANK_DOCUMENT_NAME_SENTENCE);
         },
     },
 ];

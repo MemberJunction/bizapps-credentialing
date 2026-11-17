@@ -1,5 +1,5 @@
 import type { mjBizAppsCredentialingStandardEntity } from '@mj-biz-apps/credentialing-entities';
-import type { RuleResult } from './RuleResult.js';
+import { RequiredTextRule, type RuleResult } from './RuleResult.js';
 import type { VersionStatus } from './VersionLifecycleRules.js';
 
 /**
@@ -45,6 +45,33 @@ export class StandardAuthoringRules {
             StandardAuthoringRules.NormalizeCode(a).toLowerCase() ===
             StandardAuthoringRules.NormalizeCode(b).toLowerCase()
         );
+    }
+
+    /**
+     * Validates that a standard's code and statement each hold text once trimmed.
+     */
+    public static CheckStandardText(input: { Code: string | null | undefined; Statement: string | null | undefined }): RuleResult {
+        return RequiredTextRule.FirstBlank([
+            { Value: input.Code, Reason: "Enter the standard's code." },
+            { Value: input.Statement, Reason: "Enter the standard's statement." },
+        ]);
+    }
+
+    /**
+     * Validates that a section's number and name each hold text once trimmed.
+     */
+    public static CheckSectionText(input: { Number: string | null | undefined; Name: string | null | undefined }): RuleResult {
+        return RequiredTextRule.FirstBlank([
+            { Value: input.Number, Reason: "Enter the section's number." },
+            { Value: input.Name, Reason: "Enter the section's name." },
+        ]);
+    }
+
+    /**
+     * Validates that a document requirement's name holds text once trimmed.
+     */
+    public static CheckDocumentRequirementText(input: { Name: string | null | undefined }): RuleResult {
+        return RequiredTextRule.FirstBlank([{ Value: input.Name, Reason: "Enter the document's name." }]);
     }
 
     /**

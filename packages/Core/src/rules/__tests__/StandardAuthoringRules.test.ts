@@ -182,4 +182,32 @@ describe('StandardAuthoringRules', () => {
             ).toEqual({ Allowed: false, Reason: evalModeReason });
         });
     });
+
+    describe('required text', () => {
+        const blanks = ['', '    ', '\t\n', null, undefined];
+
+        it("refuses a standard's blank code, then its blank statement, with the sentences", () => {
+            expect(StandardAuthoringRules.CheckStandardText({ Code: '1.1', Statement: 'The applicant has a policy.' })).toEqual({ Allowed: true });
+            for (const blank of blanks) {
+                expect(StandardAuthoringRules.CheckStandardText({ Code: blank, Statement: 'x' })).toEqual({ Allowed: false, Reason: "Enter the standard's code." });
+                expect(StandardAuthoringRules.CheckStandardText({ Code: '1.1', Statement: blank })).toEqual({ Allowed: false, Reason: "Enter the standard's statement." });
+            }
+            expect(StandardAuthoringRules.CheckStandardText({ Code: ' ', Statement: ' ' })).toEqual({ Allowed: false, Reason: "Enter the standard's code." });
+        });
+
+        it("refuses a section's blank number, then its blank name, with the sentences", () => {
+            expect(StandardAuthoringRules.CheckSectionText({ Number: '1', Name: 'Governance' })).toEqual({ Allowed: true });
+            for (const blank of blanks) {
+                expect(StandardAuthoringRules.CheckSectionText({ Number: blank, Name: 'x' })).toEqual({ Allowed: false, Reason: "Enter the section's number." });
+                expect(StandardAuthoringRules.CheckSectionText({ Number: '1', Name: blank })).toEqual({ Allowed: false, Reason: "Enter the section's name." });
+            }
+        });
+
+        it("refuses a document requirement's blank name with the sentence", () => {
+            expect(StandardAuthoringRules.CheckDocumentRequirementText({ Name: 'Charter' })).toEqual({ Allowed: true });
+            for (const blank of blanks) {
+                expect(StandardAuthoringRules.CheckDocumentRequirementText({ Name: blank })).toEqual({ Allowed: false, Reason: "Enter the document's name." });
+            }
+        });
+    });
 });

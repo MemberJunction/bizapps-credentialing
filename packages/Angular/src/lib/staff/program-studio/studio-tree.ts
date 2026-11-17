@@ -23,7 +23,10 @@ interface Ordered {
 }
 
 /** Which field of the section form a refusal concerns. */
-export type SectionErrorField = 'Number' | 'Form';
+export type SectionErrorField = 'Number' | 'Name' | 'Form';
+
+/** Which field of the document requirement form a refusal concerns. */
+export type RequirementErrorField = 'Name' | 'Form';
 
 /** Which field of the standard editor a refusal concerns. */
 export type StandardErrorField = 'Code' | 'Statement' | 'IsInterpretive' | 'Form';
@@ -78,9 +81,23 @@ export class StudioTree {
         return siblings.reduce((max, s) => Math.max(max, s.Sequence), 0) + 1;
     }
 
-    /** The section field a server refusal names (`Section number 1 is already used in this version.`). */
+    /**
+     * The section field a refusal names: `Section number 1 is already used in this version.` and
+     * `Enter the section's number.` beside Number, `Enter the section's name.` beside Name.
+     */
     public static SectionFieldFor(message: string): SectionErrorField {
-        return /\bsection number\b/i.test(message) ? 'Number' : 'Form';
+        if (/\bsection(?:'s)? number\b/i.test(message)) {
+            return 'Number';
+        }
+        return /\bsection's name\b/i.test(message) ? 'Name' : 'Form';
+    }
+
+    /**
+     * The document requirement field a refusal names: `Enter the document's name.` and
+     * `A document requirement named … already exists in this version.` beside Name.
+     */
+    public static RequirementFieldFor(message: string): RequirementErrorField {
+        return /\bdocument's name\b|\bdocument requirement named\b/i.test(message) ? 'Name' : 'Form';
     }
 
     /** The standard field a server refusal names, so it renders beside that field. */

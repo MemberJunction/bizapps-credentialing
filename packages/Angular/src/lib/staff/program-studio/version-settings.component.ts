@@ -4,21 +4,28 @@
  * Workflow toggles and promotion thresholds define what a review means for applications already in
  * progress, so they are editable only on a Draft; rollout flags change only what happens next, so
  * they stay editable on an Active version. Which tier is editable comes from {@link StudioViewModel};
- * the server guard decides every save. A save is one `Save()` of the version; a refusal is shown,
- * verbatim, beside the Save button.
+ * the server guard decides every save. A save is one `Save()` of the version. A number outside its
+ * range (`VersionSettingsRules.NumberRanges`, the database's own limits) or left empty is refused
+ * here first, with the sentence the server gives, beside its field; any other refusal is shown beside
+ * the Save button, as {@link StudioMessages} words it. A refusal that means the screen is out of date
+ * stays visible while the page reloads the stored version.
+ *
+ * The version object is the page's, shared with the version actions; Activate and Retire never save
+ * it (see `VersionStatusChange`), so an edit made here is written only by Save settings.
  */
 import { ChangeDetectorRef, Component, EventEmitter, Input, Output, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { BaseAngularComponent } from '@memberjunction/ng-base-types';
 import { MJButtonDirective, MJDropdownComponent, MJNumericInputComponent, MJSwitchComponent } from '@memberjunction/ng-ui-components';
-import { VersionSettingsRules } from '@mj-biz-apps/credentialing-core';
+import { VersionSettingsRules, type VersionNumberSetting } from '@mj-biz-apps/credentialing-core';
 import type { mjBizAppsCredentialingProgramVersionEntity } from '@mj-biz-apps/credentialing-entities';
 import type { CommitteeRow } from './studio-data';
 import { StudioViewModel, type SettingsTierEditable } from './studio-view-model';
+import { StudioMessages } from '../studio-messages';
 
 type VersionField = keyof mjBizAppsCredentialingProgramVersionEntity;
-type IntegerField = Extract<VersionField, 'PeerReviewerCount' | 'PassiveApprovalWindowDays' | 'MinimumObservations' | 'MinimumReviewers'>;
-type RateField = Extract<VersionField, 'MinimumAgreeRate' | 'MinimumReplayFloor'>;
+type IntegerField = Extract<VersionNumberSetting, 'PeerReviewerCount' | 'PassiveApprovalWindowDays' | 'MinimumObservations' | 'MinimumReviewers'>;
+type RateField = Extract<VersionNumberSetting, 'MinimumAgreeRate' | 'MinimumReplayFloor'>;
 type FlagField = Extract<
     VersionField,
     'RequiresScreening' | 'RequiresExecutiveApproval' | 'RequiresGoverningBodyAttestation' | 'AgentObservationsVisibleToReviewers' | 'PromotionEnabled' | 'AutoCarryForwardOnRenewal'
@@ -46,21 +53,28 @@ export interface SettingsGroup {
 export const FROZEN_SETTINGS_SENTENCE = 'These settings define what a review means for applications already in progress, so they can only be changed on a Draft version.';
 /** The sentence over the rollout flags. */
 export const ROLLOUT_FLAGS_SENTENCE = 'These flags change only what happens next.';
+/** The sentence over a tier that can still be edited and freezes at activation. */
+export const FIXED_ON_ACTIVATION_SENTENCE = 'Fixed once the version is activated.';
+/** The sentence over the rollout flags of a Retired version, which no longer change anything. */
+export const RETIRED_SETTINGS_SENTENCE = 'A retired version cannot be changed.';
 
+const LABELS = VersionSettingsRules.Labels;
+
+/** How each setting is edited; its label is the one `VersionSettingsRules` names it by in its sentences. */
 const DESCRIPTORS: Readonly<Record<string, SettingDescriptor>> = {
-    PeerReviewerCount: { Kind: 'integer', Field: 'PeerReviewerCount', Label: 'Peer reviewers per application', Unit: 'reviewers' },
-    PassiveApprovalWindowDays: { Kind: 'integer', Field: 'PassiveApprovalWindowDays', Label: 'Passive approval window', Unit: 'days' },
-    RequiresScreening: { Kind: 'flag', Field: 'RequiresScreening', Label: 'Staff screen applications before review' },
-    RequiresExecutiveApproval: { Kind: 'flag', Field: 'RequiresExecutiveApproval', Label: 'Executive approves decisions' },
-    RequiresGoverningBodyAttestation: { Kind: 'flag', Field: 'RequiresGoverningBodyAttestation', Label: "Applicant's governing body attests" },
-    CommitteeID: { Kind: 'committee', Field: 'CommitteeID', Label: 'Deciding committee' },
-    MinimumAgreeRate: { Kind: 'rate', Field: 'MinimumAgreeRate', Label: 'Minimum agree rate' },
-    MinimumObservations: { Kind: 'integer', Field: 'MinimumObservations', Label: 'Minimum observations', Unit: 'findings' },
-    MinimumReviewers: { Kind: 'integer', Field: 'MinimumReviewers', Label: 'Minimum reviewers', Unit: 'reviewers' },
-    MinimumReplayFloor: { Kind: 'rate', Field: 'MinimumReplayFloor', Label: 'Minimum replay agreement' },
-    AgentObservationsVisibleToReviewers: { Kind: 'flag', Field: 'AgentObservationsVisibleToReviewers', Label: 'Reviewers see AI observations' },
-    PromotionEnabled: { Kind: 'flag', Field: 'PromotionEnabled', Label: 'Standards may be promoted' },
-    AutoCarryForwardOnRenewal: { Kind: 'flag', Field: 'AutoCarryForwardOnRenewal', Label: 'Renewals start from the previous answers' },
+    PeerReviewerCount: { Kind: 'integer', Field: 'PeerReviewerCount', Label: LABELS.PeerReviewerCount, Unit: 'reviewers' },
+    PassiveApprovalWindowDays: { Kind: 'integer', Field: 'PassiveApprovalWindowDays', Label: LABELS.PassiveApprovalWindowDays, Unit: 'days' },
+    RequiresScreening: { Kind: 'flag', Field: 'RequiresScreening', Label: LABELS.RequiresScreening },
+    RequiresExecutiveApproval: { Kind: 'flag', Field: 'RequiresExecutiveApproval', Label: LABELS.RequiresExecutiveApproval },
+    RequiresGoverningBodyAttestation: { Kind: 'flag', Field: 'RequiresGoverningBodyAttestation', Label: LABELS.RequiresGoverningBodyAttestation },
+    CommitteeID: { Kind: 'committee', Field: 'CommitteeID', Label: LABELS.CommitteeID },
+    MinimumAgreeRate: { Kind: 'rate', Field: 'MinimumAgreeRate', Label: LABELS.MinimumAgreeRate },
+    MinimumObservations: { Kind: 'integer', Field: 'MinimumObservations', Label: LABELS.MinimumObservations, Unit: 'findings' },
+    MinimumReviewers: { Kind: 'integer', Field: 'MinimumReviewers', Label: LABELS.MinimumReviewers, Unit: 'reviewers' },
+    MinimumReplayFloor: { Kind: 'rate', Field: 'MinimumReplayFloor', Label: LABELS.MinimumReplayFloor },
+    AgentObservationsVisibleToReviewers: { Kind: 'flag', Field: 'AgentObservationsVisibleToReviewers', Label: LABELS.AgentObservationsVisibleToReviewers },
+    PromotionEnabled: { Kind: 'flag', Field: 'PromotionEnabled', Label: LABELS.PromotionEnabled },
+    AutoCarryForwardOnRenewal: { Kind: 'flag', Field: 'AutoCarryForwardOnRenewal', Label: LABELS.AutoCarryForwardOnRenewal },
 };
 
 function group(tier: SettingsTier, heading: string, frozenNote: string, fields: readonly string[]): SettingsGroup {
@@ -91,11 +105,55 @@ export class VersionSettingsComponent extends BaseAngularComponent {
 
     /** Emits the version ID after its settings were saved. */
     @Output() Saved = new EventEmitter<string>();
+    /** A save was refused because the version changed elsewhere: the page should reload what is stored. */
+    @Output() ReloadRequested = new EventEmitter<void>();
 
     public readonly Groups = VersionSettingsComponent.Groups;
     public IsSaving = false;
     public ErrorMessage = '';
+    /** The number setting {@link ErrorMessage} is about, or null when it belongs beside the Save button. */
+    public ErrorField: VersionNumberSetting | null = null;
     public SavedMessage = '';
+
+    /**
+     * The sentence above a tier: that it freezes at activation while it can still be edited, why it is
+     * frozen once it cannot, and — for the rollout flags, which stay editable on an Active version —
+     * that a retired version cannot be changed.
+     */
+    public static NoteFor(group: SettingsGroup, editable: SettingsTierEditable): string {
+        if (group.Tier === 'RolloutFlags') {
+            return editable.RolloutFlags ? group.FrozenNote : RETIRED_SETTINGS_SENTENCE;
+        }
+        return editable[group.Tier] ? FIXED_ON_ACTIVATION_SENTENCE : group.FrozenNote;
+    }
+
+    public NoteFor(group: SettingsGroup): string {
+        return VersionSettingsComponent.NoteFor(group, this.Editable);
+    }
+
+    /** The smallest value a number setting accepts. */
+    public MinFor(field: VersionNumberSetting): number {
+        return VersionSettingsRules.NumberRanges[field].Min;
+    }
+
+    /** The largest value a number setting accepts; null when it has no upper bound. */
+    public MaxFor(field: VersionNumberSetting): number | null {
+        return VersionSettingsRules.NumberRanges[field].Max;
+    }
+
+    /** The refusal about one number setting, or ''. */
+    public FieldError(field: VersionNumberSetting): string {
+        return this.ErrorField === field ? this.ErrorMessage : '';
+    }
+
+    /** The refusal that names no number setting, shown beside the Save button, or ''. */
+    public get FormError(): string {
+        return this.ErrorField == null ? this.ErrorMessage : '';
+    }
+
+    public ErrorID(field: string): string {
+        return `${this.InputID(field)}-error`;
+    }
 
     public get Editable(): SettingsTierEditable {
         return StudioViewModel.For({ Status: this.Version?.Status ?? 'Retired' }).SettingsTierEditable;
@@ -142,19 +200,23 @@ export class VersionSettingsComponent extends BaseAngularComponent {
         if (!this.CanSave || version == null) {
             return;
         }
+        this.clearMessages();
+        const problem = this.numbersEditable ? VersionSettingsRules.FirstRangeProblem(version) : null;
+        if (problem != null) {
+            this.showError(problem.Reason);
+            return;
+        }
         this.IsSaving = true;
-        this.ErrorMessage = '';
-        this.SavedMessage = '';
         this.cdr.markForCheck();
         try {
             if (await version.Save()) {
                 this.SavedMessage = 'Settings saved.';
                 this.Saved.emit(version.ID);
             } else {
-                this.ErrorMessage = version.LatestResult?.CompleteMessage || 'The settings were not saved.';
+                this.showError(StudioMessages.ForUser(version.LatestResult?.CompleteMessage || 'The settings were not saved.'));
             }
         } catch (e) {
-            this.ErrorMessage = e instanceof Error ? e.message : String(e);
+            this.showError(StudioMessages.FromError(e));
         } finally {
             this.IsSaving = false;
             this.cdr.markForCheck();
@@ -164,8 +226,29 @@ export class VersionSettingsComponent extends BaseAngularComponent {
     /** Puts every unsaved change back to the stored value. */
     public Discard(): void {
         this.Version?.Revert();
+        this.clearMessages();
+        this.cdr.markForCheck();
+    }
+
+    /** The number settings sit in the two tiers that are editable only on a Draft. */
+    private get numbersEditable(): boolean {
+        const e = this.Editable;
+        return e.WorkflowToggles || e.PromotionThresholds;
+    }
+
+    private clearMessages(): void {
         this.ErrorMessage = '';
+        this.ErrorField = null;
         this.SavedMessage = '';
+    }
+
+    /** Shows a refusal beside the number setting it names; one that means the screen is out of date also reloads. */
+    private showError(message: string): void {
+        this.ErrorMessage = message;
+        this.ErrorField = VersionSettingsRules.NumberSettingFor(message);
+        if (StudioMessages.MeansStaleView(message)) {
+            this.ReloadRequested.emit();
+        }
         this.cdr.markForCheck();
     }
 

@@ -341,6 +341,43 @@ const checks: NamedCheck[] = [
             AssertEqual(after.Standards, 1, 'standard rows');
         },
     },
+    {
+        Id: 'cred-version-rules.12',
+        Name: 'a number setting outside its range is refused with a sentence naming it by its label, and the stored value stays',
+        RequiresMutation: true,
+        Fn: async (ctx: IntegrationCheckContext) => {
+            const world = await GetOrLoadWorld(ctx);
+            const tree = await MakeScratchProgram(ctx, world, { Sections: 1, StandardsPerSection: 1 }, ctx.User);
+            const id = tree.Version.ID;
+            const before = await loadVersion(ctx, id);
+            const refusals: Array<[(v: VersionEntity) => void, string]> = [
+                [(v) => { v.PeerReviewerCount = -1; }, 'Peer reviewers per application cannot be negative.'],
+                [(v) => { v.PassiveApprovalWindowDays = 0; }, 'Passive approval window must be at least 1 day.'],
+                [(v) => { v.MinimumObservations = 0; }, 'Minimum observations must be at least 1.'],
+                [(v) => { v.MinimumReviewers = 0; }, 'Minimum reviewers must be at least 1.'],
+                [(v) => { v.MinimumAgreeRate = 1.5; }, 'Minimum agree rate must be between 0 and 1.'],
+                [(v) => { v.MinimumReplayFloor = -0.5; }, 'Minimum replay agreement must be between 0 and 1.'],
+            ];
+            for (const [change, sentence] of refusals) {
+                const version = await loadVersion(ctx, id);
+                change(version);
+                await ExpectSaveRefused(version, sentence);
+                AssertEqual(version.LatestResult?.CompleteMessage ?? '', sentence, 'the refusal is the sentence alone, with no database text');
+            }
+            const bounds = await loadVersion(ctx, id);
+            bounds.PeerReviewerCount = 0;
+            bounds.PassiveApprovalWindowDays = 1;
+            bounds.MinimumObservations = 1;
+            bounds.MinimumReviewers = 1;
+            bounds.MinimumAgreeRate = 1;
+            bounds.MinimumReplayFloor = 0;
+            await RequireSave(bounds, 'saving every number setting at the edge of its range');
+            const stored = await loadVersion(ctx, id);
+            AssertEqual(stored.PassiveApprovalWindowDays, 1, 'PassiveApprovalWindowDays');
+            AssertEqual(stored.PeerReviewerCount, 0, 'PeerReviewerCount');
+            Assert(before.PassiveApprovalWindowDays >= 1, 'the default passive approval window is inside its range');
+        },
+    },
 ];
 
 for (const check of checks) {

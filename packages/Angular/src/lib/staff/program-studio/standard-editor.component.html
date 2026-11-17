@@ -84,6 +84,12 @@
                 </div>
             </form>
         } @else {
+            <div aria-live="polite">
+                @if (ErrorMessage) {
+                    <p class="cred-std__error" role="alert">{{ ErrorMessage }}</p>
+                }
+            </div>
+            @if (!IsNew) {
             <dl class="cred-std__readonly">
                 <dt>Code</dt><dd data-field="Code">{{ Standard.Code }}</dd>
                 <dt>Statement</dt><dd data-field="Statement">{{ Standard.Statement }}</dd>
@@ -96,6 +102,7 @@
                 <dt>Evidence hint</dt><dd data-field="EvidenceHint">{{ Standard.EvidenceHint || 'None' }}</dd>
                 <dt>Evaluation mode</dt><dd data-field="EvaluationMode">{{ Standard.EvaluationMode }} <span class="cred-std__note">{{ EvaluationModeNote }}</span></dd>
             </dl>
+            }
         }
     }
 </section>

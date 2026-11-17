@@ -47,6 +47,7 @@ import {
 import type {
     mjBizAppsCredentialingAccreditingOrganizationEntity,
     mjBizAppsCredentialingOrganizationMembershipEntity,
+    mjBizAppsCredentialingProgramEntity,
     mjBizAppsCredentialingStandardEntity,
 } from '@mj-biz-apps/credentialing-entities';
 import { Outcome, WithActors } from '../actors.js';
@@ -58,12 +59,16 @@ import type { CredentialingWorld } from '../world/world.js';
 type StandardEntity = mjBizAppsCredentialingStandardEntity;
 type AccreditingOrganizationEntity = mjBizAppsCredentialingAccreditingOrganizationEntity;
 type MembershipEntity = mjBizAppsCredentialingOrganizationMembershipEntity;
+type ProgramEntity = mjBizAppsCredentialingProgramEntity;
 
 const APP_SCHEMA = '__mj_BizAppsCredentialing';
 const NOT_FOUND_SENTENCE = 'Record not found.';
 const STALE_SENTENCE = 'This record was changed by someone else. Reload it and try again.';
 const TREE_EDIT_SENTENCE = 'Sections and standards can only be edited on a Draft version. Use "Edit in draft" to create one.';
 const BLANK_LABEL_SENTENCE = 'Enter a label for this version.';
+const BLANK_PROGRAM_NAME_SENTENCE = "Enter the program's name.";
+const BLANK_PREFIX_SENTENCE = 'Enter the credential prefix.';
+const BLANK_NOUN_SENTENCE = 'Enter the subject noun.';
 const COMMON_ORGANIZATIONS_ENTITY = 'MJ_BizApps_Common: Organizations';
 const PROGRAMS_FIRST_SENTENCE = "Remove this organization's programs before deleting it.";
 const MEMBERS_FIRST_SENTENCE = "Remove this organization's members before deleting it.";
@@ -716,6 +721,41 @@ const checks: NamedCheck[] = [
             Assert(!refused.Deleted, 'deleting an organization that has a program is refused');
             AssertEqual(refused.Message, PROGRAMS_FIRST_SENTENCE, 'the refusal is the programs sentence (checked before the members)');
             AssertEqual(JSON.stringify(await scratchCounts(ctx, org)), JSON.stringify(before), 'nothing was deleted');
+        },
+    },
+    {
+        Id: 'cred-operations.15',
+        Name: "CreateProgram with a blank name, prefix or subject noun is refused with its sentence and leaves no program; an edit to blank is refused too",
+        RequiresMutation: true,
+        Fn: async (ctx: IntegrationCheckContext) => {
+            const world = await GetOrLoadWorld(ctx);
+            const staff = world.StaffA;
+            const valid = programInput(world, '2027');
+            const inOrganization = `AccreditingOrganizationID = '${Quote(world.OrgA.ID)}'`;
+            const before = await CountRows(ctx, CredentialingEntity.Program, inOrganization);
+            const refusals: Array<[Partial<CreateProgramInput>, string]> = [
+                [{ Name: '' }, BLANK_PROGRAM_NAME_SENTENCE],
+                [{ Name: '    ' }, BLANK_PROGRAM_NAME_SENTENCE],
+                [{ CredentialPrefix: '   ' }, BLANK_PREFIX_SENTENCE],
+                [{ SubjectNoun: '' }, BLANK_NOUN_SENTENCE],
+                [{ SubjectNoun: '  ' }, BLANK_NOUN_SENTENCE],
+            ];
+            for (const [change, sentence] of refusals) {
+                const result = await new CreateProgramOperation().Execute({ ...valid, ...change }, { provider: ctx.Provider, user: staff });
+                ExpectRefused(result, sentence, `CreateProgram with ${JSON.stringify(change)}`);
+                AssertEqual(result.ErrorMessage, sentence, 'the refusal is the sentence alone');
+                AssertEqual(result.ResultCode, 'REFUSED', 'ResultCode');
+            }
+            AssertEqual(await CountRows(ctx, CredentialingEntity.Program, inOrganization), before, 'programs of the organization (nothing was created)');
+
+            const tree = await MakeScratchProgram(ctx, world, { Sections: 1, StandardsPerSection: 1 }, ctx.User);
+            const noun = tree.Program.SubjectNoun;
+            const edited = await LoadEntity<ProgramEntity>(ctx, CredentialingEntity.Program, tree.Program.ID);
+            edited.SubjectNoun = '   ';
+            Assert(!(await edited.Save()), 'an edit that blanks the subject noun is refused');
+            AssertEqual(edited.LatestResult?.CompleteMessage ?? '', BLANK_NOUN_SENTENCE, 'the refusal is the subject noun sentence');
+            const stored = await LoadEntity<ProgramEntity>(ctx, CredentialingEntity.Program, tree.Program.ID);
+            AssertEqual(stored.SubjectNoun, noun, 'the stored subject noun');
         },
     },
 ];

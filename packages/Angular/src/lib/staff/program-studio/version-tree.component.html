@@ -62,7 +62,11 @@
                                 <div class="cred-tree__field">
                                     <label [for]="'cred-section-name-' + node.Section.ID">Name</label>
                                     <input [id]="'cred-section-name-' + node.Section.ID" name="name" type="text" class="mj-input" [(ngModel)]="EditingSection.Name"
-                                        [attr.aria-describedby]="SectionErrorFor(node.Section.ID, 'Form') ? 'cred-section-error-' + node.Section.ID : null" />
+                                        [attr.aria-invalid]="SectionErrorFor(node.Section.ID, 'Name') ? 'true' : null"
+                                        [attr.aria-describedby]="SectionErrorFor(node.Section.ID, 'Name') ? 'cred-section-name-error-' + node.Section.ID : (SectionErrorFor(node.Section.ID, 'Form') ? 'cred-section-error-' + node.Section.ID : null)" />
+                                    @if (SectionErrorFor(node.Section.ID, 'Name')) {
+                                        <p [id]="'cred-section-name-error-' + node.Section.ID" class="cred-tree__error" role="alert">{{ SectionErrorFor(node.Section.ID, 'Name') }}</p>
+                                    }
                                 </div>
                             </div>
                             <div class="cred-tree__field">
@@ -142,7 +146,11 @@
                         <div class="cred-tree__field">
                             <label for="cred-section-name-new">Name</label>
                             <input id="cred-section-name-new" name="name" type="text" class="mj-input" autocomplete="off" [(ngModel)]="EditingSection.Name"
-                                [attr.aria-describedby]="SectionErrorFor('new-section', 'Form') ? 'cred-section-error-new' : null" />
+                                [attr.aria-invalid]="SectionErrorFor('new-section', 'Name') ? 'true' : null"
+                                [attr.aria-describedby]="SectionErrorFor('new-section', 'Name') ? 'cred-section-name-error-new' : (SectionErrorFor('new-section', 'Form') ? 'cred-section-error-new' : null)" />
+                            @if (SectionErrorFor('new-section', 'Name')) {
+                                <p id="cred-section-name-error-new" class="cred-tree__error" role="alert">{{ SectionErrorFor('new-section', 'Name') }}</p>
+                            }
                         </div>
                     </div>
                     <div class="cred-tree__field">
@@ -159,12 +167,12 @@
                     <i class="fa-solid fa-plus" aria-hidden="true"></i> Add section
                 </button>
             }
-            <div aria-live="polite">
-                @if (SectionErrorFor('new-section', 'Form')) {
-                    <p id="cred-section-error-new" class="cred-tree__error" role="alert">{{ SectionErrorFor('new-section', 'Form') }}</p>
-                }
-            </div>
         }
+        <div aria-live="polite">
+            @if (SectionErrorFor('new-section', 'Form')) {
+                <p id="cred-section-error-new" class="cred-tree__error" role="alert">{{ SectionErrorFor('new-section', 'Form') }}</p>
+            }
+        </div>
     </section>
 
     @if (View.ShowEditInDraft) {

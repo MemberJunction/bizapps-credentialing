@@ -34,13 +34,15 @@ export { StandingService, type StandingDataSource, type StandingUser } from './l
 export { OrganizationSetupComponent, type OrganizationSetupErrorField } from './lib/staff/organization-setup/organization-setup.component';
 export { StudioViewModel, type StudioVersionView, type SettingsTierEditable } from './lib/staff/program-studio/studio-view-model';
 export { StudioData, COMMITTEE_ENTITY, type StudioDataSource, type ProgramBundle, type ProgramLoad, type ProgramListRow, type ProgramRow, type SectionRow, type StandardRow, type RequirementRow, type CommitteeRow } from './lib/staff/program-studio/studio-data';
-export { StudioTree, type TreeSection, type SequenceChange, type StandardErrorField } from './lib/staff/program-studio/studio-tree';
+export { StudioMessages, SAVE_FAILED_MESSAGE, LOAD_FAILED_MESSAGE, type StudioMessageKind } from './lib/staff/studio-messages';
+export { StudioTree, type TreeSection, type SequenceChange, type StandardErrorField, type SectionErrorField, type RequirementErrorField } from './lib/staff/program-studio/studio-tree';
+export { VersionStatusChange, type StatusWritable } from './lib/staff/program-studio/version-status-change';
 export { ProgramStudioPage, PROGRAM_NOT_FOUND_MESSAGE, type StudioSelection, type StudioMode, type ProgramLoadState, type StudioTab } from './lib/staff/program-studio/program-studio.page';
 export { ProgramListComponent } from './lib/staff/program-studio/program-list.component';
 export { ProgramWizardComponent, type WizardOrganization, type WizardErrorField } from './lib/staff/program-studio/program-wizard.component';
 export { VersionTreeComponent, type TreeErrorTarget } from './lib/staff/program-studio/version-tree.component';
 export { StandardEditorComponent, EVALUATION_MODE_NOTE, type NewStandardTarget } from './lib/staff/program-studio/standard-editor.component';
-export { VersionSettingsComponent, FROZEN_SETTINGS_SENTENCE, ROLLOUT_FLAGS_SENTENCE, type SettingDescriptor, type SettingsGroup, type SettingsTier } from './lib/staff/program-studio/version-settings.component';
+export { VersionSettingsComponent, FROZEN_SETTINGS_SENTENCE, ROLLOUT_FLAGS_SENTENCE, FIXED_ON_ACTIVATION_SENTENCE, RETIRED_SETTINGS_SENTENCE, type SettingDescriptor, type SettingsGroup, type SettingsTier } from './lib/staff/program-studio/version-settings.component';
 export { DocumentRequirementsComponent } from './lib/staff/program-studio/document-requirements.component';
 export { CredentialingAreaResource, AREA_NOT_AVAILABLE_MESSAGE, type AreaResourceState } from './lib/resources/credentialing-area-resource';
 export { CredentialingProgramStudioResource, LoadCredentialingProgramStudioResource, PROGRAM_STUDIO_PARAMS } from './lib/resources/staff-program-studio.resource';

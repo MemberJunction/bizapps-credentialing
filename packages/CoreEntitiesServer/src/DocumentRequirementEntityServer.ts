@@ -1,7 +1,7 @@
 /**
  * Server-side subclass of DocumentRequirement — a requirement is edited only on a Draft version the
- * caller can read, stays in its version, and its name is unique in the version ignoring case and
- * surrounding spaces. Writes run under the version's authoring lock (guards/AuthoringLock.ts).
+ * caller can read, stays in its version, and its name holds text (stored trimmed) and is unique in the
+ * version ignoring case and surrounding spaces. Writes run under the version's authoring lock (guards/AuthoringLock.ts).
  */
 import {
     BaseEntity,
@@ -13,7 +13,7 @@ import {
     type IMetadataProvider,
 } from '@memberjunction/core';
 import { RegisterClass, UUIDsEqual } from '@memberjunction/global';
-import { CredentialingEntity } from '@mj-biz-apps/credentialing-core';
+import { CredentialingEntity, StandardAuthoringRules } from '@mj-biz-apps/credentialing-core';
 import { mjBizAppsCredentialingDocumentRequirementEntity } from '@mj-biz-apps/credentialing-entities';
 import { LockedWrite } from './guards/LockedWrite.js';
 import { VersionTree } from './guards/VersionTree.js';
@@ -28,6 +28,9 @@ export class DocumentRequirementEntityServer extends mjBizAppsCredentialingDocum
     }
 
     public override async Save(options?: EntitySaveOptions): Promise<boolean> {
+        if ((!this.IsSaved || LockedWrite.AnyChanged(this, ['Name'])) && this.Name !== LockedWrite.Trimmed(this.Name)) {
+            this.Name = LockedWrite.Trimmed(this.Name);
+        }
         return LockedWrite.Run(this, this.IsSaved ? 'update' : 'create', async () => {
             await this.AcquireAuthoringLocks();
             return super.Save(options);
@@ -88,7 +91,8 @@ export class DocumentRequirementEntityServer extends mjBizAppsCredentialingDocum
             return edit;
         }
         if (!this.IsSaved || LockedWrite.AnyChanged(this, ['Name'])) {
-            return this.nameRefusal();
+            const text = LockedWrite.ReasonOf(StandardAuthoringRules.CheckDocumentRequirementText({ Name: this.Name }));
+            return text ?? this.nameRefusal();
         }
         return null;
     }
@@ -107,7 +111,7 @@ export class DocumentRequirementEntityServer extends mjBizAppsCredentialingDocum
         if (!res.Success) {
             throw new Error(`reading the version's document requirements failed: ${res.ErrorMessage}`);
         }
-        const name = (this.Name ?? '').trim();
+        const name = LockedWrite.Trimmed(this.Name);
         const taken = res.Results.some(
             (r) => !(this.IsSaved && UUIDsEqual(r.ID, this.ID)) && r.Name.trim().toLowerCase() === name.toLowerCase(),
         );

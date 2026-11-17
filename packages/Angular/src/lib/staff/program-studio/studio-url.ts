@@ -9,18 +9,28 @@
  * receives the saved program through its inputs, so it must write the selection back itself. It does
  * so after every load that found the program: `UpdateQueryParams` updates the tab configuration,
  * whose change makes the shell rebuild the URL from it (`buildResourceUrl`).
+ *
+ * An ID in the URL is whatever someone typed. One that is not a UUID is treated exactly like one that
+ * does not exist: such a version is dropped here, so the page falls back to one of the program's own
+ * versions; such a program is kept, so the page shows its not-found state, and `StudioData.LoadProgram`
+ * sends no query with it.
  */
+import { IsValidUUID } from '@memberjunction/global';
 import type { StudioSelection } from './program-studio.page';
 
 /** The query parameters Program Studio keeps in the URL. */
 export const PROGRAM_STUDIO_PARAMS = { Program: 'programId', Version: 'versionId' } as const;
 
 export class StudioUrl {
-    /** The selection a set of query params names; blank values count as absent. */
+    /**
+     * The selection a set of query params names; blank values count as absent, and so does a version
+     * that is not a UUID (no version has it, so the page shows one the program does have).
+     */
     public static FromParams(params: Record<string, string>): StudioSelection {
+        const versionID = params[PROGRAM_STUDIO_PARAMS.Version]?.trim() || null;
         return {
             ProgramID: params[PROGRAM_STUDIO_PARAMS.Program]?.trim() || null,
-            VersionID: params[PROGRAM_STUDIO_PARAMS.Version]?.trim() || null,
+            VersionID: IsValidUUID(versionID) ? versionID : null,
         };
     }
 

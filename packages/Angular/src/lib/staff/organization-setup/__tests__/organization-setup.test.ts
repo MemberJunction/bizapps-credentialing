@@ -109,4 +109,15 @@ describe('OrganizationSetupComponent', () => {
         expect(component.IsSubmitting).toBe(false);
         expect(emitted).not.toHaveBeenCalled();
     });
+
+    it('never shows database text: a raw failure becomes a plain sentence on the form', async () => {
+        const raw = 'Error executing SQL Error: Cannot insert duplicate key row in object. Query: DECLARE @ID UNIQUEIDENTIFIER';
+        vi.spyOn(CreateOrganizationOperation.prototype, 'Execute').mockResolvedValue({ Success: false, ResultCode: 'ERROR', ErrorMessage: raw });
+        const component = createComponent();
+        component.OrganizationName = 'Body A';
+        component.StaffEmail = 'first@example.test';
+        await component.Submit();
+        expect(component.ErrorMessage).toBe('This change could not be saved. Try again; if it keeps happening, tell your administrator.');
+        expect(component.ErrorField).toBe('Form');
+    });
 });

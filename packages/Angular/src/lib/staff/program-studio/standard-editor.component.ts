@@ -1,7 +1,9 @@
 /**
  * Adds or edits one standard (FRD FR-2.2, FR-2.3). A save is a single-record `Save()`; the server
  * guard normalizes the code, refuses a duplicate and decides every rule, and its refusal is shown
- * verbatim beside the field it names.
+ * beside the field it names, as {@link StudioMessages} words it. A blank code or statement is refused
+ * here first, with the same sentence the server gives. A refusal that means the screen is out of date
+ * stays visible while the stored standard is loaded again and the page reloads the version.
  *
  * Evaluation mode is shown, never edited: it changes only through the Trust screen of a later plan,
  * so no control here writes it and a save never sends it changed. On a version that cannot be
@@ -12,9 +14,10 @@ import { FormsModule } from '@angular/forms';
 import { BaseAngularComponent } from '@memberjunction/ng-base-types';
 import { SharedGenericModule } from '@memberjunction/ng-shared-generic';
 import { MJButtonDirective, MJDropdownComponent, MJSwitchComponent } from '@memberjunction/ng-ui-components';
-import { CredentialingEntity } from '@mj-biz-apps/credentialing-core';
+import { CredentialingEntity, NOT_FOUND_REASON, StandardAuthoringRules } from '@mj-biz-apps/credentialing-core';
 import type { mjBizAppsCredentialingStandardEntity } from '@mj-biz-apps/credentialing-entities';
 import { StudioTree, type StandardErrorField } from './studio-tree';
+import { StudioMessages } from '../studio-messages';
 
 type StandardEntity = mjBizAppsCredentialingStandardEntity;
 
@@ -73,6 +76,8 @@ export class StandardEditorComponent extends BaseAngularComponent {
     /** Emits the standard's ID after it was saved. */
     @Output() Saved = new EventEmitter<string>();
     @Output() Closed = new EventEmitter<void>();
+    /** A save was refused because the version changed elsewhere: the page should reload what is stored. */
+    @Output() ReloadRequested = new EventEmitter<void>();
 
     public Standard: StandardEntity | null = null;
     public IsLoading = false;
@@ -107,16 +112,22 @@ export class StandardEditorComponent extends BaseAngularComponent {
         if (!this.CanSave || standard == null) {
             return;
         }
-        this.IsSaving = true;
         this.clearError();
+        const text = StandardAuthoringRules.CheckStandardText({ Code: standard.Code, Statement: standard.Statement });
+        if (!text.Allowed) {
+            this.showError(text.Reason);
+            this.cdr.markForCheck();
+            return;
+        }
+        this.IsSaving = true;
         try {
             if (await standard.Save()) {
                 this.Saved.emit(standard.ID);
             } else {
-                this.showError(standard.LatestResult?.CompleteMessage || 'The standard was not saved.');
+                await this.refused(StudioMessages.ForUser(standard.LatestResult?.CompleteMessage || 'The standard was not saved.'));
             }
         } catch (e) {
-            this.showError(e instanceof Error ? e.message : String(e));
+            await this.refused(StudioMessages.FromError(e));
         } finally {
             this.IsSaving = false;
             this.cdr.markForCheck();
@@ -127,11 +138,29 @@ export class StandardEditorComponent extends BaseAngularComponent {
         this.Closed.emit();
     }
 
-    private async load(work: () => Promise<StandardEntity>): Promise<void> {
+    /**
+     * Shows a refused save. When it means the screen is out of date, the message stays, a saved
+     * standard is loaded again so the editor shows what is stored, and the page is asked to reload.
+     */
+    private async refused(message: string): Promise<void> {
+        this.showError(message);
+        if (!StudioMessages.MeansStaleView(message)) {
+            return;
+        }
+        const id = this._standardID;
+        if (id != null && this.Standard?.IsSaved) {
+            await this.load(() => this.loadExisting(id), true);
+        }
+        this.ReloadRequested.emit();
+    }
+
+    private async load(work: () => Promise<StandardEntity>, keepError = false): Promise<void> {
         const token = ++this.loadToken;
         this.IsLoading = true;
         this.LoadError = '';
-        this.clearError();
+        if (!keepError) {
+            this.clearError();
+        }
         this.Standard = null;
         this.cdr.markForCheck();
         try {
@@ -141,7 +170,7 @@ export class StandardEditorComponent extends BaseAngularComponent {
             }
         } catch (e) {
             if (token === this.loadToken) {
-                this.LoadError = e instanceof Error ? e.message : String(e);
+                this.LoadError = StudioMessages.FromError(e, 'load');
             }
         } finally {
             if (token === this.loadToken) {
@@ -154,7 +183,7 @@ export class StandardEditorComponent extends BaseAngularComponent {
     private async loadExisting(id: string): Promise<StandardEntity> {
         const standard = await this.ProviderToUse.GetEntityObject<StandardEntity>(CredentialingEntity.Standard, this.ProviderToUse.CurrentUser);
         if (!(await standard.Load(id))) {
-            throw new Error('Record not found.');
+            throw new Error(NOT_FOUND_REASON);
         }
         return standard;
     }

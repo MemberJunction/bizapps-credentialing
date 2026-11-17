@@ -1,7 +1,8 @@
 /**
  * Server-side subclass of Program — a program stays in the accrediting organization it was created in,
  * a new program can only be created in an organization the caller can read (FRD BR-13: an unreadable
- * organization is refused exactly like one that does not exist), and its name and credential prefix
+ * organization is refused exactly like one that does not exist), its name, credential prefix and
+ * subject noun hold text (stored trimmed), and its name and credential prefix
  * are unique within the organization (trimmed, ignoring case), refused with a sentence rather than
  * left to the unique constraints.
  *
@@ -42,7 +43,7 @@ export class ProgramEntityServer extends mjBizAppsCredentialingProgramEntity {
     }
 
     public override async Save(options?: EntitySaveOptions): Promise<boolean> {
-        this.trimUniqueFields();
+        this.trimText();
         if (!this.needsUniqueCheck()) {
             return super.Save(options);
         }
@@ -54,7 +55,7 @@ export class ProgramEntityServer extends mjBizAppsCredentialingProgramEntity {
 
     public override async ValidateAsync(): Promise<ValidationResult> {
         const result = await super.ValidateAsync();
-        if (this.IsSaved && !LockedWrite.AnyChanged(this, [...ProgramRules.ImmutableFields, ...UNIQUE_FIELDS])) {
+        if (this.IsSaved && !LockedWrite.AnyChanged(this, [...ProgramRules.ImmutableFields, ...ProgramRules.RequiredTextFields])) {
             return result;
         }
         try {
@@ -89,14 +90,35 @@ export class ProgramEntityServer extends mjBizAppsCredentialingProgramEntity {
         return !this.IsSaved || LockedWrite.AnyChanged(this, UNIQUE_FIELDS);
     }
 
-    /** Names and prefixes are stored without surrounding spaces. */
-    private trimUniqueFields(): void {
-        if (this.Name != null && this.Name !== this.Name.trim()) {
-            this.Name = this.Name.trim();
+    /**
+     * The name, prefix and subject noun are stored without surrounding spaces; on a create, or when one
+     * is changed, missing text becomes empty, which the text rule refuses.
+     */
+    private trimText(): void {
+        if (this.writes('Name') && this.Name !== LockedWrite.Trimmed(this.Name)) {
+            this.Name = LockedWrite.Trimmed(this.Name);
         }
-        if (this.CredentialPrefix != null && this.CredentialPrefix !== this.CredentialPrefix.trim()) {
-            this.CredentialPrefix = this.CredentialPrefix.trim();
+        if (this.writes('CredentialPrefix') && this.CredentialPrefix !== LockedWrite.Trimmed(this.CredentialPrefix)) {
+            this.CredentialPrefix = LockedWrite.Trimmed(this.CredentialPrefix);
         }
+        if (this.writes('SubjectNoun') && this.SubjectNoun !== LockedWrite.Trimmed(this.SubjectNoun)) {
+            this.SubjectNoun = LockedWrite.Trimmed(this.SubjectNoun);
+        }
+    }
+
+    /** Whether this save writes `fieldName`: every field on a create, a changed one on an update. */
+    private writes(fieldName: string): boolean {
+        return !this.IsSaved || LockedWrite.AnyChanged(this, [fieldName]);
+    }
+
+    /** A name, prefix or subject noun that holds no text, on a create or a save that changes one of them. */
+    private textRefusal(): string | null {
+        if (this.IsSaved && !LockedWrite.AnyChanged(this, ProgramRules.RequiredTextFields)) {
+            return null;
+        }
+        return LockedWrite.ReasonOf(
+            ProgramRules.CheckRequiredText({ Name: this.Name, CredentialPrefix: this.CredentialPrefix, SubjectNoun: this.SubjectNoun }),
+        );
     }
 
     private get provider(): IMetadataProvider {
@@ -105,7 +127,7 @@ export class ProgramEntityServer extends mjBizAppsCredentialingProgramEntity {
 
     private async refusal(): Promise<string | null> {
         const rule = ProgramRules.CanChangeFields(!this.IsSaved, LockedWrite.ChangedFields(this));
-        const ruleReason = LockedWrite.ReasonOf(rule);
+        const ruleReason = LockedWrite.ReasonOf(rule) ?? this.textRefusal();
         if (ruleReason != null) {
             return ruleReason;
         }

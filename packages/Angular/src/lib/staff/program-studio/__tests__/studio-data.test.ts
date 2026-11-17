@@ -19,9 +19,9 @@ function rows(results: Row[]): RunViewResult<Row> {
     return { Success: true, Results: results, RowCount: results.length, TotalRowCount: results.length, ExecutionTime: 1, ErrorMessage: '' };
 }
 
-const PROGRAM = 'P1111111-1111-1111-1111-111111111111';
+const PROGRAM = 'F1111111-1111-1111-1111-111111111111';
 
-const VERSION = 'V1111111-1111-1111-1111-111111111111';
+const VERSION = 'E1111111-1111-1111-1111-111111111111';
 const ORG = 'A1111111-1111-1111-1111-111111111111';
 const COMMON_ORG = 'C1111111-1111-1111-1111-111111111111';
 
@@ -72,6 +72,14 @@ describe('StudioData.LoadProgram', () => {
         const source = new StubSource((p) => (p.EntityName === CredentialingEntity.Program ? rows([]) : rows([{ ID: 'X' }])));
         expect(await new StudioData(source).LoadProgram(PROGRAM)).toEqual({ Found: false });
         expect(source.Calls).toHaveLength(1);
+    });
+
+    it('an ID that is not a UUID is not found, exactly like a program that does not exist, and no query is sent with it', async () => {
+        for (const id of ['not-a-uuid', '', '   ', "x' OR 1=1 --", `${PROGRAM}0`]) {
+            const source = new StubSource((p) => programAnswer(p));
+            expect(await new StudioData(source).LoadProgram(id)).toEqual({ Found: false });
+            expect(source.Calls).toEqual([]);
+        }
     });
 
     it('a failed view rejects with its message instead of showing an empty tree', async () => {

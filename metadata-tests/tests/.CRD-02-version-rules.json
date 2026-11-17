@@ -5,7 +5,7 @@
     "Description": "Verify the server enforces program version lifecycle, activation, one-draft, label, settings and delete rules, including under concurrent writes and stale snapshots.",
     "InputDefinition": {},
     "ExpectedOutcomes": {
-      "summary": "All eleven cred-version-rules checks pass on scratch programs; the sample program is left unchanged."
+      "summary": "All twelve cred-version-rules checks pass on scratch programs, including number settings outside their range refused with a sentence; the sample program is left unchanged."
     },
     "Configuration": {
       "tier": "deterministic",

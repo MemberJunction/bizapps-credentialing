@@ -5,13 +5,14 @@
  * its first version in one transaction, so this widget saves nothing itself. With one organization the
  * program is created in it and no organization control is shown; with several, the organization is a
  * required first choice. A refusal leaves the wizard open with the server's sentence beside the field
- * it names. Emits {@link ProgramCreated}; navigates nowhere.
+ * it names, as {@link StudioMessages} words it. Emits {@link ProgramCreated}; navigates nowhere.
  */
 import { ChangeDetectorRef, Component, EventEmitter, Input, Output, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { BaseAngularComponent } from '@memberjunction/ng-base-types';
 import { MJButtonDirective, MJDropdownComponent } from '@memberjunction/ng-ui-components';
 import { CreateProgramOperation, CredentialingEntity, type ProgramType, type SubjectType } from '@mj-biz-apps/credentialing-core';
+import { StudioMessages } from '../studio-messages';
 
 /** An organization the program can be created in. */
 export interface WizardOrganization {
@@ -112,10 +113,10 @@ export class ProgramWizardComponent extends BaseAngularComponent {
             if (result.Success && result.Output) {
                 this.ProgramCreated.emit({ ProgramID: result.Output.ProgramID, VersionID: result.Output.VersionID });
             } else {
-                this.showError(result.ErrorMessage || 'The program was not created.');
+                this.showError(StudioMessages.ForUser(result.ErrorMessage || 'The program was not created.'));
             }
         } catch (e) {
-            this.showError(e instanceof Error ? e.message : String(e));
+            this.showError(StudioMessages.FromError(e));
         } finally {
             this.IsSubmitting = false;
             this.cdr.markForCheck();
@@ -132,8 +133,10 @@ export class ProgramWizardComponent extends BaseAngularComponent {
     }
 
     /**
-     * The field a server refusal names: `A program named … already exists in this organization.`
-     * beside Name, `Credential prefix … is already used in this organization.` beside Prefix.
+     * The field a server refusal names: `A program named … already exists in this organization.` and
+     * `Enter the program's name.` beside Name, `Credential prefix … is already used in this
+     * organization.` and `Enter the credential prefix.` beside Prefix, `Enter the subject noun.` beside
+     * the subject noun.
      */
     public static FieldFor(message: string): WizardErrorField {
         if (/prefix/i.test(message)) {

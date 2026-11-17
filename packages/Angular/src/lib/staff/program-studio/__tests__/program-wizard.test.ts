@@ -68,6 +68,22 @@ describe('ProgramWizardComponent', () => {
         expect(emitted).not.toHaveBeenCalled();
     });
 
+    it('never shows database text: a raw failure becomes a plain sentence on the form', async () => {
+        const raw = "Error executing SQL Error: Violation of UNIQUE KEY constraint 'UQ_Program_AccreditingOrganizationID_CredentialPrefix'. Query: DECLARE @ID UNIQUEIDENTIFIER";
+        vi.spyOn(CreateProgramOperation.prototype, 'Execute').mockResolvedValue({ Success: false, ResultCode: 'ERROR', ErrorMessage: raw });
+        const c = createComponent();
+        c.Organizations = [ORG_A];
+        fill(c);
+        await c.Submit();
+        expect(c.ErrorFor('Form')).toBe('This change could not be saved. Try again; if it keeps happening, tell your administrator.');
+    });
+
+    it('places each required-text refusal beside its field', () => {
+        expect(ProgramWizardComponent.FieldFor("Enter the program's name.")).toBe('Name');
+        expect(ProgramWizardComponent.FieldFor('Enter the credential prefix.')).toBe('CredentialPrefix');
+        expect(ProgramWizardComponent.FieldFor('Enter the subject noun.')).toBe('SubjectNoun');
+    });
+
     it('places refusals by the field they name', () => {
         expect(ProgramWizardComponent.FieldFor("Violation of UNIQUE KEY constraint 'UQ_Program_AccreditingOrganizationID_CredentialPrefix'.")).toBe('CredentialPrefix');
         expect(ProgramWizardComponent.FieldFor('Enter a label for this version.')).toBe('FirstVersionLabel');

@@ -92,7 +92,8 @@ vi.mock('@mj-biz-apps/credentialing-entities', async () => {
             ID = '';
             SectionID = SECTION_ID;
             ProgramVersionID = '';
-            Code = '';
+            Code: string | null = '';
+            Statement: string | null = 'The applicant has a policy.';
             LineageKey = 'E0000000-0000-0000-0000-000000000001';
             EvaluationMode: 'Human Only' | 'AI Assisted' | 'AI Automated' = 'Human Only';
             IsInterpretive = false;
@@ -173,5 +174,26 @@ describe('StandardEntityServer', () => {
         const standard = newStandard('9.9');
         expect(await standard.Save()).toBe(false);
         expect(standard.LatestResult?.CompleteMessage).toBe('Record not found.');
+    });
+
+    it('refuses a blank code or statement — empty, whitespace or missing — with its sentence, before the duplicate check', async () => {
+        for (const blank of ['', '    ', null]) {
+            const uncoded = newStandard('x');
+            uncoded.Code = blank;
+            expect(await uncoded.Save()).toBe(false);
+            expect(uncoded.LatestResult?.CompleteMessage).toBe("Enter the standard's code.");
+
+            const unstated = newStandard('1.1');
+            unstated.Statement = blank;
+            expect(await unstated.Save()).toBe(false);
+            expect(unstated.LatestResult?.CompleteMessage).toBe("Enter the standard's statement.");
+        }
+    });
+
+    it('stores the statement trimmed', async () => {
+        const standard = newStandard('9.9');
+        standard.Statement = '  The applicant has a policy.  ';
+        expect(await standard.Save()).toBe(true);
+        expect(standard.Statement).toBe('The applicant has a policy.');
     });
 });

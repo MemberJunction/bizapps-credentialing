@@ -1,6 +1,7 @@
 import '@angular/compiler';
 import { describe, expect, it } from 'vitest';
 import { VersionSettingsRules } from '@mj-biz-apps/credentialing-core';
+import { StudioViewModel } from '../studio-view-model';
 import { VersionSettingsComponent } from '../version-settings.component';
 
 describe('VersionSettingsComponent', () => {
@@ -19,5 +20,26 @@ describe('VersionSettingsComponent', () => {
                 expect(setting.Label.trim().length).toBeGreaterThan(0);
             }
         }
+    });
+
+    it('labels each setting with the label the range sentences name it by', () => {
+        for (const group of VersionSettingsComponent.Groups) {
+            for (const setting of group.Settings) {
+                expect(setting.Label).toBe(VersionSettingsRules.Labels[setting.Field]);
+            }
+        }
+        expect(VersionSettingsRules.NumberRanges.PassiveApprovalWindowDays.OutOfRangeReason.startsWith(VersionSettingsRules.Labels.PassiveApprovalWindowDays)).toBe(true);
+    });
+
+    it('says above each tier what is true of it for a Draft, an Active and a Retired version', () => {
+        const [toggles, thresholds, rollout] = VersionSettingsComponent.Groups;
+        const frozen = 'These settings define what a review means for applications already in progress, so they can only be changed on a Draft version.';
+        const notes = (status: 'Draft' | 'Active' | 'Retired'): string[] => {
+            const editable = StudioViewModel.For({ Status: status }).SettingsTierEditable;
+            return [toggles, thresholds, rollout].map((g) => VersionSettingsComponent.NoteFor(g, editable));
+        };
+        expect(notes('Draft')).toEqual(['Fixed once the version is activated.', 'Fixed once the version is activated.', 'These flags change only what happens next.']);
+        expect(notes('Active')).toEqual([frozen, frozen, 'These flags change only what happens next.']);
+        expect(notes('Retired')).toEqual([frozen, frozen, 'A retired version cannot be changed.']);
     });
 });

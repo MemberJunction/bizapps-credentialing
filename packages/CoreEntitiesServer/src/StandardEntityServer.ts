@@ -1,6 +1,7 @@
 /**
  * Server-side subclass of Standard — a standard belongs to the version of its section, is edited only
- * on a Draft version the caller can read, has a code unique in its version (trimmed, ignoring case),
+ * on a Draft version the caller can read, has a code and a statement that hold text (both stored
+ * trimmed), has a code unique in its version (trimmed, ignoring case),
  * and its evaluation mode changes only through the Trust screen or a version clone (FRD FR-2, BR-2).
  * Writes run under the version's authoring lock (guards/AuthoringLock.ts).
  */
@@ -99,12 +100,11 @@ export class StandardEntityServer extends mjBizAppsCredentialingStandardEntity {
     /**
      * Resolves the version from the section, read as the caller, and takes the version lock. On a
      * create it also replaces whatever version the caller sent with the section's, and trims the code
-     * — both before the entity's own required-field validation runs. An unreadable section takes no lock.
+     * and the statement — all before the entity's own required-field validation runs. An unreadable
+     * section takes no lock.
      */
     protected async AcquireAuthoringLocks(): Promise<void> {
-        if (!this.IsSaved || LockedWrite.AnyChanged(this, ['Code'])) {
-            this.normalizeCode();
-        }
+        this.normalizeText();
         const sectionID = this.IsSaved ? LockedWrite.LoadedString(this, 'SectionID') : this.SectionID;
         const section = sectionID != null ? await ParentVersionLoader.LoadSection(sectionID, this.ActiveUser, this.provider) : null;
         if (section == null) {
@@ -120,10 +120,22 @@ export class StandardEntityServer extends mjBizAppsCredentialingStandardEntity {
         return LockedWrite.ProviderOf(this);
     }
 
-    private normalizeCode(): void {
-        if (this.Code != null && this.Code !== StandardAuthoringRules.NormalizeCode(this.Code)) {
-            this.Code = StandardAuthoringRules.NormalizeCode(this.Code);
+    /** Stores the code and the statement trimmed; missing text becomes empty, which the text rule refuses. */
+    private normalizeText(): void {
+        if ((!this.IsSaved || LockedWrite.AnyChanged(this, ['Code'])) && this.Code !== LockedWrite.Trimmed(this.Code)) {
+            this.Code = LockedWrite.Trimmed(this.Code);
         }
+        if ((!this.IsSaved || LockedWrite.AnyChanged(this, ['Statement'])) && this.Statement !== LockedWrite.Trimmed(this.Statement)) {
+            this.Statement = LockedWrite.Trimmed(this.Statement);
+        }
+    }
+
+    /** A code or statement that holds no text, on a create or a save that changes either. */
+    private textRefusal(): string | null {
+        if (this.IsSaved && !LockedWrite.AnyChanged(this, ['Code', 'Statement'])) {
+            return null;
+        }
+        return LockedWrite.ReasonOf(StandardAuthoringRules.CheckStandardText({ Code: this.Code, Statement: this.Statement }));
     }
 
     private async saveRefusal(): Promise<string | null> {
@@ -141,7 +153,7 @@ export class StandardEntityServer extends mjBizAppsCredentialingStandardEntity {
         if (version == null) {
             return NOT_FOUND_REASON;
         }
-        const codeRefusal = this.codeRefusal(siblings);
+        const codeRefusal = this.textRefusal() ?? this.codeRefusal(siblings);
         if (codeRefusal != null) {
             return codeRefusal;
         }

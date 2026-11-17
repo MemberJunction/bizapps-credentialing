@@ -9,6 +9,7 @@ import { BaseAngularComponent } from '@memberjunction/ng-base-types';
 import { SharedGenericModule } from '@memberjunction/ng-shared-generic';
 import { MJButtonDirective } from '@memberjunction/ng-ui-components';
 import { StudioData, type ProgramListRow } from './studio-data';
+import { StudioMessages } from '../studio-messages';
 
 @Component({
     standalone: true,
@@ -66,7 +67,7 @@ export class ProgramListComponent extends BaseAngularComponent implements OnInit
         try {
             this.Programs = await StudioData.ForProvider(this.ProviderToUse).ProgramList();
         } catch (e) {
-            this.ErrorMessage = e instanceof Error ? e.message : String(e);
+            this.ErrorMessage = StudioMessages.FromError(e, 'load');
         } finally {
             this.IsLoading = false;
             this.cdr.markForCheck();

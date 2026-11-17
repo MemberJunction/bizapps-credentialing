@@ -1,6 +1,6 @@
 /**
  * Server-side subclass of ProgramVersion — enforces the version lifecycle, activation, one-draft,
- * label and settings rules (FRD BR-2, BR-3, BR-10) and makes a Draft delete one atomic cascade.
+ * label, settings and settings-range rules (FRD BR-2, BR-3, BR-10) and makes a Draft delete one atomic cascade.
  *
  * Every write runs under the program's authoring lock and, for a saved version, the version's
  * (see guards/AuthoringLock.ts), so the rows the rules read cannot change before the write lands.
@@ -154,6 +154,10 @@ export class ProgramVersionEntityServer extends mjBizAppsCredentialingProgramVer
         if (this.Status !== 'Draft') {
             return 'A new version starts as a Draft.';
         }
+        const ranges = this.rangeRefusal();
+        if (ranges != null) {
+            return ranges;
+        }
         const siblings = await this.loadSiblings(programID, user);
         const draft = siblings.find((s) => s.Status === 'Draft');
         const startDraft = VersionLifecycleRules.CanStartDraft({ ExistingDraftLabel: draft?.Label ?? null });
@@ -168,7 +172,7 @@ export class ProgramVersionEntityServer extends mjBizAppsCredentialingProgramVer
         const stored = this.storedStatus();
         const changed = LockedWrite.ChangedFields(this);
         const settings = VersionSettingsRules.CanChangeFields(stored, changed);
-        const settingsReason = LockedWrite.ReasonOf(settings);
+        const settingsReason = LockedWrite.ReasonOf(settings) ?? this.changedRangeRefusal();
         if (settingsReason != null) {
             return settingsReason;
         }
@@ -187,6 +191,25 @@ export class ProgramVersionEntityServer extends mjBizAppsCredentialingProgramVer
             return this.labelRefusal(await this.loadSiblings(programID, user));
         }
         return null;
+    }
+
+    /** {@link rangeRefusal} for an update, which is checked only when it changes a number setting. */
+    private changedRangeRefusal(): string | null {
+        return LockedWrite.AnyChanged(this, VersionSettingsRules.NumberSettingFields) ? this.rangeRefusal() : null;
+    }
+
+    /** A number setting that is missing or outside its range, as a sentence that names it by its label. */
+    private rangeRefusal(): string | null {
+        return LockedWrite.ReasonOf(
+            VersionSettingsRules.CheckRanges({
+                PeerReviewerCount: this.PeerReviewerCount,
+                PassiveApprovalWindowDays: this.PassiveApprovalWindowDays,
+                MinimumAgreeRate: this.MinimumAgreeRate,
+                MinimumObservations: this.MinimumObservations,
+                MinimumReviewers: this.MinimumReviewers,
+                MinimumReplayFloor: this.MinimumReplayFloor,
+            }),
+        );
     }
 
     /** The activation rule, read from the tree in one RunViews call under the version lock. */

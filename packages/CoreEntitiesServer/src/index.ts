@@ -36,7 +36,7 @@ export { SectionEntityServer } from './SectionEntityServer.js';
 export { StandardEntityServer } from './StandardEntityServer.js';
 export { AuthoringLock } from './guards/AuthoringLock.js';
 export { SystemUser } from './guards/SystemUser.js';
-export { LockedWrite, STALE_RECORD_REASON, type WriteKind } from './guards/LockedWrite.js';
+export { LockedWrite, type WriteKind } from './guards/LockedWrite.js';
 export {
     ParentVersionLoader,
     type LoadedAccreditingOrganization,

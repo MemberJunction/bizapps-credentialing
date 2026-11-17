@@ -8,6 +8,7 @@ const ORGANIZATIONS = 'MJ_BizApps_Credentialing: Accrediting Organizations';
 const PROGRAMS = 'MJ_BizApps_Credentialing: Programs';
 const VERSIONS = 'MJ_BizApps_Credentialing: Program Versions';
 const SECTIONS = 'MJ_BizApps_Credentialing: Sections';
+const REQUIREMENTS = 'MJ_BizApps_Credentialing: Document Requirements';
 
 /** What the fake database returns to reads made as the caller (the row filter already applied). */
 const db = {
@@ -15,6 +16,7 @@ const db = {
     programs: [] as Array<{ ID: string; Name: string; CredentialPrefix: string }>,
     version: null as { ID: string; Status: 'Draft' | 'Active' | 'Retired'; ProgramID: string; ClonedFromVersionID: string | null } | null,
     sections: [] as Array<{ ID: string; Number: string }>,
+    requirements: [] as Array<{ ID: string; Name: string }>,
 };
 const sqlSeen: string[] = [];
 const filtersSeen: string[] = [];
@@ -33,6 +35,8 @@ function viewResult(p: ViewParams): ViewResult {
             return { Success: true, Results: db.version ? [db.version] : [] };
         case SECTIONS:
             return { Success: true, Results: db.sections };
+        case REQUIREMENTS:
+            return { Success: true, Results: db.requirements };
         default:
             return { Success: false, Results: [], ErrorMessage: `unexpected entity ${p.EntityName}` };
     }
@@ -113,19 +117,28 @@ vi.mock('@mj-biz-apps/credentialing-entities', async () => {
             AccreditingOrganizationID = ORG_ID;
             Name = '';
             CredentialPrefix = '';
+            SubjectNoun: string | null = 'technician';
             EntityInfo = { Name: PROGRAMS };
         },
         mjBizAppsCredentialingSectionEntity: class extends FakeEntity {
             ProgramVersionID = VERSION_ID;
-            Number = '';
+            Number: string | null = '';
+            Name: string | null = 'Governance';
             __mj_UpdatedAt: Date | null = null;
             EntityInfo = { Name: SECTIONS };
+        },
+        mjBizAppsCredentialingDocumentRequirementEntity: class extends FakeEntity {
+            ProgramVersionID = VERSION_ID;
+            Name: string | null = '';
+            __mj_UpdatedAt: Date | null = null;
+            EntityInfo = { Name: REQUIREMENTS };
         },
     };
 });
 
 const { ProgramEntityServer } = await import('../ProgramEntityServer.js');
 const { SectionEntityServer } = await import('../SectionEntityServer.js');
+const { DocumentRequirementEntityServer } = await import('../DocumentRequirementEntityServer.js');
 
 function newProgram(name: string, prefix: string): InstanceType<typeof ProgramEntityServer> {
     const program = new ProgramEntityServer();
@@ -145,6 +158,7 @@ beforeEach(() => {
     db.programs = [{ ID: OTHER_PROGRAM_ID, Name: 'Field Technician', CredentialPrefix: 'SFT' }];
     db.version = { ID: VERSION_ID, Status: 'Draft', ProgramID: OTHER_PROGRAM_ID, ClonedFromVersionID: null };
     db.sections = [{ ID: 'B0000000-0000-0000-0000-000000000001', Number: '1' }];
+    db.requirements = [{ ID: 'B0000000-0000-0000-0000-000000000002', Name: 'Charter' }];
     sqlSeen.length = 0;
     filtersSeen.length = 0;
 });
@@ -205,5 +219,71 @@ describe('SectionEntityServer uniqueness', () => {
         const section = newSection('1');
         expect(await section.Save()).toBe(false);
         expect(section.LatestResult?.CompleteMessage).toBe('Sections and standards can only be edited on a Draft version. Use "Edit in draft" to create one.');
+    });
+});
+
+describe('required text', () => {
+    const blanks: Array<string | null> = ['', '    ', null];
+
+    it("refuses a program's blank name, prefix or subject noun with its sentence, before looking for duplicates", async () => {
+        for (const blank of blanks) {
+            const unnamed = newProgram('x', 'NEW');
+            unnamed.Name = blank as string;
+            expect(await unnamed.Save()).toBe(false);
+            expect(unnamed.LatestResult?.CompleteMessage).toBe("Enter the program's name.");
+
+            const noPrefix = newProgram('Another Program', 'x');
+            noPrefix.CredentialPrefix = blank as string;
+            expect(await noPrefix.Save()).toBe(false);
+            expect(noPrefix.LatestResult?.CompleteMessage).toBe('Enter the credential prefix.');
+
+            const noNoun = newProgram('Another Program', 'NEW');
+            noNoun.SubjectNoun = blank;
+            expect(await noNoun.Save()).toBe(false);
+            expect(noNoun.LatestResult?.CompleteMessage).toBe('Enter the subject noun.');
+        }
+        expect(filtersSeen.some((f) => f.startsWith(PROGRAMS))).toBe(false);
+    });
+
+    it("stores a program's subject noun trimmed", async () => {
+        const program = newProgram('Another Program', 'AP');
+        program.SubjectNoun = '  facility ';
+        expect(await program.Save()).toBe(true);
+        expect(program.SubjectNoun).toBe('facility');
+    });
+
+    it("refuses a section's blank number or name with its sentence, and stores the name trimmed", async () => {
+        for (const blank of blanks) {
+            const unnumbered = newSection('x');
+            unnumbered.Number = blank;
+            expect(await unnumbered.Save()).toBe(false);
+            expect(unnumbered.LatestResult?.CompleteMessage).toBe("Enter the section's number.");
+
+            const unnamed = newSection('2');
+            unnamed.Name = blank;
+            expect(await unnamed.Save()).toBe(false);
+            expect(unnamed.LatestResult?.CompleteMessage).toBe("Enter the section's name.");
+        }
+        const section = newSection('2');
+        section.Name = '  Governance ';
+        expect(await section.Save()).toBe(true);
+        expect(section.Name).toBe('Governance');
+    });
+
+    it("refuses a document requirement's blank name with its sentence, and stores the name trimmed", async () => {
+        for (const blank of blanks) {
+            const unnamed = new DocumentRequirementEntityServer();
+            unnamed.Name = blank as string;
+            expect(await unnamed.Save()).toBe(false);
+            expect(unnamed.LatestResult?.CompleteMessage).toBe("Enter the document's name.");
+        }
+        const requirement = new DocumentRequirementEntityServer();
+        requirement.Name = '  Bylaws ';
+        expect(await requirement.Save()).toBe(true);
+        expect(requirement.Name).toBe('Bylaws');
+        const duplicate = new DocumentRequirementEntityServer();
+        duplicate.Name = ' charter ';
+        expect(await duplicate.Save()).toBe(false);
+        expect(duplicate.LatestResult?.CompleteMessage).toBe('A document requirement named charter already exists in this version.');
     });
 });

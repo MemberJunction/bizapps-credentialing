@@ -4,13 +4,15 @@
  * One call to `Credentialing.CreateOrganization` through `ProviderToUse`; the server writes the
  * organization, the membership, the staff role and the application grant in one transaction and
  * resolves the email itself, so no role needs permission to list users. This widget saves nothing
- * of its own and navigates nowhere: it emits {@link OrganizationCreated}.
+ * of its own and navigates nowhere: it emits {@link OrganizationCreated}. A refusal is shown beside the
+ * field it names, as {@link StudioMessages} words it.
  */
 import { ChangeDetectorRef, Component, EventEmitter, Input, Output, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { BaseAngularComponent } from '@memberjunction/ng-base-types';
 import { MJButtonDirective } from '@memberjunction/ng-ui-components';
 import { CreateOrganizationOperation } from '@mj-biz-apps/credentialing-core';
+import { StudioMessages } from '../studio-messages';
 
 /** Which field a refusal concerns, so it renders beside that field. */
 export type OrganizationSetupErrorField = 'Name' | 'Email' | 'Form' | null;
@@ -57,10 +59,10 @@ export class OrganizationSetupComponent extends BaseAngularComponent {
                 this.SuccessMessage = `${name} is set up. ${email} can now sign in; if they are already signed in, they need to sign out and in again.`;
                 this.OrganizationCreated.emit(result.Output.AccreditingOrganizationID);
             } else {
-                this.showError(result.ErrorMessage || 'The organization could not be set up.');
+                this.showError(StudioMessages.ForUser(result.ErrorMessage || 'The organization could not be set up.'));
             }
         } catch (e) {
-            this.showError(e instanceof Error ? e.message : String(e));
+            this.showError(StudioMessages.FromError(e));
         } finally {
             this.IsSubmitting = false;
             this.cdr.markForCheck();
