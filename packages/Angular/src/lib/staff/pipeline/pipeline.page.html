@@ -1,0 +1,169 @@
+<div class="cred-pipeline">
+    <header class="cred-pipeline__header">
+        <div>
+            <h1 class="cred-pipeline__title">Pipeline</h1>
+            <p class="cred-pipeline__subtitle">Applications and applicant invitations for your accrediting organizations.</p>
+        </div>
+        <button mjButton Variant="primary" type="button" (click)="OpenInviteWizard()">
+            <i class="fa-solid fa-envelope-open-text" aria-hidden="true"></i>
+            Invite applicant
+        </button>
+    </header>
+
+    @if (ReissueError) {
+        <mj-alert Variant="error" [Message]="ReissueError" [Dismissible]="true" (Dismissed)="ReissueError = ''"></mj-alert>
+    }
+
+    <div class="cred-pipeline__filters">
+        <div class="cred-pipeline__filter-item">
+            <label id="cred-pipeline-status-label" class="cred-pipeline__filter-label">Status</label>
+            <mj-dropdown
+                name="StatusFilter"
+                AriaLabelledBy="cred-pipeline-status-label"
+                [Data]="StatusChoices"
+                TextField="Label"
+                ValueField="ID"
+                [ValuePrimitive]="true"
+                [(ngModel)]="StatusFilter">
+            </mj-dropdown>
+        </div>
+        <div class="cred-pipeline__filter-item">
+            <label id="cred-pipeline-program-label" class="cred-pipeline__filter-label">Program</label>
+            <mj-dropdown
+                name="ProgramFilter"
+                AriaLabelledBy="cred-pipeline-program-label"
+                [Data]="ProgramChoices"
+                TextField="Label"
+                ValueField="ID"
+                [ValuePrimitive]="true"
+                [(ngModel)]="ProgramFilter">
+            </mj-dropdown>
+        </div>
+    </div>
+
+    @if (IsLoading) {
+        <mj-loading Text="Loading applications..."></mj-loading>
+    } @else if (ErrorMessage) {
+        <mj-alert Variant="error" Title="Pipeline could not load" [Message]="ErrorMessage"></mj-alert>
+    } @else if (Snapshot.Applications.length === 0) {
+        <mj-empty-state
+            Icon="fa-solid fa-inbox"
+            Title="No applications yet"
+            Message="Invite an applicant to start an application on an active program version.">
+        </mj-empty-state>
+    } @else if (FilteredApplications.length === 0) {
+        <mj-empty-state
+            Icon="fa-solid fa-filter-circle-xmark"
+            Title="No matching applications"
+            Message="No applications match the selected status and program filters.">
+        </mj-empty-state>
+    } @else {
+        <div class="cred-pipeline__table-wrap">
+            <table class="cred-pipeline__table">
+                <thead>
+                    <tr>
+                        <th scope="col">Applicant</th>
+                        <th scope="col">Program &amp; version</th>
+                        <th scope="col">Status</th>
+                        <th scope="col">Submitted</th>
+                        <th scope="col">Contacts</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @for (row of Page.Items; track row.ID) {
+                        <tr>
+                            <td class="cred-pipeline__subject">{{ row.SubjectName }}</td>
+                            <td>
+                                <span class="cred-pipeline__program">{{ row.ProgramName }}</span>
+                                <span class="cred-pipeline__version">{{ row.VersionLabel }}</span>
+                            </td>
+                            <td>
+                                <span class="cred-pipeline__status">{{ FormatStatus(row.Status) }}</span>
+                            </td>
+                            <td class="cred-pipeline__date">{{ FormatSubmittedDate(row.SubmittedAt) }}</td>
+                            <td>
+                                @if (row.Contacts.length === 0) {
+                                    <span class="cred-pipeline__muted">No contacts</span>
+                                } @else {
+                                    <ul class="cred-pipeline__contacts">
+                                        @for (contact of row.Contacts; track contact.ID) {
+                                            <li class="cred-pipeline__contact-row">
+                                                <span class="cred-pipeline__contact-email">{{ contact.Email }}</span>
+                                                <span class="cred-pipeline__contact-role">({{ contact.ContactRole }})</span>
+                                                <button
+                                                    mjButton
+                                                    Variant="outline"
+                                                    Size="sm"
+                                                    type="button"
+                                                    [disabled]="ReissuingContactID !== null"
+                                                    (click)="Reissue(contact)">
+                                                    @if (ReissuingContactID === contact.ID) {
+                                                        <i class="fa-solid fa-spinner fa-spin" aria-hidden="true"></i>
+                                                    }
+                                                    Send a new link
+                                                </button>
+                                            </li>
+                                        }
+                                    </ul>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        @if (Page.TotalCount > PageSize) {
+            <div class="cred-pipeline__pager" role="navigation" aria-label="Pipeline pagination">
+                <span class="cred-pipeline__pager-summary">
+                    Showing {{ Page.StartIndex }}–{{ Page.EndIndex }} of {{ Page.TotalCount }}
+                </span>
+                <div class="cred-pipeline__pager-actions">
+                    <button mjButton Variant="outline" Size="sm" type="button" [disabled]="Page.PageIndex === 0" (click)="PreviousPage()">
+                        Previous
+                    </button>
+                    <button mjButton Variant="outline" Size="sm" type="button" [disabled]="Page.PageIndex + 1 >= Page.TotalPages" (click)="NextPage()">
+                        Next
+                    </button>
+                </div>
+            </div>
+        }
+    }
+
+    <bizapps-cred-invite-wizard
+        [Provider]="ProviderToUse"
+        [Visible]="InviteDialogOpen"
+        [Targets]="Snapshot.ActiveTargets"
+        [Subjects]="Snapshot.Subjects"
+        (Closed)="CloseInviteWizard()"
+        (Invited)="OnInvited($event)">
+    </bizapps-cred-invite-wizard>
+
+    <mj-dialog [Visible]="ReissueDialogOpen" Title="New invitation link" Size="md" (Close)="CloseReissueDialog()">
+        <div class="cred-pipeline__reissue-body">
+            @if (ReissueOutcome) {
+                <mj-alert
+                    [Variant]="ReissueOutcome.InvitationUrl || !ReissueOutcome.Note ? 'success' : 'warning'"
+                    [Message]="ReissueOutcome.PrimaryMessage">
+                </mj-alert>
+                @if (ReissueOutcome.InvitationUrl) {
+                    <div class="cred-pipeline__copy-row">
+                        <input
+                            id="cred-pipeline-reissue-url"
+                            type="text"
+                            class="mj-input cred-pipeline__url-input"
+                            aria-label="New invitation link"
+                            [value]="ReissueOutcome.InvitationUrl"
+                            readonly />
+                        <button mjButton Variant="primary" Size="sm" type="button" (click)="CopyReissueLink()">
+                            {{ ReissueCopied ? 'Copied' : 'Copy link' }}
+                        </button>
+                    </div>
+                }
+            }
+        </div>
+        <mj-dialog-actions>
+            <button mjButton Variant="primary" type="button" (click)="CloseReissueDialog()">Done</button>
+        </mj-dialog-actions>
+    </mj-dialog>
+</div>

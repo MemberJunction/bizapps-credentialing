@@ -48,6 +48,21 @@ describe('Credentialing Integration Test Bundles', () => {
         expect(ids).toEqual(['cred-users.1']);
     });
 
+    it('registers the cred-invite bundle with its nine checks', () => {
+        const inviteIds = IntegrationCheckRegistry.Instance.GetBundle('cred-invite').map((c) => c.Id);
+        expect(inviteIds).toEqual([
+            'cred-invite.1',
+            'cred-invite.2',
+            'cred-invite.3',
+            'cred-invite.4',
+            'cred-invite.5',
+            'cred-invite.6',
+            'cred-invite.9',
+            'cred-invite.11',
+            'cred-invite.12',
+        ]);
+    });
+
     it('marks every rule, operation, isolation and world seeding check as mutating', () => {
         const checks = [
             ...IntegrationCheckRegistry.Instance.GetBundle('cred-version-rules'),

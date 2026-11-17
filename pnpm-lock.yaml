@@ -270,6 +270,9 @@ importers:
       '@memberjunction/core-entities':
         specifier: 6.2.2
         version: 6.2.2
+      '@memberjunction/generic-database-provider':
+        specifier: 6.2.2
+        version: 6.2.2(@aws-sdk/credential-provider-node@3.972.97)(@modelcontextprotocol/sdk@1.30.0(zod@3.25.76))(@smithy/signature-v4@5.7.5)(@types/node@22.20.1)(axios@1.19.0)(chokidar@3.6.0)(encoding@0.1.13)(typescript@5.9.3)(ws@8.23.0)(zod@3.25.76)
       '@memberjunction/global':
         specifier: 6.2.2
         version: 6.2.2
@@ -328,6 +331,9 @@ importers:
       '@memberjunction/server':
         specifier: 6.2.2
         version: 6.2.2(@aws-sdk/credential-provider-node@3.972.97)(@aws-sdk/credential-providers@3.1116.0)(@azure/identity@4.13.2)(@modelcontextprotocol/sdk@1.30.0(zod@3.25.76))(@smithy/signature-v4@5.7.5)(axios@1.19.0)(chokidar@3.6.0)(encoding@0.1.13)(playwright@1.65.1)(socks@2.8.9)(typescript@5.9.3)(vitest@4.1.12)
+      '@memberjunction/server-extensions-core':
+        specifier: 6.2.2
+        version: 6.2.2
       '@memberjunction/sqlserver-dataprovider':
         specifier: 6.2.2
         version: 6.2.2(@aws-sdk/credential-provider-node@3.972.97)(@modelcontextprotocol/sdk@1.30.0(zod@3.25.76))(@smithy/signature-v4@5.7.5)(@types/node@24.10.11)(axios@1.19.0)(chokidar@3.6.0)(encoding@0.1.13)(typescript@5.9.3)(ws@8.21.3)(zod@3.25.76)

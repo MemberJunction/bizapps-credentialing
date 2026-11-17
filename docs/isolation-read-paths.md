@@ -156,3 +156,29 @@ All through `SystemUser.Get`, and only **after** the caller's own row filter has
 - The integration world (`packages/IntegrationTests/src/world/applicant-world.ts`) writes its
   subjects, party records, contacts, applications and responses as the system user inside
   `OperationWrite`, as an invitation will; test code, not product code.
+
+### System-user reads and writes added by Task 4
+
+`Credentialing.InviteApplicant` and `Credentialing.ReissueInvitation` authorize `Credentialing Staff`
+first, load the version/program (or contact) as the caller (so another organization stops with
+`Record not found.`), take `AuthoringLock.ForUserEmail` (normalized email, then organization and version
+for `InviteApplicant`), and then use `SystemUser.Get` only for the shared platform records that staff
+cannot read or write directly:
+
+- **BizApps Common party records (`MJ_BizApps_Common: People` / `Organizations`):** finds or creates
+  the party record for a newly created `Subject` (`PartyEntityID` / `PartyRecordID`) and links a newly
+  created `MJ: Users` row (`LinkedEntityID` / `LinkedEntityRecordID` pointing to `People`), matching B1's
+  `CreateOrganization`.
+- **Users, roles, and applications (`MJ: Users`, `MJ: User Roles`, `MJ: User Applications`):** reads
+  users by `LOWER(Email)` to reject internal accounts (holding `Credentialing Staff`, `Credentialing Admin`,
+  or any role outside external roles + `Magic Link Baseline`) and to reuse existing external users without
+  duplicating rows; creates new external `User` rows (`Type = 'User'`) and adds the
+  `Credentialing Applicant` role and `Credentialing` application row, then refreshes `UserCache` after commit.
+- **Magic-link invitations (`MJ: Magic Link Invites`):** after transaction commit,
+  `MagicLinkInvitationIssuer` calls `MagicLinkService.CreateInvite` passing the configured provisioning
+  principal (`magicLink.contextUserForProvisioning` or `SystemUser.Get`), with fixed role
+  `Credentialing Applicant`, fixed application `Credentialing`, and `MaxUses: 1`. Staff retain zero
+  permission on `MJ: Magic Link Invites` (`cred-invite.9`, P10).
+- **Applicant-data writes (`Subject`, `SubjectContact`, `Application`, `StandardResponse`):** written
+  as the caller inside `OperationWrite.Run` so entity permissions and org-scoped row filters run against
+  the staff caller (`InvitedByUserID` and audit records carry the staff caller).

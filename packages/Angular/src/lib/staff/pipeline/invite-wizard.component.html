@@ -1,0 +1,206 @@
+<mj-dialog [Visible]="Visible" Title="Invite applicant" Size="md" (Close)="Close()">
+    <div class="cred-invite">
+        @if (Targets.length === 0) {
+            <mj-empty-state
+                Icon="fa-solid fa-folder-open"
+                Title="No active program versions"
+                Message="Activate a program version in Program Studio before inviting an applicant.">
+            </mj-empty-state>
+        } @else {
+            @if (Model.Step !== 'Result') {
+                <p class="cred-invite__step-indicator">Step {{ StepNumber }} of 4 — {{ Model.Step }}</p>
+            }
+
+            @if (ErrorMessage) {
+                <mj-alert Variant="error" [Message]="ErrorMessage"></mj-alert>
+            }
+
+            @switch (Model.Step) {
+                @case ('Version') {
+                    <div class="cred-invite__body">
+                        <label id="cred-invite-version-label" class="cred-invite__label">Program and active version</label>
+                        <mj-dropdown
+                            name="InviteVersionID"
+                            AriaLabelledBy="cred-invite-version-label"
+                            [Data]="TargetChoices"
+                            TextField="DisplayLabel"
+                            ValueField="VersionID"
+                            [ValuePrimitive]="true"
+                            Placeholder="Choose a program and version"
+                            [ngModel]="Model.VersionID"
+                            (ngModelChange)="OnVersionChange($event)">
+                        </mj-dropdown>
+                        @if (SelectedTarget) {
+                            <p class="cred-invite__hint">
+                                Accepts {{ SelectedTarget.SubjectType.toLowerCase() }} applications under {{ SelectedTarget.AccreditingOrganizationName }}.
+                            </p>
+                        }
+                    </div>
+                }
+
+                @case ('Subject') {
+                    <div class="cred-invite__body">
+                        <fieldset class="cred-invite__modes">
+                            <legend class="cred-invite__label">Applicant record</legend>
+                            <label class="cred-invite__radio">
+                                <input type="radio" name="SubjectMode" value="new" [(ngModel)]="Model.SubjectMode" />
+                                Create a new applicant
+                            </label>
+                            <label class="cred-invite__radio">
+                                <input
+                                    type="radio"
+                                    name="SubjectMode"
+                                    value="existing"
+                                    [disabled]="EligibleSubjects.length === 0"
+                                    [(ngModel)]="Model.SubjectMode" />
+                                Use an existing applicant
+                            </label>
+                        </fieldset>
+
+                        @if (Model.SubjectMode === 'existing') {
+                            <div class="cred-invite__field">
+                                <label id="cred-invite-existing-label" class="cred-invite__label">Existing applicant</label>
+                                <mj-dropdown
+                                    name="ExistingSubjectID"
+                                    AriaLabelledBy="cred-invite-existing-label"
+                                    [Data]="EligibleSubjects"
+                                    TextField="DisplayName"
+                                    ValueField="ID"
+                                    [ValuePrimitive]="true"
+                                    Placeholder="Choose an applicant"
+                                    [(ngModel)]="Model.ExistingSubjectID">
+                                </mj-dropdown>
+                            </div>
+                        } @else {
+                            <div class="cred-invite__field">
+                                <label for="cred-invite-subject-name" class="cred-invite__label">Applicant name</label>
+                                <input
+                                    id="cred-invite-subject-name"
+                                    name="NewSubjectDisplayName"
+                                    type="text"
+                                    class="mj-input"
+                                    autocomplete="off"
+                                    [(ngModel)]="Model.NewSubjectDisplayName" />
+                            </div>
+                            <div class="cred-invite__field">
+                                <label for="cred-invite-subject-email" class="cred-invite__label">Primary email</label>
+                                <input
+                                    id="cred-invite-subject-email"
+                                    name="NewSubjectPrimaryEmail"
+                                    type="email"
+                                    class="mj-input"
+                                    autocomplete="off"
+                                    [(ngModel)]="Model.NewSubjectPrimaryEmail" />
+                            </div>
+                        }
+                    </div>
+                }
+
+                @case ('Contact') {
+                    <div class="cred-invite__body">
+                        <p class="cred-invite__hint">The person who will sign in with this invitation link.</p>
+                        <div class="cred-invite__field">
+                            <label for="cred-invite-first-name" class="cred-invite__label">First name</label>
+                            <input
+                                id="cred-invite-first-name"
+                                name="ContactFirstName"
+                                type="text"
+                                class="mj-input"
+                                autocomplete="off"
+                                [(ngModel)]="Model.ContactFirstName" />
+                        </div>
+                        <div class="cred-invite__field">
+                            <label for="cred-invite-last-name" class="cred-invite__label">Last name</label>
+                            <input
+                                id="cred-invite-last-name"
+                                name="ContactLastName"
+                                type="text"
+                                class="mj-input"
+                                autocomplete="off"
+                                [(ngModel)]="Model.ContactLastName" />
+                        </div>
+                        <div class="cred-invite__field">
+                            <label for="cred-invite-contact-email" class="cred-invite__label">Contact email</label>
+                            <input
+                                id="cred-invite-contact-email"
+                                name="ContactEmail"
+                                type="email"
+                                class="mj-input"
+                                autocomplete="off"
+                                [(ngModel)]="Model.ContactEmail" />
+                        </div>
+                    </div>
+                }
+
+                @case ('Review') {
+                    <div class="cred-invite__body">
+                        <dl class="cred-invite__summary">
+                            <dt>Program &amp; version</dt>
+                            <dd>{{ SelectedTarget?.ProgramName }} — {{ SelectedTarget?.VersionLabel }}</dd>
+
+                            <dt>Applicant</dt>
+                            <dd>
+                                @if (Model.SubjectMode === 'existing') {
+                                    {{ SelectedExistingSubject?.DisplayName }} (existing)
+                                } @else {
+                                    {{ Model.NewSubjectDisplayName.trim() }} ({{ Model.NewSubjectPrimaryEmail.trim() }})
+                                }
+                            </dd>
+
+                            <dt>Contact</dt>
+                            <dd>{{ Model.ContactFirstName.trim() }} {{ Model.ContactLastName.trim() }} &lt;{{ Model.ContactEmail.trim() }}&gt;</dd>
+                        </dl>
+                    </div>
+                }
+
+                @case ('Result') {
+                    <div class="cred-invite__body">
+                        @if (Outcome) {
+                            <mj-alert
+                                [Variant]="Outcome.InvitationUrl || !Outcome.Note ? 'success' : 'warning'"
+                                [Message]="Outcome.PrimaryMessage">
+                            </mj-alert>
+                            @if (Outcome.InvitationUrl) {
+                                <div class="cred-invite__link-row">
+                                    <label for="cred-invite-result-url" class="cred-invite__label">Invitation link</label>
+                                    <div class="cred-invite__link-copy">
+                                        <input
+                                            id="cred-invite-result-url"
+                                            type="text"
+                                            class="mj-input cred-invite__url-input"
+                                            [value]="Outcome.InvitationUrl"
+                                            readonly />
+                                        <button mjButton Variant="primary" Size="sm" type="button" (click)="CopyLink()">
+                                            {{ CopiedLink ? 'Copied' : 'Copy link' }}
+                                        </button>
+                                    </div>
+                                </div>
+                            }
+                        }
+                    </div>
+                }
+            }
+        }
+    </div>
+
+    <mj-dialog-actions>
+        @if (Targets.length === 0 || Model.Step === 'Result') {
+            <button mjButton Variant="primary" type="button" (click)="Close()">Done</button>
+        } @else {
+            @if (Model.Step === 'Review') {
+                <button mjButton Variant="primary" type="button" [disabled]="IsSubmitting" (click)="Submit()">
+                    @if (IsSubmitting) {
+                        <i class="fa-solid fa-spinner fa-spin" aria-hidden="true"></i>
+                    }
+                    Send invitation
+                </button>
+            } @else {
+                <button mjButton Variant="primary" type="button" [disabled]="!Model.CanProceed()" (click)="Next()">Next</button>
+            }
+            @if (Model.Step !== 'Version') {
+                <button mjButton Variant="outline" type="button" [disabled]="IsSubmitting" (click)="Back()">Back</button>
+            }
+            <button mjButton Variant="outline" type="button" [disabled]="IsSubmitting" (click)="Close()">Cancel</button>
+        }
+    </mj-dialog-actions>
+</mj-dialog>

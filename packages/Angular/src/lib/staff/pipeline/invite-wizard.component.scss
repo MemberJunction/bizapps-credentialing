@@ -1,0 +1,96 @@
+.cred-invite {
+    display: flex;
+    flex-direction: column;
+    gap: var(--mj-space-3, 0.75rem);
+    min-width: 0;
+    color: var(--mj-text-primary);
+}
+
+.cred-invite__step-indicator {
+    margin: 0;
+    font-size: var(--mj-text-sm, 0.875rem);
+    font-weight: var(--mj-font-medium, 500);
+    color: var(--mj-text-secondary);
+}
+
+.cred-invite__body {
+    display: flex;
+    flex-direction: column;
+    gap: var(--mj-space-3, 0.75rem);
+}
+
+.cred-invite__field {
+    display: flex;
+    flex-direction: column;
+    gap: var(--mj-space-1, 0.25rem);
+}
+
+.cred-invite__label {
+    font-size: var(--mj-text-sm, 0.875rem);
+    font-weight: var(--mj-font-medium, 500);
+    color: var(--mj-text-primary);
+}
+
+.cred-invite__hint {
+    margin: 0;
+    font-size: var(--mj-text-xs, 0.75rem);
+    color: var(--mj-text-secondary);
+}
+
+.cred-invite__modes {
+    display: flex;
+    flex-direction: column;
+    gap: var(--mj-space-2, 0.5rem);
+    margin: 0;
+    padding: 0;
+    border: 0;
+}
+
+.cred-invite__radio {
+    display: flex;
+    align-items: center;
+    gap: var(--mj-space-2, 0.5rem);
+    min-height: 44px;
+    font-size: var(--mj-text-sm, 0.875rem);
+    cursor: pointer;
+}
+
+.cred-invite__summary {
+    display: grid;
+    grid-template-columns: minmax(8rem, auto) 1fr;
+    gap: var(--mj-space-2, 0.5rem) var(--mj-space-4, 1rem);
+    margin: 0;
+    padding: var(--mj-space-3, 0.75rem);
+    border: 1px solid var(--mj-border-default);
+    border-radius: var(--mj-radius-md, 6px);
+    background: var(--mj-bg-surface-sunken, var(--mj-bg-surface));
+
+    dt {
+        font-weight: var(--mj-font-medium, 500);
+        color: var(--mj-text-secondary);
+    }
+
+    dd {
+        margin: 0;
+        color: var(--mj-text-primary);
+        word-break: break-word;
+    }
+}
+
+.cred-invite__link-row {
+    display: flex;
+    flex-direction: column;
+    gap: var(--mj-space-1, 0.25rem);
+}
+
+.cred-invite__link-copy {
+    display: flex;
+    align-items: center;
+    gap: var(--mj-space-2, 0.5rem);
+}
+
+.cred-invite__url-input {
+    flex: 1;
+    min-width: 0;
+    font-family: monospace;
+}

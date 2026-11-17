@@ -28,6 +28,7 @@ const ALL_BUNDLES = [
     'cred-smoke',
     'cred-schema',
     'cred-operations-wire',
+    'cred-invite-wire',
     'cred-world',
     'cred-users',
 ];
@@ -46,6 +47,7 @@ const SERVER_ONLY_BUNDLES = {
     'cred-standard-rules': 'CRD-03 - Standard rules',
     'cred-operations': 'CRD-04 - Operations',
     'cred-isolation': 'CRD-05 - Isolation',
+    'cred-invite': 'CRD-09 - Invitations',
 };
 
 const args = process.argv.slice(2);

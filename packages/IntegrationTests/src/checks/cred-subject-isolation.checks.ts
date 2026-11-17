@@ -93,9 +93,26 @@ async function subjectsRead(ctx: IntegrationCheckContext, entity: { Name: string
     return (res.Results ?? []).map((r) => String(r[entity.SubjectColumn]).toLowerCase());
 }
 
-/** Asserts `user` reads rows of every subject in `mine` and of no subject outside it, from all nine entities. */
-async function expectReadsOnly(ctx: IntegrationCheckContext, user: UserInfo, mine: readonly WorldSubject[], label: string): Promise<void> {
-    const allowed = new Set(mine.map((s) => s.ID.toLowerCase()));
+/** Subject IDs belonging to `organizationID`, read as the integration context user. */
+async function orgSubjectIds(ctx: IntegrationCheckContext, organizationID: string): Promise<Set<string>> {
+    const rows = await FindRows<{ ID: string }>(
+        ctx,
+        CredentialingEntity.Subject,
+        `AccreditingOrganizationID = '${Quote(organizationID)}'`,
+        ['ID'],
+    );
+    return new Set(rows.map((r) => r.ID.toLowerCase()));
+}
+
+/** Asserts `user` reads rows of every subject in `mine` and of no subject outside `permitted` (default: `mine`), from all nine entities. */
+async function expectReadsOnly(
+    ctx: IntegrationCheckContext,
+    user: UserInfo,
+    mine: readonly WorldSubject[],
+    label: string,
+    permitted?: ReadonlySet<string>,
+): Promise<void> {
+    const allowed = permitted ?? new Set(mine.map((s) => s.ID.toLowerCase()));
     for (const entity of APPLICANT_ENTITIES) {
         const seen = await subjectsRead(ctx, entity, user);
         const foreign = seen.filter((id) => !allowed.has(id));
@@ -342,9 +359,11 @@ const checks: NamedCheck[] = [
         Fn: async (ctx: IntegrationCheckContext) => {
             const world = await GetOrLoadWorld(ctx);
             const { SubjectOne, SubjectTwo, SubjectOrgB } = world.Applicants;
+            const orgASubjects = await orgSubjectIds(ctx, world.OrgA.ID);
+            const orgBSubjects = await orgSubjectIds(ctx, world.OrgB.ID);
             await withEvidence(ctx, world, async () => {
-                await expectReadsOnly(ctx, world.StaffA, [SubjectOne, SubjectTwo], 'staff-a');
-                await expectReadsOnly(ctx, world.StaffB, [SubjectOrgB], 'staff-b');
+                await expectReadsOnly(ctx, world.StaffA, [SubjectOne, SubjectTwo], 'staff-a', orgASubjects);
+                await expectReadsOnly(ctx, world.StaffB, [SubjectOrgB], 'staff-b', orgBSubjects);
                 for (const entity of APPLICANT_ENTITIES) {
                     AssertEqual((await subjectsRead(ctx, entity, world.StaffNoMembership)).length, 0, `staff with no membership: rows of ${entity.Name}`);
                 }

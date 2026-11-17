@@ -19,7 +19,7 @@
             <p class="cred-list__empty" role="status">No program matches.</p>
         }
         <ul class="cred-list__items">
-            @for (program of Visible; track program.ID) {
+            @for (program of Page.Items; track program.ID) {
                 <li>
                     <button type="button" class="cred-list__item" [class.cred-list__item--selected]="IsSelected(program.ID)"
                         [attr.aria-current]="IsSelected(program.ID) ? 'page' : null" (click)="Select(program)">
@@ -29,5 +29,14 @@
                 </li>
             }
         </ul>
+        @if (Page.TotalCount > PageSize) {
+            <div class="cred-list__pager" role="navigation" aria-label="Programs pagination">
+                <span class="cred-list__pager-summary">{{ Page.StartIndex }}–{{ Page.EndIndex }} of {{ Page.TotalCount }}</span>
+                <div class="cred-list__pager-actions">
+                    <button mjButton Variant="outline" Size="sm" type="button" [disabled]="Page.PageIndex === 0" (click)="PreviousPage()">Previous</button>
+                    <button mjButton Variant="outline" Size="sm" type="button" [disabled]="Page.PageIndex + 1 >= Page.TotalPages" (click)="NextPage()">Next</button>
+                </div>
+            </div>
+        }
     }
 </nav>

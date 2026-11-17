@@ -26,8 +26,11 @@ import { LoadBizAppsCredentialingActions } from '@mj-biz-apps/credentialing-acti
 // Server-side entity subclasses register at priority 2 and must load after the
 // client-shared entities so their overrides win.
 import { LoadBizAppsCredentialingEntitiesServer } from '@mj-biz-apps/credentialing-core-entities-server';
+import { RegisterCredentialingServices } from './services/register.js';
 
 export * from './generated/generated.js';
+export { MagicLinkInvitationIssuer } from './invitations/MagicLinkInvitationIssuer.js';
+export { RegisterCredentialingServices } from './services/register.js';
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
 
@@ -44,4 +47,5 @@ export const RESOLVER_PATHS: string[] = [resolve(__dirname, 'generated/*.js')];
 export function LoadBizAppsCredentialingServer(): void {
     LoadBizAppsCredentialingEntitiesServer();
     LoadBizAppsCredentialingActions();
+    RegisterCredentialingServices();
 }

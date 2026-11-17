@@ -5,7 +5,7 @@
     "Description": "Verify the subject boundary of the nine applicant-data entities: contacts read only their own subject's rows and staff only their organization's subjects' rows; another subject's ID is refused exactly like a random one; a direct save or delete is refused for every caller while an operation write succeeds as the caller; a contact reads no authoring entity or membership; SubjectAccess reads authoring rows as the system user only after the caller's filter admitted the owned row; the subject lock refuses a waiter with the applicant sentence; and background units on isolated providers serialize on it.",
     "InputDefinition": {},
     "ExpectedOutcomes": {
-      "summary": "All nine cred-subject-isolation checks pass. Check 8 needs a registered IsolatedProviderFactory and reports itself skipped (not runnable) in a process without one."
+      "summary": "All nine cred-subject-isolation checks pass, including check 8 using the registered IsolatedProviderFactory."
     },
     "Configuration": {
       "tier": "deterministic",

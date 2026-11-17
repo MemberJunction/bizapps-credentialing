@@ -12,6 +12,8 @@ export const CredentialingOperation = {
     ReorderVersionTree: 'Credentialing.ReorderVersionTree',
     CreateOrganization: 'Credentialing.CreateOrganization',
     CreateCommittee: 'Credentialing.CreateCommittee',
+    InviteApplicant: 'Credentialing.InviteApplicant',
+    ReissueInvitation: 'Credentialing.ReissueInvitation',
 } as const;
 
 /** One of the {@link CredentialingOperation} keys. */
@@ -26,5 +28,17 @@ export const CREDENTIALING_STAFF_ROLE = 'Credentialing Staff';
 /** The external role of a subject's contact. */
 export const CREDENTIALING_APPLICANT_ROLE = 'Credentialing Applicant';
 
+/** The external role of a peer reviewer. */
+export const CREDENTIALING_REVIEWER_ROLE = 'Credentialing Reviewer';
+
+/** The external role of a committee member. */
+export const CREDENTIALING_COMMITTEE_ROLE = 'Credentialing Committee';
+
+/** The platform's restricted baseline role for magic-link accounts. */
+export const MAGIC_LINK_BASELINE_ROLE = 'Magic Link Baseline';
+
 /** The role organization setup requires of its caller. */
 export const CREDENTIALING_ADMIN_ROLE = 'Credentialing Admin';
+
+/** Shown when issuing the magic-link invite throws after committing the application. */
+export const INVITATION_FAILED_NOTE = 'The applicant was added, but the invitation link could not be created. Use Send a new link.';

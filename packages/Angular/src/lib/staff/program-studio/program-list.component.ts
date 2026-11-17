@@ -8,6 +8,7 @@ import { FormsModule } from '@angular/forms';
 import { BaseAngularComponent } from '@memberjunction/ng-base-types';
 import { SharedGenericModule } from '@memberjunction/ng-shared-generic';
 import { MJButtonDirective } from '@memberjunction/ng-ui-components';
+import { PIPELINE_PAGE_SIZE, PageSlice, type PagedSlice } from '../pipeline/pipeline-data';
 import { StudioData, type ProgramListRow } from './studio-data';
 import { StudioMessages } from '../studio-messages';
 
@@ -42,17 +43,47 @@ export class ProgramListComponent extends BaseAngularComponent implements OnInit
     @Output() ProgramSelected = new EventEmitter<string>();
     @Output() NewProgramRequested = new EventEmitter<void>();
 
+    private _filter = '';
+    public readonly PageSize = PIPELINE_PAGE_SIZE;
     public Programs: ProgramListRow[] = [];
-    public Filter = '';
+    public PageIndex = 0;
     public IsLoading = false;
     public ErrorMessage = '';
 
+    public get Filter(): string {
+        return this._filter;
+    }
+
+    public set Filter(value: string) {
+        if (value !== this._filter) {
+            this._filter = value;
+            this.PageIndex = 0;
+        }
+    }
+
     public get Visible(): ProgramListRow[] {
-        const f = this.Filter.trim().toLowerCase();
+        const f = this._filter.trim().toLowerCase();
         if (f.length === 0) {
             return this.Programs;
         }
         return this.Programs.filter((p) => p.Name.toLowerCase().includes(f) || p.CredentialPrefix.toLowerCase().includes(f));
+    }
+
+    public get Page(): PagedSlice<ProgramListRow> {
+        return PageSlice(this.Visible, this.PageIndex, this.PageSize);
+    }
+
+    public PreviousPage(): void {
+        if (this.Page.PageIndex > 0) {
+            this.PageIndex = this.Page.PageIndex - 1;
+        }
+    }
+
+    public NextPage(): void {
+        const page = this.Page;
+        if (page.PageIndex + 1 < page.TotalPages) {
+            this.PageIndex = page.PageIndex + 1;
+        }
     }
 
     ngOnInit(): void {

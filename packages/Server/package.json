@@ -27,12 +27,14 @@
     "@memberjunction/core": "^6.2.1",
     "@memberjunction/global": "^6.2.1",
     "@memberjunction/server": "^6.2.1",
+    "@memberjunction/server-extensions-core": "^6.2.1",
     "@memberjunction/sqlserver-dataprovider": "^6.2.1"
   },
   "devDependencies": {
     "@memberjunction/core": "6.2.2",
     "@memberjunction/global": "6.2.2",
     "@memberjunction/server": "6.2.2",
+    "@memberjunction/server-extensions-core": "6.2.2",
     "@memberjunction/sqlserver-dataprovider": "6.2.2",
     "typescript": "^5.9.3"
   }

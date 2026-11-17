@@ -49,6 +49,7 @@ export type StaffState = 'Ready' | 'FirstRunSetup' | 'NoMembership';
 /** The registration names of the application's resource components. */
 export const CredentialingResource = {
     ProgramStudio: 'CredentialingProgramStudioResource',
+    Pipeline: 'CredentialingPipelineResource',
     OrganizationSetup: 'CredentialingOrganizationSetupResource',
     ReviewHome: 'CredentialingReviewHomeResource',
     ApplicantHome: 'CredentialingApplicantHomeResource',
@@ -61,13 +62,14 @@ interface RankedItem {
 }
 
 const PROGRAM_STUDIO: RankedItem['Item'] = { Area: 'Staff', Label: 'Program Studio', Icon: 'fa-solid fa-diagram-project', DriverClass: CredentialingResource.ProgramStudio };
+const PIPELINE: RankedItem['Item'] = { Area: 'Staff', Label: 'Pipeline', Icon: 'fa-solid fa-inbox', DriverClass: CredentialingResource.Pipeline };
 const SET_UP_ORGANIZATION: RankedItem['Item'] = { Area: 'Staff', Label: 'Set up organization', Icon: 'fa-solid fa-building-circle-check', DriverClass: CredentialingResource.OrganizationSetup };
 const NEW_ORGANIZATION: RankedItem['Item'] = { Area: 'Staff', Label: 'New organization', Icon: 'fa-solid fa-building-circle-arrow-right', DriverClass: CredentialingResource.OrganizationSetup };
 const ASSIGNMENTS: RankedItem['Item'] = { Area: 'Review', Label: 'Assignments', Icon: 'fa-solid fa-clipboard-check', DriverClass: CredentialingResource.ReviewHome };
 const MY_APPLICATIONS: RankedItem['Item'] = { Area: 'Applicant', Label: 'My Applications', Icon: 'fa-solid fa-file-signature', DriverClass: CredentialingResource.ApplicantHome };
 
-/** Default ranks: first-run setup is the one thing an admin must do; New organization opens first only when alone. */
-const RANK = { SetUpOrganization: 0, ProgramStudio: 1, Assignments: 2, MyApplications: 3, NewOrganization: 4 } as const;
+/** Default ranks: first-run setup is the one thing an admin must do; Program Studio stays Staff's default above Pipeline; New organization opens first only when alone. */
+const RANK = { SetUpOrganization: 0, ProgramStudio: 1, Pipeline: 2, Assignments: 3, MyApplications: 4, NewOrganization: 5 } as const;
 
 export class AreaNav {
     /** The areas the user sees, in navigation order, each once. */
@@ -136,6 +138,7 @@ export class AreaNav {
         const items: RankedItem[] = [];
         if (AreaNav.holds(standing, CredentialingRole.Staff)) {
             items.push({ Item: PROGRAM_STUDIO, DefaultRank: RANK.ProgramStudio });
+            items.push({ Item: PIPELINE, DefaultRank: RANK.Pipeline });
         }
         if (AreaNav.holds(standing, CredentialingRole.Admin)) {
             items.push(

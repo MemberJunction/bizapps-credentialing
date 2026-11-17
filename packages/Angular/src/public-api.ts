@@ -24,6 +24,7 @@ export * from './lib/generated/generated-forms.module';
 
 import { LoadCredentialingApplication } from './lib/application/credentialing.application';
 import { LoadCredentialingProgramStudioResource } from './lib/resources/staff-program-studio.resource';
+import { LoadCredentialingPipelineResource } from './lib/resources/staff-pipeline.resource';
 import { LoadCredentialingOrganizationSetupResource } from './lib/resources/staff-organization-setup.resource';
 import { LoadCredentialingReviewHomeResource } from './lib/resources/review-home.resource';
 import { LoadCredentialingApplicantHomeResource } from './lib/resources/applicant-home.resource';
@@ -44,8 +45,13 @@ export { VersionTreeComponent, type TreeErrorTarget } from './lib/staff/program-
 export { StandardEditorComponent, EVALUATION_MODE_NOTE, type NewStandardTarget } from './lib/staff/program-studio/standard-editor.component';
 export { VersionSettingsComponent, FROZEN_SETTINGS_SENTENCE, ROLLOUT_FLAGS_SENTENCE, FIXED_ON_ACTIVATION_SENTENCE, RETIRED_SETTINGS_SENTENCE, type SettingDescriptor, type SettingsGroup, type SettingsTier } from './lib/staff/program-studio/version-settings.component';
 export { DocumentRequirementsComponent } from './lib/staff/program-studio/document-requirements.component';
+export { PipelinePage } from './lib/staff/pipeline/pipeline.page';
+export { InviteWizardComponent } from './lib/staff/pipeline/invite-wizard.component';
+export { PipelineData, FilterPipelineApplications, PageSlice, PIPELINE_PAGE_SIZE, type PipelineDataSource, type PagedSlice, type PipelineApplicationRow, type PipelineContactRow, type PipelineActiveTarget, type PipelineSubjectOption, type PipelineFilter, type PipelineSnapshot } from './lib/staff/pipeline/pipeline-data';
+export { InviteWizardModel, FormatInvitationOutcome, EligibleSubjectsForTarget, type InviteWizardStep, type InviteSubjectMode, type FormattedInvitationOutcome } from './lib/staff/pipeline/invite-wizard-model';
 export { CredentialingAreaResource, AREA_NOT_AVAILABLE_MESSAGE, type AreaResourceState } from './lib/resources/credentialing-area-resource';
 export { CredentialingProgramStudioResource, LoadCredentialingProgramStudioResource, PROGRAM_STUDIO_PARAMS } from './lib/resources/staff-program-studio.resource';
+export { CredentialingPipelineResource, LoadCredentialingPipelineResource } from './lib/resources/staff-pipeline.resource';
 export { CredentialingOrganizationSetupResource, LoadCredentialingOrganizationSetupResource } from './lib/resources/staff-organization-setup.resource';
 export { CredentialingReviewHomeResource, LoadCredentialingReviewHomeResource } from './lib/resources/review-home.resource';
 export { CredentialingApplicantHomeResource, LoadCredentialingApplicantHomeResource } from './lib/resources/applicant-home.resource';
@@ -58,6 +64,7 @@ export { CredentialingApplicantHomeResource, LoadCredentialingApplicantHomeResou
 export function LoadBizAppsCredentialingClient(): void {
     LoadCredentialingApplication();
     LoadCredentialingProgramStudioResource();
+    LoadCredentialingPipelineResource();
     LoadCredentialingOrganizationSetupResource();
     LoadCredentialingReviewHomeResource();
     LoadCredentialingApplicantHomeResource();

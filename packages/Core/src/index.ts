@@ -32,3 +32,5 @@ export * from './operations/CloneVersionToDraftOperation.js';
 export * from './operations/ReorderVersionTreeOperation.js';
 export * from './operations/CreateOrganizationOperation.js';
 export * from './operations/CreateCommitteeOperation.js';
+export * from './operations/InviteApplicantOperation.js';
+export * from './operations/ReissueInvitationOperation.js';

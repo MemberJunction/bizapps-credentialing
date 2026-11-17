@@ -687,9 +687,11 @@ A user API key (`mj_sk_…`, `x-api-key` header) is not used by this harness.
 | `cred-isolation` | `CRD-05 - Isolation` | server only |
 | `cred-world` | `CRD-06 - World` | server and client (`pnpm run seed:dev`; the applicant world is written on the server transport only) |
 | `cred-applicant-schema` | `CRD-07 - Applicant schema` | server only |
-| `cred-subject-isolation` | `CRD-08 - Subject isolation` | server only (check 8 needs a registered `IsolatedProviderFactory`) |
+| `cred-subject-isolation` | `CRD-08 - Subject isolation` | server only (all 9 checks run; the integration test barrel registers `CreateIndependentInstance` / `ReleaseIndependentInstance`) |
+| `cred-invite` | `CRD-09 - Invitations` | server only (`packages/IntegrationTests/src/checks/cred-invite.checks.ts` registers a fixture `InvitationIssuer`) |
 | `cred-users` | — (client harness only) | client (`pnpm run seed:users`; registered in `cred-world.checks.ts`) |
 | `cred-operations-wire` | — (client harness only) | client only |
+| `cred-invite-wire` | — (client harness only) | client only (checks 7, 8 and 10 against MJAPI's live `MagicLinkService`) |
 
 ```sh
 MJ_INTEGRATION_TEST=1 RUN_MUTATION_TESTS=1 corepack pnpm mj test run --name "CRD-02 - Version rules"   # 12 checks
@@ -698,8 +700,10 @@ MJ_INTEGRATION_TEST=1 RUN_MUTATION_TESTS=1 corepack pnpm mj test run --name "CRD
 MJ_INTEGRATION_TEST=1 RUN_MUTATION_TESTS=1 corepack pnpm mj test run --name "CRD-05 - Isolation"      # 9 checks
 MJ_INTEGRATION_TEST=1 RUN_MUTATION_TESTS=1 corepack pnpm mj test run --name "CRD-06 - World"          # 2 checks
 MJ_INTEGRATION_TEST=1 RUN_MUTATION_TESTS=1 corepack pnpm mj test run --name "CRD-07 - Applicant schema"  # 3 checks
-MJ_INTEGRATION_TEST=1 RUN_MUTATION_TESTS=1 corepack pnpm mj test run --name "CRD-08 - Subject isolation" # 9 checks (8 runs where a provider factory is registered)
+MJ_INTEGRATION_TEST=1 RUN_MUTATION_TESTS=1 corepack pnpm mj test run --name "CRD-08 - Subject isolation" # 9 checks
+MJ_INTEGRATION_TEST=1 RUN_MUTATION_TESTS=1 corepack pnpm mj test run --name "CRD-09 - Invitations"       # 9 checks
 corepack pnpm run test:integration cred-operations-wire                                               # 3 checks, GraphQL
+corepack pnpm run test:integration cred-invite-wire                                                   # 3 checks, GraphQL
 corepack pnpm run seed:dev                                                                            # 2 checks (cred-world), GraphQL
 corepack pnpm run seed:users                                                                          # 1 check (cred-users), GraphQL
 ```
@@ -1049,5 +1053,39 @@ notifier); a getter for a service nobody registered throws `The <name> service i
 this server.` `InBackground` gives each unit of work its own provider from the registered
 `IsolatedProviderFactory` and releases it through the factory. The factory interface has
 `Release(provider)` beside the plan's `Create()`, so `InBackground` releases exactly what it was
-given. Nothing registers a factory in the `mj test` process yet, so `cred-subject-isolation.8` reports
-itself skipped there (`SkipCheck`, not on the allowlist) until Task 4 registers the real one.
+given. Registering `CreateIndependentInstance` / `ReleaseIndependentInstance` on
+`CredentialingServices.Providers` in `packages/IntegrationTests/src/index.ts` lets
+`cred-subject-isolation.8` run and pass in `mj test run`.
+
+## Magic-link invitations and registered server services (B2 Task 4 Step 3 discovery)
+
+Verified from MJ v6.2.2 (`mj/packages/MJServer/src/index.ts:204-206, 1414-1428`,
+`mj/packages/MJServer/src/auth/magicLink/MagicLinkService.ts`, `mj/packages/MJServer/src/auth/magicLink/magicLinkCore.ts:72-85`,
+`mj/packages/MJServer/src/isolatedProvider.ts`, `mj/packages/MJCoreEntitiesServer/src/custom/MJUserEntityServer.server.ts:136-150`):
+
+- **Obtaining `MagicLinkService` in `packages/Server`:** Open App server packages load before `serve()`
+  creates `ServerExtensionLoader`. Calling
+  `GetServerExtensionLoader()?.Services.GetService<IServerExtensionMagicLinkService>(SERVER_EXTENSION_CORE_SERVICE_KEYS.MagicLink)`
+  (`'MJ:MagicLinkService'`) lazily inside `MagicLinkInvitationIssuer.IssueApplicantLink` retrieves the
+  running MJAPI `MagicLinkService` once HTTP serving starts.
+- **`mj test run` vs. MJAPI:** `bizapps-credentialing/mj.config.cjs` has no `dynamicPackages` block, so
+  `mj test run` does not load `@mj-biz-apps/credentialing-server` automatically and never starts MJAPI's
+  HTTP/`MagicLinkService` stack. However, `Metadata.Provider` (`SQLServerDataProvider` / `DatabaseProviderBase`)
+  supports `CreateIndependentInstance()` and `ReleaseIndependentInstance()` (the exact mechanism behind
+  `CreateIsolatedProvider`). `packages/IntegrationTests/src/index.ts` registers that `Providers` factory
+  for `mj test run` (without importing `@memberjunction/server`, which runs `LoadConfig()` at import time
+  and would break unit tests), so `cred-subject-isolation.8` runs and passes with 0 skips, while
+  `cred-invite` registers a fixture `InvitationIssuer` and `cred-invite-wire` verifies live link issuance,
+  `POST /magic-link/redeem?format=json`, invite metadata, and parallel new-email locking against running
+  MJAPI on port `4050`.
+- **Principal for provisioning and invites:** `MJUserEntityServer` refuses user creation unless
+  `contextUser.Type === 'Owner'`, and `CanIssueInvites` / `isInviterActive` require an active user whose
+  role is in `inviteIssuerRoleNames` or an `Owner`/`Developer` allowed by core entity permissions on
+  `MJ: Magic Link Invites`. The `System` user (`not.set@nowhere.com`, `Type = 'Owner'`, `IsActive = 1`)
+  and `magicLink.contextUserForProvisioning` pass all checks, while `'Credentialing Staff'` has been
+  removed from `magicLink.inviteIssuerRoleNames` (`[]` in local `../mj/mj.config.cjs`).
+- **Required host configuration (`mj.config.cjs`):** `magicLink.enabled: true`,
+  `magicLink.inviteIssuerRoleNames: []`, `magicLink.grantableRoleNames` including
+  `'Credentialing Applicant'` (plus `'Magic Link Baseline'` as baseline role), `magicLink.explorerUrl`
+  pointing to Explorer (`http://localhost:4251`), and `magicLink.contextUserForProvisioning` pointing to an
+  active `Owner` user (`System` when unset).
