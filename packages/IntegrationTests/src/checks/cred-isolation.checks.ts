@@ -58,8 +58,16 @@ const CREDENTIALING_ROLES: readonly string[] = [...INTERNAL_ROLES, ...EXTERNAL_R
 /** Platform entities whose rows route around row filters (FRD NFR-2.2); no credentialing role may hold any grant on them. */
 const FORBIDDEN_ENTITIES = ['MJ: Record Changes', 'MJ: Queries'] as const;
 
-/** The seven entities of this app's schema. */
-const ALL_ENTITIES: readonly string[] = Object.values(CredentialingEntity);
+/** The seven B1 entities of this app's schema (Task 3 adds applicant-entity isolation checks). */
+const ALL_ENTITIES: readonly string[] = [
+    CredentialingEntity.AccreditingOrganization,
+    CredentialingEntity.OrganizationMembership,
+    CredentialingEntity.Program,
+    CredentialingEntity.ProgramVersion,
+    CredentialingEntity.Section,
+    CredentialingEntity.Standard,
+    CredentialingEntity.DocumentRequirement,
+];
 
 /** The five program-tree entities, which carry an `AccreditingOrganizationID` only through their program. */
 const TREE_ENTITIES = [

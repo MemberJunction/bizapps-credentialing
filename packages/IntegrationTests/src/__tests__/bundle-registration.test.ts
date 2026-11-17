@@ -13,6 +13,11 @@ describe('Credentialing Integration Test Bundles', () => {
         expect(bundleNames).toContain('cred-schema');
     });
 
+    it('registers the cred-applicant-schema bundle with its three checks', () => {
+        const ids = IntegrationCheckRegistry.Instance.GetBundle('cred-applicant-schema').map((c) => c.Id);
+        expect(ids).toEqual(['cred-applicant-schema.1', 'cred-applicant-schema.2', 'cred-applicant-schema.3']);
+    });
+
     it('registers the cred-version-rules bundle with its twelve checks', () => {
         const ids = IntegrationCheckRegistry.Instance.GetBundle('cred-version-rules').map((c) => c.Id);
         expect(ids).toEqual(Array.from({ length: 12 }, (_, i) => `cred-version-rules.${i + 1}`));

@@ -16,6 +16,7 @@ export * from './world/placeholder-organization-program.js';
 export * from './world/load-world.js';
 export * from './checks/cred-smoke.checks.js';
 export * from './checks/cred-schema.checks.js';
+export * from './checks/cred-applicant-schema.checks.js';
 export * from './checks/cred-version-rules.checks.js';
 export * from './checks/cred-standard-rules.checks.js';
 export * from './checks/cred-operations.checks.js';

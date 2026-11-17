@@ -20,7 +20,9 @@ export class mjBizAppsCredentialingProgramVersionFormComponent extends BaseFormC
             { sectionKey: 'mJBizAppsCredentialingStandards', sectionName: 'Standards', isExpanded: false },
             { sectionKey: 'mJBizAppsCredentialingDocumentRequirements', sectionName: 'Document Requirements', isExpanded: false },
             { sectionKey: 'mJBizAppsCredentialingSections', sectionName: 'Sections', isExpanded: false },
-            { sectionKey: 'mJBizAppsCredentialingProgramVersions', sectionName: 'Program Versions', isExpanded: false }
+            { sectionKey: 'mJBizAppsCredentialingProgramVersions', sectionName: 'Program Versions', isExpanded: false },
+            { sectionKey: 'mJBizAppsCredentialingApplications', sectionName: 'Applications', isExpanded: false },
+            { sectionKey: 'mJBizAppsCredentialingResponseSources', sectionName: 'Response Sources', isExpanded: false }
         ]);
     }
 }
