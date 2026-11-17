@@ -22,7 +22,7 @@ import { CredentialingEntity } from '@mj-biz-apps/credentialing-core';
 import { CountRows, FindRows, Quote, RequireDelete } from '../wire.js';
 import { ADMIN_ROLE, APPLICANT_ROLE, EnsureWorldUsers, GetOrLoadWorld, LoadWorld, STAFF_ROLE, UI_ROLE } from '../world/load-world.js';
 import { PLACEHOLDER_PROGRAM_NAME } from '../world/placeholder-organization-program.js';
-import { EnsureProgramTree, type ProgramTreeSpec, type SectionSpec, type StandardSpec } from '../world/program-tree.js';
+import { EnsureProgramTree, type ProgramTree, type ProgramTreeSpec, type SectionSpec, type StandardSpec } from '../world/program-tree.js';
 import type { CredentialingWorld } from '../world/world.js';
 
 interface StandardSummaryRow {
@@ -45,6 +45,62 @@ interface RequirementSummaryRow {
     Name: string;
     IsRequired: boolean;
     SensitivityPolicy: string;
+}
+
+/** cred-world.2's assertions: a partially deleted tree is repaired and its surviving rows keep their IDs. */
+async function verifyRepair(ctx: IntegrationCheckContext, spec: ProgramTreeSpec, first: ProgramTree): Promise<void> {
+    AssertEqual(first.Sections.length, 3, 'initial sections');
+    AssertEqual(first.Sections.reduce((sum, s) => sum + s.Standards.length, 0), 6, 'initial standards');
+
+    const deletedSection = first.Sections[1];
+    for (const standard of deletedSection.Standards) {
+        await RequireDelete(standard, `repair standard ${standard.Code}`);
+    }
+    await RequireDelete(deletedSection.Section, `repair section ${deletedSection.Section.Number}`);
+
+    AssertEqual(
+        await CountRows(ctx, CredentialingEntity.Section, `ProgramVersionID = '${Quote(first.Version.ID)}'`),
+        2,
+        'sections after partial delete',
+    );
+    AssertEqual(
+        await CountRows(ctx, CredentialingEntity.Standard, `ProgramVersionID = '${Quote(first.Version.ID)}'`),
+        4,
+        'standards after partial delete',
+    );
+
+    const repaired = await EnsureProgramTree(ctx, spec, ctx.User);
+    AssertEqual(repaired.Sections.length, 3, 'repaired sections');
+    AssertEqual(repaired.Sections.reduce((sum, s) => sum + s.Standards.length, 0), 6, 'repaired standards');
+    AssertEqual(
+        await CountRows(ctx, CredentialingEntity.Section, `ProgramVersionID = '${Quote(first.Version.ID)}'`),
+        3,
+        'stored sections after repair',
+    );
+    AssertEqual(
+        await CountRows(ctx, CredentialingEntity.Standard, `ProgramVersionID = '${Quote(first.Version.ID)}'`),
+        6,
+        'stored standards after repair',
+    );
+
+    Assert(UUIDsEqual(repaired.Program.ID, first.Program.ID), 'program kept its ID');
+    Assert(UUIDsEqual(repaired.Version.ID, first.Version.ID), 'version kept its ID');
+    for (const survivingIndex of [0, 2]) {
+        Assert(
+            UUIDsEqual(repaired.Sections[survivingIndex].Section.ID, first.Sections[survivingIndex].Section.ID),
+            `surviving section ${survivingIndex + 1} kept its ID`,
+        );
+        for (let j = 0; j < 2; j++) {
+            Assert(
+                UUIDsEqual(repaired.Sections[survivingIndex].Standards[j].ID, first.Sections[survivingIndex].Standards[j].ID),
+                `surviving standard ${survivingIndex + 1}.${j + 1} kept its ID`,
+            );
+        }
+    }
+    Assert(
+        !UUIDsEqual(repaired.Sections[1].Section.ID, deletedSection.Section.ID),
+        'deleted section was recreated with a new ID',
+    );
 }
 
 function hasRole(user: UserInfo, roleName: string): boolean {
@@ -216,57 +272,18 @@ const checks: NamedCheck[] = [
             const world = await GetOrLoadWorld(ctx);
             const spec = buildRepairSpec(world.OrgA.ID);
             const first = await EnsureProgramTree(ctx, spec, ctx.User);
-            AssertEqual(first.Sections.length, 3, 'initial sections');
-            AssertEqual(first.Sections.reduce((sum, s) => sum + s.Standards.length, 0), 6, 'initial standards');
-
-            const deletedSection = first.Sections[1];
-            for (const standard of deletedSection.Standards) {
-                await RequireDelete(standard, `repair standard ${standard.Code}`);
+            try {
+                await verifyRepair(ctx, spec, first);
+            } finally {
+                // The tree is scratch: a Draft version's delete removes its sections and standards
+                // (ProgramVersionEntityServer), so seeding twice leaves nothing new behind.
+                await RequireDelete(first.Version, `repair version of ${spec.Program.Name}`);
+                await RequireDelete(first.Program, `repair program ${spec.Program.Name}`);
             }
-            await RequireDelete(deletedSection.Section, `repair section ${deletedSection.Section.Number}`);
-
             AssertEqual(
-                await CountRows(ctx, CredentialingEntity.Section, `ProgramVersionID = '${Quote(first.Version.ID)}'`),
-                2,
-                'sections after partial delete',
-            );
-            AssertEqual(
-                await CountRows(ctx, CredentialingEntity.Standard, `ProgramVersionID = '${Quote(first.Version.ID)}'`),
-                4,
-                'standards after partial delete',
-            );
-
-            const repaired = await EnsureProgramTree(ctx, spec, ctx.User);
-            AssertEqual(repaired.Sections.length, 3, 'repaired sections');
-            AssertEqual(repaired.Sections.reduce((sum, s) => sum + s.Standards.length, 0), 6, 'repaired standards');
-            AssertEqual(
-                await CountRows(ctx, CredentialingEntity.Section, `ProgramVersionID = '${Quote(first.Version.ID)}'`),
-                3,
-                'stored sections after repair',
-            );
-            AssertEqual(
-                await CountRows(ctx, CredentialingEntity.Standard, `ProgramVersionID = '${Quote(first.Version.ID)}'`),
-                6,
-                'stored standards after repair',
-            );
-
-            Assert(UUIDsEqual(repaired.Program.ID, first.Program.ID), 'program kept its ID');
-            Assert(UUIDsEqual(repaired.Version.ID, first.Version.ID), 'version kept its ID');
-            for (const survivingIndex of [0, 2]) {
-                Assert(
-                    UUIDsEqual(repaired.Sections[survivingIndex].Section.ID, first.Sections[survivingIndex].Section.ID),
-                    `surviving section ${survivingIndex + 1} kept its ID`,
-                );
-                for (let j = 0; j < 2; j++) {
-                    Assert(
-                        UUIDsEqual(repaired.Sections[survivingIndex].Standards[j].ID, first.Sections[survivingIndex].Standards[j].ID),
-                        `surviving standard ${survivingIndex + 1}.${j + 1} kept its ID`,
-                    );
-                }
-            }
-            Assert(
-                !UUIDsEqual(repaired.Sections[1].Section.ID, deletedSection.Section.ID),
-                'deleted section was recreated with a new ID',
+                await CountRows(ctx, CredentialingEntity.Program, `Name = '${Quote(spec.Program.Name)}'`),
+                0,
+                'the repair check leaves no program behind',
             );
         },
     },

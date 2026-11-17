@@ -140,7 +140,7 @@ async function ensureCredentialingApplication(ctx: IntegrationCheckContext, user
 
 /**
  * Creates (or finds) the world's users. Kept apart from {@link EnsureWorldData} so a clean instance
- * can have its users before it has any organization.
+ * can have its users before any organization exists.
  */
 export async function EnsureWorldUsers(ctx: IntegrationCheckContext): Promise<WorldUsers> {
     const users: WorldUsers = {

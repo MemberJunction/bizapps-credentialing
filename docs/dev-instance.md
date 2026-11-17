@@ -125,7 +125,15 @@ when `Credentialing` exists in `__mj.Application`, it also ensures the
     `inviteIssuerRoleNames: ['Credentialing Staff']`,
     `grantableRoleNames: ['Credentialing Applicant', 'Credentialing Reviewer', 'Credentialing Committee']`.
     MJAPI boots cleanly even before those Credentialing roles exist because `MagicLinkService` enforces those lists per request rather than at startup.
-  - `MJ_MAGIC_LINK_PRIVATE_KEY` is set in `mj/.env` (RSA private key).
+  - `MJ_MAGIC_LINK_PRIVATE_KEY` must be set in `mj/.env`: a 2048-bit RSA private key, PEM or
+    base64 of the PEM (`MagicLinkKeyManager.normalizePem`,
+    `mj/packages/MJServer/src/auth/magicLink/MagicLinkKeys.ts`). The same key signs dev-login tokens
+    (`localDevAuth.ts` initializes the same manager). **Left empty, MJAPI generates a new key at every
+    start**, so every dev-login token and magic-link session dies on each MJAPI restart (Explorer then
+    gets HTTP 401 on every call and stalls on "Taking longer than expected"). Measured during the
+    B1 verification: the variable was present but empty on this instance, and the token's `kid`
+    changed at every restart; after setting it, a token minted before a restart still answered
+    `CurrentUser` after it. Generate it without printing it — see "Rebuild from nothing", step 9.
   - `dynamicPackages.server` registers `@mj-biz-apps/common-server` (`LoadBizAppsCommonServer`), `@mj-biz-apps/tasks-server` (`LoadBizAppsTasksServer`), `@mj-biz-apps/committees-server` (`LoadCommitteesServer`), and `@mj-biz-apps/credentialing-server` (`LoadBizAppsCredentialingServer`).
   - `dynamicPackages.client` registers `@mj-biz-apps/common-ng`, `@mj-biz-apps/tasks-ng`, `@mj-biz-apps/committees-ng`, and `@mj-biz-apps/credentialing-ng` (`Enabled: true`).
 - `mj/packages/MJAPI/package.json` and `mj/packages/MJExplorer/package.json` list
@@ -474,7 +482,10 @@ http://localhost:4251/app/credentialing#token=<the jwt printed by: pnpm run pers
 Measured: opened in a fresh isolated browser context, Explorer signs in as Staff B, shows Program
 Studio with only `Sample Program B`, and (no `mj_magic_link` claim) keeps the app switcher. Use a
 fresh tab or browser context per persona (the token lives in that tab's `sessionStorage`). The token
-is not refreshed; it lasts as long as dev-login's token (8 hours here). Screenshot:
+is not refreshed; it lasts as long as dev-login's token (8 hours here), and survives an MJAPI restart
+only when `MJ_MAGIC_LINK_PRIVATE_KEY` is set (otherwise mint a new one after every restart). Once
+stored, the tab keeps using it on later navigations without the fragment (`MJMagicLinkProvider.hasSessionToken`,
+`auth-services.module.ts:66-81`). Screenshot:
 `../logs/screens/t12-staff-b-fragment-token.png`. The `MJ_DEV_AUTH_DEFAULT_EMAIL` route above still
 works and is the one to use for a normal, refreshing dev session.
 
@@ -487,13 +498,22 @@ workspace parent during recovery, re-apply the `@typespec/ts-http-runtime` /
 at the workspace parent and `corepack pnpm --filter "@mj-biz-apps/common-*" run build`
 before `corepack pnpm run build`.
 
+Followed literally, top to bottom, for the B1 verification (`docs/verification/b1-2026-11.md`);
+every step below is the one that worked.
+
 1. Stop MJAPI (`4050`) and MJExplorer (`4251`) so no open connections hold the database.
-2. Drop (if present) and recreate the database:
+2. Drop (if present) and recreate the database, with read-committed snapshot on:
    ```sql
    ALTER DATABASE [MJ_6_2_2_CLEAN_credentialing] SET SINGLE_USER WITH ROLLBACK IMMEDIATE;
    DROP DATABASE [MJ_6_2_2_CLEAN_credentialing];
    CREATE DATABASE [MJ_6_2_2_CLEAN_credentialing];
+   ALTER DATABASE [MJ_6_2_2_CLEAN_credentialing] SET READ_COMMITTED_SNAPSHOT ON WITH ROLLBACK IMMEDIATE;
    ```
+   Without the last line every MJAPI start logs `[WorkQueue] Error: Database transport —
+   READ_COMMITTED_SNAPSHOT is OFF for this SQL Server database. The Database transport requires it`
+   (`mj/packages/MJServer/src/services/WorkQueueHostService.ts`, `ReportTopologyIssues`). A new SQL
+   Server database has it off; check with
+   `SELECT is_read_committed_snapshot_on FROM sys.databases WHERE name = 'MJ_6_2_2_CLEAN_credentialing'`.
 3. From `mj/` (using `mj/.env`), migrate and populate MJ core:
    ```sh
    corepack pnpm mj migrate
@@ -509,23 +529,49 @@ before `corepack pnpm run build`.
    (cd ../bizapps-committees && corepack pnpm run mj:migrate)
    corepack pnpm run dev:owner
    ```
-5. From `bizapps-credentialing/` (using `bizapps-credentialing/.env`), migrate and push app metadata (strip any `sync` blocks if keeping working tree clean):
+   On the first run `dev:owner` prints `Application 'Credentialing' not yet in metadata; skipping MJ:
+   User Applications` — expected; step 6 adds the row.
+5. From `bizapps-credentialing/` (using `bizapps-credentialing/.env`), migrate and push app metadata,
+   then restore the metadata files:
    ```sh
    corepack pnpm run mj:migrate
    corepack pnpm exec mj sync push --dir=metadata --ci
+   git checkout -- metadata
    ```
+   The push writes a `sync` block (`lastModified`, `checksum`) into every record file it touches and
+   changes the trailing newline; that is its only change (checked with `git diff` — nothing else
+   differs), and `sync` blocks are never committed. On a fresh database the push reports
+   `created: 100, updated: 1`.
 6. Ensure `admin@memberjunction.org` has the `MJ: User Applications` row for `Credentialing` (either via `corepack pnpm run dev:owner` in `bizapps-credentialing/` when no browser is needed — idempotent via entity objects — or in Explorer via **Application launcher → Configure… → Available Applications → Add Credentialing → Save Changes**):
    ```sh
-   corepack pnpm run dev:owner
+   corepack pnpm run dev:owner     # Granted MJ: User Applications 'Credentialing' to 'admin@memberjunction.org'.
    ```
-7. From `mj/`, start MJAPI (`corepack pnpm run start:api`, port `4050`) and MJExplorer (`corepack pnpm run start:explorer`, port `4251`).
-8. From `bizapps-credentialing/`, build this app's packages (the `mj test` check module is
-   `packages/IntegrationTests/dist/index.js`) and push the integration test rows (`MJ: Tests`):
+7. From `bizapps-credentialing/`, build this app's packages, push the integration test rows
+   (`MJ: Tests`) and restore their files the same way, then confirm CodeGen has nothing to change:
    ```sh
    corepack pnpm run build:packages
-   corepack pnpm exec mj sync push --dir=metadata-tests --ci
+   corepack pnpm exec mj sync push --dir=metadata-tests --ci     # created: 7
+   git checkout -- metadata-tests
+   corepack pnpm run mj:codegen                                  # 520 entities
+   git status --short                                            # nothing under migrations/ or src/generated/
    ```
-9. Set `MJ_BASE_ENCRYPTION_KEY` — the same value — in `mj/.env` (MJAPI) and
+   Build before starting MJAPI: `mj/mj.config.cjs` `dynamicPackages.server` loads
+   `@mj-biz-apps/credentialing-server` from its `dist/`, and `mj/`'s own `corepack pnpm run build`
+   (step 3) does not build this app's packages (no `@mj-biz-apps/credentialing-*` task in its turbo
+   run). The `mj test` check module is `packages/IntegrationTests/dist/index.js`.
+8. From `mj/`, start MJAPI (`corepack pnpm run start:api`, port `4050`) and MJExplorer
+   (`corepack pnpm run start:explorer`, port `4251`). Start them detached (for example with `nohup …
+   &` and the output redirected to a log file) when they must outlive the shell that started them.
+   MJAPI is up when `POST /auth/dev-login` answers; Explorer's first page load after a start compiles
+   for a few minutes.
+9. Set `MJ_MAGIC_LINK_PRIVATE_KEY` in `mj/.env` once (it survives rebuilds, since it is not in the
+   database), without printing it, then restart MJAPI:
+   ```sh
+   K=$(openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 2>/dev/null | base64 | tr -d '\n')
+   # write it as the value of MJ_MAGIC_LINK_PRIVATE_KEY= in mj/.env (one line)
+   ```
+   See "Magic-Link & Dynamic Package Wiring" for what goes wrong without it.
+10. Set `MJ_BASE_ENCRYPTION_KEY` — the same value — in `mj/.env` (MJAPI) and
    `bizapps-credentialing/.env` (`mj test`, the dev scripts). It is the key material of the
    `Base Encryption Key` row (`__mj.EncryptionKey`, `EnvVarKeySource`, algorithm `AES-256-GCM`,
    256 bits), so it is 32 random bytes, base64-encoded, generated as MJ's message says
@@ -538,9 +584,33 @@ before `corepack pnpm run build`.
    Without it every MJAPI start and `mj test` run prints `ENCRYPTION KEY VALIDATION FAILED`
    (`EncryptionStartupValidator`), and any save of an encrypted field (`MJ: Credentials`) fails.
    Set it before anything is encrypted: values encrypted under one key cannot be read with another.
-10. Set `MJ_API_KEY` in `bizapps-credentialing/.env` for the client-transport harness. It is
+11. Set `MJ_API_KEY` in `bizapps-credentialing/.env` for the client-transport harness. It is
    MJAPI's **system** API key — the same value as `MJ_API_KEY` in `mj/.env` — not a user
    `mj_sk_…` key (see "Running tests" below). No key is created in Explorer or in the database.
+
+Steps 9–11 are one-time `.env` settings; on a rebuild of an instance that already has them, check
+that each is present and non-empty (`grep -c '^MJ_MAGIC_LINK_PRIVATE_KEY=.' mj/.env`) and move on.
+
+### First run on the rebuilt database
+
+Before any test row or `seed:dev`, the database has no accrediting organization. This is the
+order that proves first-run setup (B1 verification, Step 1):
+
+```sh
+corepack pnpm run seed:users        # cred-users.1: the six world accounts, roles and app rows, no organization
+# restart MJAPI so its user cache holds the new accounts
+corepack pnpm run persona admin     # token=…; open http://localhost:4251/app/credentialing#token=<token>
+```
+
+`admin@example.test` lands on **Set up organization**. `seed:users` gives it the Credentialing
+`MJ: User Applications` row (`ensureCredentialingApplication`, `load-world.ts`), so no Explorer
+configuration is needed. Creating `Sample Accrediting Body A` with `staff.a@example.test` writes one
+accrediting organization, one Common organization of that name and one membership; `staff.a`
+already holds `Credentialing Staff` and the application row from `seed:users`, and the operation adds
+neither a second time. `staff.a@example.test` then signs in **without an MJAPI restart** (the
+operation refreshes the user cache) and gets an empty Program Studio. The world loader finds that
+organization by name and adopts it as `OrgA` (`seed:dev` creates no second one). After that, run
+`pnpm test`, the `CRD-*` rows, restart MJAPI, then `test:integration`, `seed:dev`, `probe:isolation`.
 
 ## Running tests
 
@@ -620,7 +690,11 @@ entities are writable over GraphQL):
   `CredentialingWorld` (`EnsureWorldUsers` + `EnsureWorldData` including `SampleProgram`,
   `PlaceholderProgram` with 12 sections / 36 standards / 5 document requirements, and `ProgramB`),
   verifies idempotent reload, and verifies `EnsureProgramTree` partial-delete repair on a run-unique
-  scratch tree.
+  scratch tree (`Repair <hex>`), which it deletes again when the check ends (a Draft version's delete
+  removes its tree), so a second `seed:dev` leaves every row count unchanged. Measured: the row counts
+  of the seven credentialing tables, Common organizations, users, user roles, user applications and
+  committees were identical before and after two more runs. (Before this was fixed, every run left one
+  `Repair <hex>` program in `OrgA`; the earlier ones are still in this dev database.)
 - `pnpm run seed:users` (`node test-harnesses/integration.mjs cred-users`): runs `EnsureWorldUsers`
   only (creates or finds the six world user accounts, their roles, and Credentialing application
   rows, with no accrediting organizations), for first-run setup verification. Restart MJAPI

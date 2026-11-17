@@ -165,6 +165,7 @@ try {
   }
 
   // 3. Ensure MJ: User Applications row exists for the target application (when pushed).
+  let addedApp = false;
   if (!skipApp) {
     const app = md.Applications.find(
       (a) => a.Name?.trim().toLowerCase() === appName.toLowerCase()
@@ -192,6 +193,7 @@ try {
         if (!(await userApp.Save())) {
           throw new Error(`Failed to grant application '${appName}': ${userApp.LatestResult?.CompleteMessage ?? 'unknown error'}`);
         }
+        addedApp = true;
         console.log(`Granted MJ: User Applications '${appName}' to '${email}'.`);
       } else {
         console.log(`MJ: User Applications '${appName}' already present for '${email}'.`);
@@ -199,7 +201,7 @@ try {
     }
   }
 
-  if (!createdUser && addedRoles === 0) {
+  if (!createdUser && addedRoles === 0 && !addedApp) {
     console.log(`Summary: nothing new created for '${email}'.`);
   }
 } finally {
