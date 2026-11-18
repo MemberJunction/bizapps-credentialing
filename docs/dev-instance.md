@@ -505,8 +505,9 @@ workspace parent during recovery, re-apply the `@typespec/ts-http-runtime` /
 at the workspace parent and `corepack pnpm --filter "@mj-biz-apps/common-*" run build`
 before `corepack pnpm run build`.
 
-Followed literally, top to bottom, for the B1 verification (`docs/verification/b1-2026-11.md`);
-every step below is the one that worked.
+Followed literally, top to bottom, for the B1 verification (`docs/verification/b1-2026-11.md`) and
+again for the B2 verification (`docs/verification/b2-2026-11.md`, 2026-11-17); every step below is the
+one that worked. Steps 3a, 7a and the counts were corrected by the B2 run.
 
 1. Stop MJAPI (`4050`) and MJExplorer (`4251`) so no open connections hold the database.
 2. Drop (if present) and recreate the database, with read-committed snapshot on:
@@ -529,6 +530,17 @@ every step below is the one that worked.
    corepack pnpm mj codegen --skipdb
    corepack pnpm run build
    ```
+   3a. The push in `mj/` rewrites the `sync` block (`lastModified`, `checksum`) of MJ's own committed
+   record files when its checksum differs from the database's (B2 run: `updated: 2`,
+   `metadata/component-libraries/.component-libraries.json` and `metadata/components/.components.json`,
+   only those two keys changed). Nothing in `mj/` may be committed, and `git status --short` in `mj/`
+   must show only the local registration files, so restore exactly the files the push rewrote, after
+   checking that their diff is `sync` keys only:
+   ```sh
+   git -C ../mj diff metadata/ | grep '^[-+] ' | grep -v -E '"(lastModified|checksum)"'   # expect: no output
+   git -C ../mj checkout -- metadata/component-libraries/.component-libraries.json metadata/components/.components.json
+   ```
+   MJ's migrate applied 162 migrations in about 250 s; `codegen --skipfiles` reported 446 entities.
 4. Migrate dependency apps leaf-first (with `.env` in each sibling root), and provision the local dev Owner user (`admin@memberjunction.org` with roles `Developer`, `Integration`, `UI`) from `bizapps-credentialing/`:
    ```sh
    (cd ../bizapps-common && corepack pnpm run mj:migrate)
@@ -558,7 +570,11 @@ every step below is the one that worked.
    a push wrote 3 `sync` blocks and dropped 7 files' final newlines; after the script, `git diff` held
    only the hand edit. On a fresh database the push reported `created: 100, updated: 1`; two records
    were added since (the committee-type catalog filter and its permission row: `created: 2,
-   unchanged: 101` on this instance), so a fresh push now creates 102.
+   unchanged: 101` on this instance), so a fresh push created 102 at the end of B1. With B2's records
+   (row-level security filters and permissions for the applicant-data entities, the two reading prompts
+   with their templates, the `Credentialing: Application Submitted` notification type) a fresh push
+   reports `created: 132, updated: 1` (B2 verification); `metadata:strip-sync` then removed 133 `sync`
+   blocks and `git status` was clean.
 6. Ensure `admin@memberjunction.org` has the `MJ: User Applications` row for `Credentialing` (either via `corepack pnpm run dev:owner` in `bizapps-credentialing/` when no browser is needed — idempotent via entity objects — or in Explorer via **Application launcher → Configure… → Available Applications → Add Credentialing → Save Changes**):
    ```sh
    corepack pnpm run dev:owner     # Granted MJ: User Applications 'Credentialing' to 'admin@memberjunction.org'.
@@ -567,20 +583,35 @@ every step below is the one that worked.
    (`MJ: Tests`) and strip their `sync` blocks the same way, then confirm CodeGen has nothing to change:
    ```sh
    corepack pnpm run build:packages
-   corepack pnpm exec mj sync push --dir=metadata-tests --ci     # created: 7
+   corepack pnpm exec mj sync push --dir=metadata-tests --ci     # created: 16 (CRD-00 … CRD-15)
    corepack pnpm run metadata:strip-sync
-   corepack pnpm run mj:codegen                                  # 520 entities
+   corepack pnpm run mj:codegen                                  # 530 entities
    git status --short                                            # nothing under migrations/ or src/generated/
    ```
    Build before starting MJAPI: `mj/mj.config.cjs` `dynamicPackages.server` loads
    `@mj-biz-apps/credentialing-server` from its `dist/`, and `mj/`'s own `corepack pnpm run build`
    (step 3) does not build this app's packages (no `@mj-biz-apps/credentialing-*` task in its turbo
    run). The `mj test` check module is `packages/IntegrationTests/dist/index.js`.
+7a. Reset the evidence store and set up its storage account. The files under the store root belong
+   to the dropped database: their `MJ: Files` rows are gone, and the orphan sweep only removes objects
+   that still have a row, so nothing would ever remove them. Move the root's contents away (or delete
+   them), then create the storage rows; `dev:storage` reads the root it recorded in `mj/.env` on an
+   earlier run (`CREDENTIALING_EVIDENCE_STORE_ROOT`) and rewrites `CREDENTIALING_EVIDENCE_STORAGE_ACCOUNT`
+   and the root there, touching no other line:
+   ```sh
+   mv <store root> <somewhere outside every repository>   # or delete it; it holds only test fixtures
+   corepack pnpm run dev:storage     # Created credential type … storage account … System-user permission row
+   ```
+   The first `dev:storage` of the B2 run failed with `Give the evidence root directory: --root …` because
+   the script read the root only from `--root` or the environment; it now falls back to the line in
+   `mj/.env`. See "Storage (Step 2 discovery)" for what it creates.
 8. From `mj/`, start MJAPI (`corepack pnpm run start:api`, port `4050`) and MJExplorer
    (`corepack pnpm run start:explorer`, port `4251`). Start them detached (for example with `nohup …
    &` and the output redirected to a log file) when they must outlive the shell that started them.
    MJAPI is up when `POST /auth/dev-login` answers; Explorer's first page load after a start compiles
-   for a few minutes.
+   for a few minutes. The MJAPI log then shows `Credentialing evidence routes mounted at /credentialing
+   (storage account: Credentialing Evidence (Local Disk))` and `Credentialing: reading queue started
+   (boot sweep in 10 s, then every 5 minutes).`
 9. Set `MJ_MAGIC_LINK_PRIVATE_KEY` in `mj/.env` once (it survives rebuilds, since it is not in the
    database), without printing it, then restart MJAPI:
    ```sh
@@ -614,6 +645,9 @@ every step below is the one that worked.
 
 Steps 9–11 are one-time `.env` settings; on a rebuild of an instance that already has them, check
 that each is present and non-empty (`grep -c '^MJ_MAGIC_LINK_PRIVATE_KEY=.' mj/.env`) and move on.
+The same holds for the AI key (`AI_VENDOR_API_KEY__GeminiLLM` in `mj/.env`, used by the reading queue,
+never printed) and the two `CREDENTIALING_EVIDENCE_*` lines step 7a writes. Keep a private copy of
+`mj/.env` before a rebuild: nothing in the database holds these values.
 
 ### First run on the rebuilt database
 
@@ -714,9 +748,15 @@ MJ_INTEGRATION_TEST=1 RUN_MUTATION_TESTS=1 corepack pnpm mj test run --name "CRD
 MJ_INTEGRATION_TEST=1 RUN_MUTATION_TESTS=1 corepack pnpm mj test run --name "CRD-07 - Applicant schema"  # 3 checks
 MJ_INTEGRATION_TEST=1 RUN_MUTATION_TESTS=1 corepack pnpm mj test run --name "CRD-08 - Subject isolation" # 12 checks
 MJ_INTEGRATION_TEST=1 RUN_MUTATION_TESTS=1 corepack pnpm mj test run --name "CRD-09 - Invitations"       # 9 checks
+MJ_INTEGRATION_TEST=1 RUN_MUTATION_TESTS=1 corepack pnpm mj test run --name "CRD-10 - Responses"         # 12 checks
+MJ_INTEGRATION_TEST=1 RUN_MUTATION_TESTS=1 corepack pnpm mj test run --name "CRD-11 - Evidence"          # 5 checks
+MJ_INTEGRATION_TEST=1 RUN_MUTATION_TESTS=1 corepack pnpm mj test run --name "CRD-12 - Reader"            # 10 checks
+MJ_INTEGRATION_TEST=1 RUN_MUTATION_TESTS=1 corepack pnpm mj test run --name "CRD-13 - Prefill"           # 9 checks
+MJ_INTEGRATION_TEST=1 RUN_MUTATION_TESTS=1 corepack pnpm mj test run --name "CRD-14 - Submission"        # 14 checks
 MJ_INTEGRATION_TEST=1 RUN_MUTATION_TESTS=1 corepack pnpm mj test run --name "CRD-15 - Applicant world"   # 2 checks
 corepack pnpm run test:integration cred-operations-wire                                               # 3 checks, GraphQL
 corepack pnpm run test:integration cred-invite-wire                                                   # 3 checks, GraphQL
+corepack pnpm run test:integration                                                                    # 23 checks (every client bundle, cred-evidence's 12 included)
 corepack pnpm run seed:dev                                                                            # 2 checks (cred-world), GraphQL + sample document uploads
 corepack pnpm run seed:users                                                                          # 1 check (cred-users), GraphQL
 ```
@@ -1200,7 +1240,7 @@ on first use by the unit tests and `cred-evidence`.
 ```sh
 corepack pnpm --filter @mj-biz-apps/credentialing-server run test        # extractor, local disk driver, routes
 corepack pnpm --filter @mj-biz-apps/credentialing-core-entities-server exec vitest run src/__tests__/EvidenceIntake.test.ts
-MJ_INTEGRATION_TEST=1 RUN_MUTATION_TESTS=1 corepack pnpm mj test run --name "CRD-11 - Evidence"   # 4 checks
+MJ_INTEGRATION_TEST=1 RUN_MUTATION_TESTS=1 corepack pnpm mj test run --name "CRD-11 - Evidence"   # 5 checks
 ../servers.sh restart api                  # from the workspace parent, once, after CRD-11 first creates applicant.evidence@example.test
 corepack pnpm run test:integration cred-evidence                                                  # 11 checks, HTTP
 ```

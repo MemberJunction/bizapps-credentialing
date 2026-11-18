@@ -3,7 +3,10 @@
 A step-by-step manual regression of everything the Credentialing app does today, driven through
 MJExplorer and checked against the database. It covers the first feature set: accrediting
 organizations, staff membership, role-scoped navigation, and Program Studio (programs, versions,
-sections, standards, document requirements, version settings and the version lifecycle).
+sections, standards, document requirements, version settings and the version lifecycle); and the
+second: invitations and the Pipeline, the applicant area, the Standards Runner, the document library
+and viewer, reading on the AI model, prefill with citations, review and submit, and applicant
+isolation (sections O–V).
 
 It is written to be followed by a person or by an agent with a browser tool. Every case has an ID,
 the persona to sign in as, the steps, the expected result, and, where a write is involved, the
@@ -35,7 +38,11 @@ corepack pnpm run -s persona <name>
 | `staff-b` | `staff.b@example.test` | Credentialing Staff, member of Sample Accrediting Body B | token |
 | `staff-none` | `staff.none@example.test` | Credentialing Staff, no membership | token |
 | `admin` | `admin@example.test` | Credentialing Admin | token |
-| `applicant-a` | `applicant.a@example.test` | Credentialing Applicant | magic link |
+| `applicant-a` | `applicant.a@example.test` | Credentialing Applicant, contact of `Sample Applicant One` (Body A) | magic link |
+| `applicant-b` | `applicant.b@example.test` | Credentialing Applicant, contact of `Sample Applicant Two` (Body A) | magic link |
+| `applicant-two` | `applicant.two@example.test` | Credentialing Applicant, contact of both Body A subjects (subject picker) | magic link |
+| `applicant-org-b` | `applicant.orgb@example.test` | Credentialing Applicant, contact of `Sample Applicant Org B` (Body B) | magic link |
+| `applicant-reading` | `applicant.reading@example.test` | Credentialing Applicant, contact of `Sample Reading Applicant` (`Sample Reading Program`) | magic link |
 | `reviewer-a` | `reviewer.a@example.test` | Credentialing Reviewer | magic link |
 | `committee-a` | `committee.a@example.test` | Credentialing Committee | magic link |
 
@@ -386,11 +393,123 @@ Run these in the same session; each must pass in full.
 
 | Command | Expect |
 |---|---|
-| `corepack pnpm run build:packages` | 7 of 7 packages build, 0 TypeScript errors |
+| `corepack pnpm run build` | 7 of 7 packages build, 0 TypeScript errors |
 | `corepack pnpm test` | every package's tests pass, 0 failed |
-| `MJ_INTEGRATION_TEST=1 RUN_MUTATION_TESTS=1 corepack pnpm mj test run --name "<row>"` for `CRD-00 - Smoke`, `CRD-01 - Schema`, `CRD-02 - Version rules`, `CRD-03 - Standard rules`, `CRD-04 - Operations`, `CRD-05 - Isolation`, `CRD-06 - World` | every row passes with 0 failed checks |
-| `corepack pnpm run test:integration` | 0 failed |
+| `MJ_INTEGRATION_TEST=1 RUN_MUTATION_TESTS=1 corepack pnpm mj test run --name "<row>"` for every row in `metadata-tests/tests/` (`CRD-00 - Smoke` … `CRD-15 - Applicant world`, sixteen rows) | every row passes with 0 failed and 0 skipped checks |
+| `corepack pnpm run test:integration` (after an MJAPI restart) | 0 failed |
+| `corepack pnpm run seed:dev` | 2 passed, 0 failed; a second run creates nothing |
 | `corepack pnpm run probe:isolation` | every case `PASS` |
+
+## O. Invitations and the Pipeline
+
+Create the program of P–U first if you want one of your own: `Regression Inspector <RUN>` (Person,
+noun `inspector`, prefix `RI<RUN>`), two sections, six standards (one Eligibility attestation, two
+Narrative `Prefill`, one Evidence `Locate`, two Narrative `Manual`), document requirements `Safety
+policy <RUN>` (Normal) and `Inspection license <RUN>` (Restricted Allowed), the Prefill and Locate
+standards bound to `Safety policy <RUN>` under **Where the assistant looks**, `Applicant's governing
+body attests` on, the deciding committee chosen, activated.
+
+| ID | Persona | Steps | Expected | Database check |
+|---|---|---|---|---|
+| O1 | `staff-a` | In the standard editor of a Prefill standard on the Draft, add `Safety policy <RUN>` under **Where the assistant looks** and press `Save sources`. | `1. Reads the applicant's Safety policy <RUN> and drafts an answer.`; `Sources saved.` A Manual standard shows `Manual standards have no sources.` | One `ResponseSource` row, `Document Extraction`, rank 1. |
+| O2 | `staff-a` | Open the same standard on the Active version. | The sources are listed read-only with `Sources are part of the standards and change only in a draft version.` | — |
+| O3 | `staff-a` | Pipeline → `Invite applicant`. Step 1 lists only Active versions of Body A (`<program> — <label> (Person)`). Choose the version; `Create a new applicant` `Sample Applicant <RUN>`, `applicant.<run>@example.test`; contact `Sample`, `Applicant <RUN>`, same email; `Send invitation`. | Step 4 summarizes program, applicant and contact. The result: `No email was sent from this server. Copy this link and send it to applicant.<run>@example.test. It works once and expires on {date}.`, the link, `Copy link`. The new row appears in the Pipeline as `Draft`. | One `Subject` (Person, Body A, party = a Common person), one `SubjectContact` (Primary), one user with `Credentialing Applicant` only, one Draft `Application` with one `Empty` response per standard; `__mj.MagicLinkInvite` row `Status = 'Active'` (`Consumed` once redeemed). |
+| O4 | `staff-a` | Invite the same subject to the same version again (`Use an existing applicant`). | `This subject already has an open application on this version.` | No second application. |
+| O5 | `staff-a` | Leave a contact field blank or type an invalid email in the wizard. | `Next` stays disabled, or the field's sentence (`Enter the contact's first name.`, `Enter a valid email address for the contact.`) shows beside it. | — |
+| O6 | `staff-a` | `Send a new link` on the row. | A dialog with a new link and the same `No email was sent…` sentence. | A new `MagicLinkInvite` row. |
+| O7 | `staff-a` | After an application of P–U is submitted: open the bell, then the notification `<subject> submitted the <program> <label> application.` | The Pipeline opens with that application's detail: `Status: Submitted · n of n confirmed · Submitted on {date}`, `Documents frozen at submission`, the governing-body attestation. The notification is read. | `UserNotification.Unread = 0`. |
+| O8 | `staff-a` | Open Pipeline from the nav with no `applicationId` in the URL. | The list, no detail and no `Record not found.` | — |
+| O9 | `staff-a` | With the Pipeline open, activate a version in Program Studio, return to the Pipeline tab (do not reload), press `Invite applicant`. | The new version is listed in step 1. | — |
+
+---
+
+## P. Applicant area and My Applications
+
+| ID | Persona | Steps | Expected |
+|---|---|---|---|
+| P1 | invitee of O3 | Open the link in a fresh browser context; press `Continue to sign in`. | Lands on **My Applications**. Nav: `My Applications`, `Standards`, `Documents` only; no app switcher. The card: program, version, `Sample Accrediting Body A`, `Draft`, `0 of 6 confirmed`, `Continue`. |
+| P2 | invitee of O3 | Open the used link again in another fresh context. | It does not sign in (a link works once); staff must `Send a new link`. |
+| P3 | `applicant-two` | Sign in. | A subject picker listing both subjects; choosing one puts `subjectId` in the URL. |
+| P4 | invitee | Confirm an answer in Standards, then press `My Applications` (no reload). | The count shows the new number of confirmed answers. |
+| P5 | `applicant-a` | Sign in. | `Sample Applicant Program 2026`, Draft. |
+
+---
+
+## Q. Standards Runner
+
+| ID | Persona | Steps | Expected | Database check |
+|---|---|---|---|---|
+| Q1 | invitee | `Continue`. | Header: program, label, status, organization, `n of 6 confirmed`, `Withdraw application`, `Review and submit`. A section rail with `0/3` per section. Filters `Needs your review`, `Confirmed`, `All`. A program with no Prefill/Locate standard shows `This program does not draft answers. Every answer is written by you.` | — |
+| Q2 | invitee | On the Eligibility standard, read the disabled `Read and confirm`. | `Choose Met, Partially met or Not met before confirming.` below it (a Narrative standard with no text says `Write an answer before confirming.`; a Locate one `Point to a document or write an answer before confirming.`). | — |
+| Q3 | invitee | `Edit answer`, type an answer, choose `Met`, `Save draft`. | `Draft saved`; the answer and `Self-assessment: Met` show; `Read and confirm` is enabled. While editing, `Save draft` is disabled with `Make a change before saving.` until something changes and `Read and confirm` with `Save your draft before confirming.` | Response `Drafted`, `AuthorType = Human`. |
+| Q4 | invitee | `Read and confirm` → the dialog → `Confirm this answer`. | `Confirmed by <email> on {date}` and `Confirmed answers are locked. Ask the program's staff to reopen one if it must change.` | `Status = Confirmed`, `ConfirmedByUserID` = the invitee. |
+| Q5 | `staff-a` | Pipeline → `View answers` on that application → reopen the confirmed answer with a reason. | The applicant's card returns to Drafted and can be edited. | `Status = Drafted`, `ReopenReason` set. |
+| Q6 | invitee | `Withdraw application` → the dialog. Tab through it, press Escape. | Focus stays in the dialog; Escape closes it and focus returns to `Withdraw application`; nothing changes. | `Status = Draft`. |
+
+---
+
+## R. Documents and the viewer
+
+| ID | Persona | Steps | Expected | Database check |
+|---|---|---|---|---|
+| R1 | invitee | Documents. | One ledger per application with each requirement, `Required`, `Restricted Allowed` where set, `None on file`, `Not uploaded`, and `Upload` (plus `Attest instead of uploading` on a restricted one); `General uploads` with `Uploading does not submit anything.` | — |
+| R2 | invitee | `Upload` on `Safety policy <RUN>`, choose a two-page text PDF. | `Document uploaded.`; the row shows the file, the date, `Current`, `Reading…`, then (without a reload) `n passages cited` or `n passages found for n standards.` | `EvidenceDocument`: `TextStatus = Extracted`, `PageCount = 2`, `ReadingStatus = Complete`, `ReadingAttempts = 1`; a file under the store root. |
+| R3 | invitee | Upload an empty file, a 26 MB file, a `.pdf` whose bytes are not a PDF, a `.exe`. | `This file is empty.` / `This file is larger than 25 MB.` / `This file is not a valid PDF file.` / `This file type cannot be read. Upload a PDF, Word (.docx), Excel (.xlsx), text, Markdown, PNG or JPEG file.` | No new row. |
+| R4 | invitee | `View` the PDF; switch to `Extracted text`; Tab around; Escape. | Original and Extracted text tabs; focus stays in the dialog; Escape closes it and focus returns to `View`. | — |
+| R5 | invitee | `Upload new` with another PDF; `Versions (2)`. | Both versions listed with uploader, date and hash; the earlier one replaced. | Earlier row `Status = Superseded`. |
+| R6 | invitee | `Attest instead of uploading` on `Inspection license <RUN>`; read the statement; `Record attestation`. | `Attestation recorded for Inspection license <RUN>.`; the row: `Attested by <email> on {date}. No file is stored.`, `Restricted attestation`, `Update attestation`. | One `DocumentAttestation` with the statement `I attest that Inspection license <RUN> exists and is maintained, and can be shown to a reviewer on request.` |
+| R7 | invitee | Upload a scanned page (an image-only PDF) as a general upload. | `This is a scan. The assistant is reading it; this can take a few minutes.`, then `This text was read from a scan by the assistant and may contain errors.`; the viewer's Extracted text starts with `[Page 1]` and the transcription. | `TextStatus = Recognized`; one `Credentialing: Scan Reader` prompt run. |
+
+---
+
+## S. Reading on the AI model
+
+| ID | Persona | Steps | Expected | Database check |
+|---|---|---|---|---|
+| S1 | — | After R2. | — | One `Extraction` per bound standard, `Status = Proposed`, `Excerpt` found verbatim in `ExtractedText`, `StartOffset`/`EndOffset` set, `AIPromptRunID` set; the run's model is the one the reader prompt lists (Gemini 3.8 Flash on the dev instance). |
+| S2 | `applicant-reading` | Documents: a document the assistant could not read shows why, and `Read again`. Press it. | The row goes back to `Reading…` and then to its result. A document the model could not be reached for never reads as `0 passages found`. | `ReadingAttempts` increases. |
+| S3 | — | Stop MJAPI while a document is `Reading…`; start it again. | The document finishes reading within 5 minutes with nobody acting (boot sweep, then every 5 minutes). | `ReadingStatus = Complete`. |
+
+---
+
+## T. Prefill and citations
+
+| ID | Persona | Steps | Expected | Database check |
+|---|---|---|---|---|
+| T1 | invitee | After R2, open Standards (no reload). | Each Prefill standard: `Drafted by assistant`, `Drafted from <file> · {date}`, a citation chip `<file>`, `How this was drafted`, the drafted answer. The Locate standard: `Passages located`, `The assistant found these passages. Write your answer.`, its chip. | Responses `Prefilled` / `Located`, `AuthorType = Agent`, `SourceType = Document Extraction`; one `ResponseCitation` each. |
+| T2 | invitee | Press a chip. | The viewer opens on `Extracted text` with the quoted sentence highlighted. | — |
+| T3 | invitee | Edit a drafted answer and save; then `Refresh prefills`. | The edited text stays; nothing a person wrote or confirmed is overwritten. | `AuthorType = Human`, text unchanged after the refresh. |
+| T4 | invitee | Confirm every answer. | Each card confirmed; the section rail shows `3/3`. | All responses `Confirmed`. |
+
+---
+
+## U. Review and submit
+
+| ID | Persona | Steps | Expected | Database check |
+|---|---|---|---|---|
+| U1 | invitee | `Review and submit` before everything is done. | Readiness checklist with `Pass` / `Needs attention` per eligibility standard, section, required document and attestation; `Submit application` disabled with `{n} items still need attention before you can submit.` (`1 item still needs attention…` for one). Each gap links to its screen. | — |
+| U2 | invitee | When only the attestation is left. | The reason under the button is the attestation's: `Give the attesting officer's name and role, or the date the governing body approved.` | — |
+| U3 | invitee | Fill officer name and role, tick the statement, `Submit application`, confirm in the dialog. | The runner shows `Submitted` and `This application was submitted on {date} (UTC). Its answers and documents are locked.` (the date is the UTC day). | `Application.Status = Submitted`, `SubmittedAt`, attestation fields, `SubmissionDispatchedAt` set; one `ApplicationDocument` per frozen document and attestation (general uploads included); one `UserNotification` per staff member of Body A, none for Body B. |
+| U4 | invitee | Look at every card and every document row. | No `Edit answer` or `Read and confirm`; each document says `This document is part of a submitted application and cannot be replaced until that review is finished.` (attestation: `…cannot be changed until that review is finished.`). | — |
+| U5 | invitee | Behind the UI, with the session's own token: `ExecuteRemoteOperation` `Credentialing.SaveResponse` on a confirmed response. | `REFUSED` with the locked sentence of U3. | Response row unchanged. |
+| U6 | another subject | Run P1–U3 once on an Organization program (subject type `Organization`). | Everything reads correctly for an organization (party record a Common organization; the notification says `<organization> submitted the <program> <label> application.`). | `Subject.SubjectType = Organization`. |
+
+---
+
+## V. Applicant isolation seen from the UI
+
+Use the subject, application and document IDs of P–U.
+
+| ID | Persona | Steps | Expected |
+|---|---|---|---|
+| V1 | `staff-b` | `/app/credentialing/Pipeline?applicationId=<P–U application>`; then a random UUID. | Body B's list and `Record not found.` both times; no detail. |
+| V2 | `staff-b`, `applicant-b`, no token | `GET /credentialing/evidence/<P–U document>/content`; then a random UUID. | `404 {"Message":"Record not found."}` for both (no token: `401 {"error":"Authentication required"}`). |
+| V3 | `applicant-b` | `/app/credentialing/Standards?subjectId=<P–U subject>&applicationId=<P–U application>`. | `This area is not available to your account.` (not a blank page). |
+| V4 | `applicant-b` | `/app/credentialing/Standards?applicationId=<P–U application>` (own subject). | `This area is not available to your account.` |
+| V5 | `applicant-b` | `/app/credentialing/Documents?documentId=<P–U document>`. | Their own library and `Record not found.` |
+| V6 | any applicant | Read the console on each applicant screen. | Nothing logged by this app. The shell's own cache warnings for an account without `UI` (`[WARNING] [Cache] … lacks read permission on …`) are logged at error level by MemberJunction and are not failures. |
+
+The full read-path and write-path isolation cases are automated: `corepack pnpm run probe:isolation` (P11–P20).
 
 ---
 
@@ -479,3 +598,60 @@ packages passing (219 tests); `CRD-00` 1, `CRD-01` 1, `CRD-02` 12, `CRD-03` 12, 
 - The shell logs its own permission warnings at error level for accounts without the `UI` role.
   They are not raised by this app.
 - Accounts created by a magic link are shown as `Guest <email>`.
+
+### Run 2 — 2026-11-17, B2 verification (sections O–V)
+
+- **Build under test:** `feature/b2-applications` from `e80ee13`; the fixes below were committed
+  during the run, and every case listed as Pass was seen on the code that includes them.
+- **Instance:** the database rebuilt from nothing for this run (`docs/dev-instance.md`, "Rebuild from
+  nothing"), then the automated suites, then this pass. Program `Sample Field Inspector` 2027
+  (Person; the shape of section O) and `Sample Organization Review` 2027 (Organization) were authored
+  in the browser for it; subjects `Sample Applicant Three` and `Sample Member Organization`.
+- **Driven by:** an agent with a scripted headless Chrome (Puppeteer), one isolated browser context
+  per persona; every write was checked with `sqlcmd`. Reading and recognition ran live on Gemini 3.8
+  Flash. Record: [`verification/b2-2026-11.md`](verification/b2-2026-11.md).
+
+| Section | Cases | Result |
+|---|---|---|
+| O. Invitations and Pipeline | O1, O3, O7 | Pass |
+| O | O8 | **Fail, fixed**: a Pipeline opened from the nav said `Record not found.`; it read Explorer's own `applicationId` (the MJ app) from the tab configuration as an application ID. |
+| O | O9 | **Fail, fixed**: the invite wizard did not list a version activated after the Pipeline tab had loaded. Fixed with a refresh when Explorer shows the cached tab again; covered by a unit test, not re-run by tab switch in the browser. |
+| O | O2, O4, O5, O6 | Not run in this pass (O4–O6 are covered by `CRD-09` and `cred-invite-wire`) |
+| O | O7 wording | **Fail, fixed**: the notification said `<subject> submitted its …` for a person; now `submitted the …`. |
+| P. Applicant area | P1, P4 | Pass (P4 after the fix below) |
+| P | P4 first try | **Fail, fixed**: after confirming in Standards, My Applications still said `1 of 6 confirmed`; the same staleness showed Standards `Not started` after a document was read. |
+| P | P2, P3, P5 | Not run in this pass |
+| Q. Standards Runner | Q1–Q4, Q6 | Pass |
+| Q | Q5 | Not run in this pass (covered by `CRD-10`) |
+| R. Documents | R1, R2, R4, R6, R7 | Pass |
+| R | R3, R5 | Not run in the browser (R3 is covered by `cred-evidence` over HTTP) |
+| S. Reading | S1 | Pass (3 extractions on Gemini 3.8 Flash; scan recognized) |
+| S | S2, S3 | Not run in this pass (covered by `CRD-12`) |
+| T. Prefill | T1, T2, T4 | Pass |
+| T | T3 | Edit kept (`AuthorType = Human`); `Refresh prefills` not pressed in this pass (covered by `CRD-13`) |
+| U. Review and submit | U2–U6 | Pass |
+| U | U1 | Pass: `11 items still need attention before you can submit.` seen for `applicant-b`'s draft, linked to the button. The one-gap form read `1 items …` in the code (found while writing this suite, not on screen) and was fixed. |
+| U | U3 date | **Fail, fixed**: an evening submission (US time) was shown as `submitted on Nov 18` beside `Nov 17` everywhere else; the sentence now says `(UTC)`. |
+| V. Applicant isolation | V1–V6 | Pass after the fixes below |
+| V | V1 first try | **Fail, fixed**: staff-b's Pipeline silently ignored another organization's `applicationId`; now `Record not found.` as for a random ID. |
+| V | V3 first try | **Fail, fixed**: a foreign `subjectId` in the URL gave a blank page; now `This area is not available to your account.` |
+| Look and accessibility (the four applicant screens) | dark theme, 768 px, keyboard-only, dialogs, disabled reasons, 44 px targets, console | Pass after the fixes below; console: only MemberJunction's own cache warnings |
+| Look and accessibility, first try | | **Fail, fixed**: buttons of 34–36 px (MJ's small button size, runner filters, application picker, citation chips, self-assessment choices); disabled `Read and confirm`, `Save draft` and `Submit application` not linked to their visible reason (`aria-describedby`); `Edit answer` left keyboard focus on the page body. |
+
+**Fixes made during the run** (each with tests; commits on `feature/b2-applications`):
+
+1. `dev:storage` reuses the evidence root recorded in `mj/.env` (`344c916`).
+2. Applicant screens and the Pipeline reload when Explorer shows their cached tab again
+   (`49af10d`, `af3df57`).
+3. The submitted-and-locked sentence names the time zone (`9ca3da5`).
+4. The submission notification reads correctly for people and organizations (`c6fca79`).
+5. Pipeline: `Record not found.` for an application staff cannot see; Explorer's app ID is no longer
+   read as an application ID (`9bd30ce`, `af3df57`).
+6. A deep link to another applicant's subject shows the not-available sentence (`1d32fc1`).
+7. 44 px targets, disabled reasons linked to their buttons, focus kept on edit (`41b283b`).
+8. `1 item still needs attention`, not `1 items` (`54c685d`).
+
+**Automated suites on the final tree:** `build` 7/7; `pnpm test` 681 passed, 0 failed (Core 210,
+CoreEntitiesServer 94, Angular 312, Server 50, IntegrationTests 15); the sixteen `CRD-*` rows 133
+checks, 0 failed, 0 skipped (`CRD-10`, `CRD-14`, `CRD-15` re-run after the last fixes);
+`test:integration` 23/0; `seed:dev` 2/0; `probe:isolation` 34/34.

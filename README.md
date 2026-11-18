@@ -22,17 +22,19 @@
   <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-5.9-3178C6?style=flat-square&logo=typescript&logoColor=white" />
   <a href="./LICENSE"><img alt="License: BUSL-1.1" src="https://img.shields.io/badge/License-BUSL--1.1-green?style=flat-square" /></a>
   <img alt="Node" src="https://img.shields.io/badge/Node-18%2B-339933?style=flat-square&logo=node.js&logoColor=white" />
-  <img alt="Status" src="https://img.shields.io/badge/Status-Pre--release%20(program%20authoring)-orange?style=flat-square" />
+  <img alt="Status" src="https://img.shields.io/badge/Status-Pre--release%20(applications%20and%20evidence)-orange?style=flat-square" />
 </p>
 
 ---
 
-> ⚠️ **Status: pre-release — first feature set (program authoring).** Accrediting organizations,
-> their staff, and programs of versioned standards can be set up and authored. Applications,
-> review, committee decisions, credentials, verification and renewals do **not** exist yet. What the
-> whole product must do is specified in the
+> ⚠️ **Status: pre-release — second feature set (applications and evidence).** Accrediting
+> organizations, their staff and programs of versioned standards can be set up and authored; staff
+> invite applicants, who answer the standards, build a document library that the assistant reads for
+> evidence, see drafted answers with citations, and submit. Review, committee decisions, credentials,
+> verification and renewals do **not** exist yet. What the whole product must do is specified in the
 > [Functional Requirements Document](plans/active/credentialing-frd.md), the document to read first;
-> what was verified for this feature set is in [`docs/verification/b1-2026-11.md`](docs/verification/b1-2026-11.md).
+> what was verified is in [`docs/verification/b1-2026-11.md`](docs/verification/b1-2026-11.md) and
+> [`docs/verification/b2-2026-11.md`](docs/verification/b2-2026-11.md).
 
 Associations and non-profits track member certifications, professional licenses, continuing-education requirements, volunteer background checks, and staff compliance training. Today, every application reinvents the same tables and workflows for tracking credentials, evidence, and renewals. BizApps Credentialing provides the thin, reusable primitive layer designed to handle all these scenarios natively on the MemberJunction platform — deliberately thin, in the same spirit as [BizApps Tasks](https://github.com/MemberJunction/bizapps-tasks) and [BizApps Issues](https://github.com/MemberJunction/bizapps-issues).
 
@@ -47,7 +49,8 @@ bizapps-committees      Committees, Memberships, Meetings              __mj_BizA
       ▲
 bizapps-credentialing   Accrediting Organizations, Memberships,        __mj_BizAppsCredentialing   ◄── this app
                         Programs, Versions, Sections, Standards,
-                        Document Requirements
+                        Document Requirements, Subjects, Applications,
+                        Responses, Evidence Documents, Extractions
       ▲
 Consuming apps          Member portals, LMS integrations, registries
 ```
@@ -102,6 +105,16 @@ Schema `__mj_BizAppsCredentialing` (FRD section 4):
 | `Section` | A numbered group of standards in a version. |
 | `Standard` | One requirement: code, statement, guidance, response type, intake mode, evaluation mode, and a lineage key that follows it from version to version. |
 | `DocumentRequirement` | A document a version asks applicants for, with its sensitivity policy. |
+| `Subject` | The party being credentialed (a person or an organization), owned by one accrediting organization, with a party reference to a bizapps-common `Person` or `Organization`. |
+| `SubjectContact` | A user who acts for a subject (Primary or Staff); it is what makes a signed-in user an applicant. |
+| `Application` | A subject's application to an Active program version: status, submission and governing-body attestation, durable submission dispatch, a historical flag. One live application per subject and version. |
+| `StandardResponse` | One answer per application and standard: text, self-assessment, status (Empty, Drafted, Prefilled, Located, Confirmed, …), author type and provenance. Only a person confirms. |
+| `ResponseCitation` | A pointer from an answer to a document: excerpt, character span, page where known. |
+| `EvidenceDocument` | A file in a subject's document library: hash, size, extracted or recognized text, reading status, supersession. The bytes live in MJ Storage. |
+| `DocumentAttestation` | A signed statement in place of a restricted document. |
+| `ApplicationDocument` | The documents and attestations frozen into an application when it is submitted. |
+| `Extraction` | One reading of one document for one standard: drafted value, verbatim excerpt and span, confidence, the AI prompt run. |
+| `ResponseSource` | Where the assistant looks for a standard's answer (a document requirement), authored on a Draft version. |
 
 ### Roles
 
@@ -109,22 +122,26 @@ Schema `__mj_BizAppsCredentialing` (FRD section 4):
 |---|---|
 | `Credentialing Admin` | Set up accrediting organizations and name each one's first staff member. |
 | `Credentialing Staff` | Author programs of their own organizations: create programs, edit Draft versions (sections, standards, document requirements, settings), activate, retire, and start a new Draft from an Active version. |
-| `Credentialing Applicant`, `Credentialing Reviewer`, `Credentialing Committee` | Sign in by magic link and see their (empty) area; no data access yet. |
+| `Credentialing Staff` (applications) | Invite applicants by magic link (or send a new link), follow applications in the Pipeline, read answers and frozen documents, reopen a confirmed answer, withdraw an application; receive an in-app notification when an application is submitted. |
+| `Credentialing Applicant` | Sign in by magic link; for each subject they act for: see My Applications, answer and confirm standards, upload and attest documents, read what the assistant found, review and submit. Reads only their own subjects' rows. |
+| `Credentialing Reviewer`, `Credentialing Committee` | Sign in by magic link and see their (empty) area; no data access yet. |
 
-Organization isolation is enforced by row-level security filters and server-side guards; every
-read path is listed in [`docs/isolation-read-paths.md`](docs/isolation-read-paths.md). No
+Organization and subject isolation are enforced by row-level security filters and server-side
+guards; every read path, including file bytes, extracted text and AI prompt runs, is listed in
+[`docs/isolation-read-paths.md`](docs/isolation-read-paths.md). Applicant data is written only
+through the app's remote operations and evidence routes, never through generated mutations. No
 credentialing role holds MJ's `UI` role.
 
 ### TypeScript Packages
 
 | Package Directory | npm Package | Role |
 |---|---|---|
-| `packages/Entities` | `@mj-biz-apps/credentialing-entities` | CodeGen entity subclasses for the seven tables. |
+| `packages/Entities` | `@mj-biz-apps/credentialing-entities` | CodeGen entity subclasses for the seventeen tables. |
 | `packages/Actions` | `@mj-biz-apps/credentialing-actions` | MemberJunction Actions; no actions yet (compiling skeleton). |
-| `packages/Core` | `@mj-biz-apps/credentialing-core` | The authoring rules (version lifecycle, settings tiers, standard codes, program ownership) and the contracts of the five remote operations, shared by browser and server. |
-| `packages/CoreEntitiesServer` | `@mj-biz-apps/credentialing-core-entities-server` | Server entity subclasses that enforce the rules on every save and delete, and the server bodies of the remote operations (create program, edit in draft, reorder a version's tree, set up an organization, create a committee for a program's organization). |
-| `packages/Server` | `@mj-biz-apps/credentialing-server` | Server bootstrap registered with MJAPI via `LoadBizAppsCredentialingServer`, plus the generated GraphQL resolvers. |
-| `packages/Angular` | `@mj-biz-apps/credentialing-ng` | The Credentialing application in MJExplorer: Program Studio, organization setup and the role areas. |
+| `packages/Core` | `@mj-biz-apps/credentialing-core` | The rules (version lifecycle, settings tiers, standard codes, program ownership, application lifecycle, answers and freeze, the submission gate, prefill ranking, evidence files, verbatim excerpts) and the contracts of the remote operations, shared by browser and server. |
+| `packages/CoreEntitiesServer` | `@mj-biz-apps/credentialing-core-entities-server` | Server entity subclasses that enforce the rules on every save and delete (applicant data only inside an operation), the server bodies of the remote operations (authoring, invitations, answers, documents, prefill, submission), the evidence intake, the reading queue, the prefill runner and the durable submission dispatch. |
+| `packages/Server` | `@mj-biz-apps/credentialing-server` | Server bootstrap registered with MJAPI via `LoadBizAppsCredentialingServer`; the evidence upload and download routes (`/credentialing/evidence`); storage, text extraction in a child process, scan recognition and evidence reading through MJ AI prompts, magic-link invitations and staff notifications; the generated GraphQL resolvers. |
+| `packages/Angular` | `@mj-biz-apps/credentialing-ng` | The Credentialing application in MJExplorer: Program Studio, organization setup, the Pipeline, and the applicant area (My Applications, Standards, Documents, Review and submit). |
 | `packages/IntegrationTests` | `@mj-biz-apps/credentialing-integration-tests` (private) | Integration check bundles run by `mj test` (`CRD-*` rows in `metadata-tests/`) and by the GraphQL harness; the sample world used for development. |
 
 ### Explorer
@@ -137,8 +154,24 @@ The **Credentialing** application shows each user the areas their roles serve:
   `?programId=…&versionId=…`.
 - **Set up organization** / **New organization** (Credentialing Admin) — creates an accrediting
   organization and gives its first staff member the staff role and the application.
-- **Assignments** (Reviewer, Committee) and **My Applications** (Applicant) — placeholders that
-  say there is nothing yet.
+- **Pipeline** (Credentialing Staff) — the organization's applications and contacts; **Invite
+  applicant** (program version, new or existing subject, contact) issues a magic link and shows it
+  when no email provider is configured; **Send a new link**; an application's answers, citations and
+  documents (frozen ones after submission); reopen an answer or withdraw an application, each with a
+  reason. A submission notification opens the application here.
+- **Response sources** in the standard editor (Draft versions) — bind a standard to the document
+  requirement the assistant reads it from.
+- **My Applications** (Applicant) — the subject's applications with their progress; a picker when
+  the user acts for several subjects.
+- **Standards** (Applicant) — the Standards Runner: sections with progress, a card per standard with
+  the answer, self-assessment, drafted answers and located passages with their citation chips,
+  `Refresh prefills`, `Read and confirm`, and **Review and submit** (the gate, the documents that will
+  freeze, the governing-body attestation where the version asks for it).
+- **Documents** (Applicant) — the document library by requirement and general uploads: upload and
+  replace, version history, attest instead of uploading a restricted document, `Still current`,
+  what the assistant read, `Read again`, and a viewer with the original and the extracted or
+  recognized text with the cited span highlighted.
+- **Assignments** (Reviewer, Committee) — a placeholder that says there is nothing yet.
 
 A staff user with no organization membership sees a sentence saying so instead of an empty screen.
 A page opened by URL by a user whose roles do not serve it shows `This area is not available to your
@@ -146,8 +179,10 @@ account.`
 
 ### Not there yet
 
-Applications and intake, document upload, review and AI observations, committee decisions,
-credential issuance and public verification, renewals, and issuing invitations from the product.
+Review, conversations and information requests, AI observations and verification, committee
+decisions, credential issuance and public verification, renewals and carry-forward, data bindings
+to host data (`Host Query` sources), and self-service sign-in for a returning applicant (staff send a
+new link).
 
 ## Development
 

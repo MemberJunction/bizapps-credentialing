@@ -134,12 +134,12 @@ This section defines the concepts the requirements use. It is conceptual; column
 
 ### 4.3 Subjects and identity
 
-- **Subject.** The party being credentialed: subject type, display name, primary email, status (Active; Inactive for records that exist only as historical ground truth), a **party reference** to a record in the instance (by default a BizApps Common Person or Organization; optionally any entity the deployment names), and a profile snapshot captured at application time.
+- **Subject.** The party being credentialed: subject type, display name, primary email, status (Active; Inactive for a party that has history but no current credential), a **party reference** to a record in the instance (by default a BizApps Common Person or Organization; optionally any entity the deployment names), and a profile snapshot captured at application time. **A subject belongs to exactly one accrediting organization.** A party that applies to programs of two organizations is two subjects, one in each, so every subject-owned row (applications, responses, documents, extractions) resolves to one owner with one join (§4.1) and the organizations stay isolated from each other (BR-13). Whether a subject's records are historical is not carried by its status: one party can have imported history and a live application at the same time, so history is flagged on the application (§4.4, FR-18.2).
 - **Subject Contact.** User × subject with role (Primary, Staff). A subject contact row is what makes a signed-in user an applicant for that subject.
 
 ### 4.4 Applications and responses
 
-- **Application.** Subject × program version, optionally bound to a renewal cycle. Carries the lifecycle status, submission and decision timestamps, the current stage window, clock-pause state, governing-body attestation, and audit-sample flag. One live application per subject, version and cycle; closed-out history accumulates beneath.
+- **Application.** Subject × program version, optionally bound to a renewal cycle. Carries the lifecycle status, submission and decision timestamps, the current stage window, clock-pause state, governing-body attestation, audit-sample flag, and a **historical** flag for an application imported as ground truth. One live application per subject, version and cycle; closed-out history accumulates beneath.
 - **Standard Response.** One per application × standard: response text, scalar response value, self-assessment (Met, Partially met, Not met), status (Empty, Drafted, Prefilled, Located, Confirmed, Flagged), author type (Human, Agent), confirmer and time, and **provenance** (source type, source reference, retrieval time, raw value, staleness).
 - **Response Citation.** A pointer from a response to evidence: document, source label, page reference, locator.
 
@@ -380,7 +380,7 @@ This section defines the concepts the requirements use. It is conceptual; column
 - **FR-16.1** All recognition data (programs, standards, applications, responses, citations, documents, commentary, reactions, decisions, credentials) shall be first-class entities queryable through the platform's stored queries and reporting, so staff can ask across all subjects: which subjects answer a given standard strongly, the most common gaps by section, agreement trends, cycle times.
 - **FR-16.2** An **executive dashboard** shall show pipeline by stage, decisions per month, reviewer agreement trend, AI cost per application, credentials by status and program, renewals due and completed, and audit outcomes. Unpriced AI runs render as unpriced, never as zero.
 - **FR-16.3** The **Staff Pipeline** shall show KPIs (active, in committee window, clocks paused, median cycle with the prior-year figure, expiring credentials), one persistent search plus one filter popover, and a ledger with one primary action per row by stage and an overflow of secondary actions, with every row-scoped form in a slide panel and every withdraw a two-step act.
-- **FR-16.4** Cross-subject queries shall exclude subjects marked Inactive (historical corpus) at the query layer.
+- **FR-16.4** Staff cross-subject queries and reporting shall include historical (imported) applications, labelled as historical; reviewer-facing comparisons and every live surface shall draw only from live applications, distinguished by the application's historical flag at the query layer.
 
 ### FR-17 Assistant
 
@@ -390,7 +390,7 @@ This section defines the concepts the requirements use. It is conceptual; column
 ### FR-18 Historical migration
 
 - **FR-18.1** The system shall import historical applications, responses, documents and reviewer commentary from a legacy platform, to the extent the export allows, mapping legacy standards onto lineage keys.
-- **FR-18.2** Imported commentary shall be flagged as historical, human-authored ground truth, immutable after import, and excluded from live surfaces by marking its subjects Inactive, so it can be used for replay evaluation from the first day without polluting the live pipeline.
+- **FR-18.2** Imported applications and their commentary shall be flagged as historical, human-authored ground truth, immutable after import, and excluded from live surfaces by the **historical flag on the application**, not by the subject's status, so they can be used for replay evaluation from the first day without polluting the live pipeline, and a party with imported history can still hold a live application (for example its first renewal) as the same subject.
 - **FR-18.3** Imported credentials shall be recorded with issuing source Import and receive cycles like any other credential.
 
 ### FR-19 Integration and API
@@ -424,7 +424,7 @@ These hold on every write path, including raw API calls, regardless of the inter
 - **BR-13** Cross-organization reads return nothing and cross-organization writes are refused with a message identical to "not found", so records cannot be enumerated.
 - **BR-14** The public registry returns only the whitelisted fields; the registry principal reads nothing else.
 - **BR-15** Verification excerpts are the source of truth; spans are derived and re-verified; an extraction without a locator is invalid.
-- **BR-16** Imported historical commentary is immutable and excluded from live surfaces and from every cross-subject read.
+- **BR-16** Imported historical applications and their commentary are immutable and excluded from live surfaces (pipeline, assignments, docket, reviewer comparisons); staff cross-subject reporting may include them only labelled as historical. History is marked on the application, never by making the subject Inactive.
 
 ---
 
