@@ -1296,7 +1296,10 @@ restored, it passed.
   returned it; the boot sweep and `Read again` retry it). Every other failure (rate limit, timeout,
   vendor or transport error) is `Failed` (`FailedRunResult`): the queue commits what the other reads
   found, marks the document `Failed` with the retry sentence, and the 5-minute sweep reads it again
-  until `ReadingQueue.MaxAttempts`.
+  until `ReadingQueue.MaxAttempts`. Retries are spaced: a `Failed` document waits
+  `ReadingQueue.RetrySpacingMinutes` (10) per attempt already made, so three attempts span about half
+  an hour. A server start resets every `Failed` and `Could Not Run` document to `Pending` with its
+  attempts back to zero, the one automatic second chance a final failure gets.
 - **`RequireSpecificModels: true` on both prompts.** With it false, `SelectionStrategy: 'Specific'`
   appends power-matched fallback models when the listed ones lack credentials
   (`BaseModelRunner.ts:711-726`). Measured: with both of the reader's prompt-model rows pointed at

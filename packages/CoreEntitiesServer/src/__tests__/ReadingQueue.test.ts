@@ -9,8 +9,10 @@ import type {
     ReadingDocument,
     ReadingStateChange,
     RecognizedTextChange,
+    RequeueQuery,
     StandardToRead,
 } from '../reading/ReadingData.js';
+import { RequeueFilter } from '../reading/DatabaseReadingData.js';
 import {
     CompleteReadingNote,
     NO_TEXT_FOUND_NOTE,
@@ -96,12 +98,18 @@ class MemoryData implements ReadingData {
             .map((d) => d.ID);
     }
 
-    public async FindRequeueable(maxAttempts: number, includeCouldNotRun: boolean): Promise<string[]> {
+    public async FindRequeueable(query: RequeueQuery): Promise<string[]> {
         if (this.FailRequeue) {
             throw new Error('requeue read failed');
         }
+        const due = (d: ReadingDocument): boolean =>
+            (this.ReadAt.get(d.ID)?.getTime() ?? 0) + d.ReadingAttempts * query.RetrySpacingMinutes * 60_000 <= query.Now.getTime();
         return [...this.Documents.values()]
-            .filter((d) => (d.ReadingStatus === 'Failed' && d.ReadingAttempts < maxAttempts) || (includeCouldNotRun && d.ReadingStatus === 'Could Not Run'))
+            .filter((d) =>
+                query.AtBoot
+                    ? d.ReadingStatus === 'Failed' || d.ReadingStatus === 'Could Not Run'
+                    : d.ReadingStatus === 'Failed' && d.ReadingAttempts < query.MaxAttempts && due(d),
+            )
             .map((d) => d.ID);
     }
 
@@ -263,7 +271,7 @@ class Process {
     public Steps: SweepStep[] = [];
     private claims = 0;
 
-    public constructor(data: MemoryData, clock: { Now: Date }, reader: EvidenceReader, recognizer: TextRecognizer, name: string) {
+    public constructor(data: MemoryData, clock: { Now: Date }, reader: EvidenceReader, recognizer: TextRecognizer, name: string, retrySpacingMinutes = 0) {
         this.Seams.Now = () => clock.Now;
         this.Worker = new ReadingWorker({
             Data: data,
@@ -273,7 +281,7 @@ class Process {
             ContextUser: () => new UserInfo(null, { ID: 'U0000000-0000-4000-8000-000000000001' }),
             NewClaimID: () => `C${name}000000-0000-4000-8000-${String(++this.claims).padStart(12, '0')}`,
             Seams: this.Seams,
-            Limits: { StaleAfterMinutes: 15, MaxAttempts: 3, PrefillLookBackMinutes: 24 * 60 },
+            Limits: { StaleAfterMinutes: 15, MaxAttempts: 3, PrefillLookBackMinutes: 24 * 60, RetrySpacingMinutes: retrySpacingMinutes },
             Committed: async (subjectID) => {
                 this.CommittedAttempts++;
                 if (this.CommittedFailures > 0) {
@@ -431,6 +439,21 @@ describe('ReadingQueue', () => {
         });
     });
 
+    describe('RequeueFilter', () => {
+        const now = new Date('2026-11-17T10:00:00.000Z');
+        it('between boots selects Failed with attempts left whose wait has passed', () => {
+            expect(RequeueFilter({ MaxAttempts: 3, AtBoot: false, Now: now, RetrySpacingMinutes: 10 })).toBe(
+                "(ReadingStatus = 'Failed' AND ReadingAttempts < 3 AND DATEADD(minute, ReadingAttempts * 10, __mj_UpdatedAt) <= '2026-11-17T10:00:00.000Z')",
+            );
+        });
+        it('with no spacing leaves the date out', () => {
+            expect(RequeueFilter({ MaxAttempts: 3, AtBoot: false, Now: now, RetrySpacingMinutes: 0 })).toBe("(ReadingStatus = 'Failed' AND ReadingAttempts < 3)");
+        });
+        it('at boot selects every Failed and Could Not Run document', () => {
+            expect(RequeueFilter({ MaxAttempts: 3, AtBoot: true, Now: now, RetrySpacingMinutes: 10 })).toBe("(ReadingStatus IN ('Failed', 'Could Not Run'))");
+        });
+    });
+
     describe('transient failures', () => {
         it('one of three reads failing transiently keeps the two found, marks the document Failed, and the next Sweep re-reads it to Complete', async () => {
             data.Standards = [standard('R.1'), standard('R.2'), standard('R.3')];
@@ -467,6 +490,34 @@ describe('ReadingQueue', () => {
             expect(data.Doc().ReadingStatus).toBe('Failed');
             expect(data.Current().find((e) => e.StandardID === 'S-R.2')?.ID).toBe(before?.ID);
             expect(data.Current()).toHaveLength(2);
+        });
+
+        it('retries are spaced: a model outage of ten minutes does not use up the attempts, and a restart gives a final failure another chance', async () => {
+            const spaced = new Process(data, clock, reader, recognizer, 'spaced', 10);
+            reader.Answers['R.2'] = { Kind: 'Failed', Reason: UNREACHABLE };
+            data.AddDocument();
+            await spaced.Worker.DrainOnce();
+            expect(data.Doc().ReadingAttempts).toBe(1);
+            minutes(5);
+            await spaced.Worker.Sweep(false);
+            expect(data.Doc().ReadingAttempts).toBe(1);
+            minutes(5);
+            await spaced.Worker.Sweep(false);
+            expect(data.Doc().ReadingAttempts).toBe(2);
+            minutes(15);
+            await spaced.Worker.Sweep(false);
+            expect(data.Doc().ReadingAttempts).toBe(2);
+            minutes(5);
+            await spaced.Worker.Sweep(false);
+            expect(data.Doc().ReadingAttempts).toBe(3);
+            expect(data.Doc().ReadingNote).toBe(READING_FAILED_FINAL_NOTE);
+            minutes(60);
+            await spaced.Worker.Sweep(false);
+            expect(data.Doc().ReadingAttempts).toBe(3);
+            reader.Answers['R.2'] = found(EXCERPT_TWO);
+            await spaced.Worker.Sweep(true);
+            expect(data.Doc().ReadingStatus).toBe('Complete');
+            expect(data.Doc().ReadingAttempts).toBe(1);
         });
 
         it('a transient failure on the last attempt gives the final note and is not requeued', async () => {

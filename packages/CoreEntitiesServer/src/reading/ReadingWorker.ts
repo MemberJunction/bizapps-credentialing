@@ -56,6 +56,8 @@ export interface ReadingQueueSeams {
     Now?: () => Date;
     /** When set, the queue sees only the documents of these subjects (a check's own scratch subjects). */
     OnlySubjectIDs?: readonly string[];
+    /** Overrides `ReadingLimits.RetrySpacingMinutes` (a check sets 0 so it need not wait out the spacing, which is unit-tested). */
+    RetrySpacingMinutes?: number;
 }
 
 /** The limits of the queue (`ReadingQueue.StaleAfterMinutes`, `MaxAttempts`, `PrefillLookBackMinutes`). */
@@ -64,6 +66,12 @@ export interface ReadingLimits {
     MaxAttempts: number;
     /** How far back the boot sweep looks for finished readings whose reading-committed hook a crash may have skipped. */
     PrefillLookBackMinutes: number;
+    /**
+     * Minutes a `Failed` document waits, per attempt already made, before the sweep reads it again
+     * (attempt 2 waits this long after the first failure, attempt 3 twice as long after the second),
+     * so three attempts outlast a model outage of several minutes instead of being spent back to back.
+     */
+    RetrySpacingMinutes: number;
 }
 
 /** What a worker needs; the server's come from `CredentialingServices`, the unit tests' from memory. */
@@ -546,19 +554,24 @@ export class ReadingWorker {
     }
 
     /**
-     * Sets back to `Pending` each `Failed` document with attempts left and, at boot only, each `Could
-     * Not Run` document with its attempts reset (a model may have been configured since). Each is an
-     * entity save under the document's lock after a re-read.
+     * Sets back to `Pending` each `Failed` document with attempts left whose retry wait has passed
+     * (`ReadingLimits.RetrySpacingMinutes`). At boot only, it also resets, with attempts back to zero,
+     * each `Could Not Run` document (a model may have been configured since) and each `Failed` document
+     * that had used its last attempt (the outage that failed it may be over): a restart is the one
+     * automatic second chance those get. Each is an entity save under the document's lock after a re-read.
      */
     private async requeue(atBoot: boolean): Promise<void> {
         const limits = this.options.Limits;
-        const ids = await this.options.Data.FindRequeueable(limits.MaxAttempts, atBoot, this.options.Seams.OnlySubjectIDs ?? null);
+        const ids = await this.options.Data.FindRequeueable(
+            { MaxAttempts: limits.MaxAttempts, AtBoot: atBoot, Now: this.now(), RetrySpacingMinutes: this.options.Seams.RetrySpacingMinutes ?? limits.RetrySpacingMinutes },
+            this.options.Seams.OnlySubjectIDs ?? null,
+        );
         for (const documentID of ids) {
             await this.options.Data.UnderDocumentLock(documentID, async (scope) => {
                 const current = await scope.Read();
                 if (current?.ReadingStatus === 'Failed' && current.ReadingAttempts < limits.MaxAttempts) {
                     await scope.Save({ ReadingStatus: 'Pending', ReadingNote: null });
-                } else if (atBoot && current?.ReadingStatus === 'Could Not Run') {
+                } else if (atBoot && (current?.ReadingStatus === 'Could Not Run' || current?.ReadingStatus === 'Failed')) {
                     await scope.Save({ ReadingStatus: 'Pending', ReadingNote: null, ReadingAttempts: 0 });
                 }
             });

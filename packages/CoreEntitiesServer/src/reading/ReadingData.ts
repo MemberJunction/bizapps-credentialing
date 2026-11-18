@@ -104,10 +104,11 @@ export interface ReadingData {
      */
     FindCandidates(staleBefore: Date, subjectIDs: readonly string[] | null): Promise<string[]>;
     /**
-     * IDs of the documents the sweep may set back to `Pending`: `Failed` with fewer than `maxAttempts`
-     * attempts and, when `includeCouldNotRun`, every `Could Not Run`.
+     * IDs of the documents the sweep may set back to `Pending`. Between boots: `Failed` with fewer than
+     * `MaxAttempts` attempts whose row was last written at least `ReadingAttempts * RetrySpacingMinutes`
+     * minutes before `Now`. At boot: every `Failed` and every `Could Not Run` document.
      */
-    FindRequeueable(maxAttempts: number, includeCouldNotRun: boolean, subjectIDs: readonly string[] | null): Promise<string[]>;
+    FindRequeueable(query: RequeueQuery, subjectIDs: readonly string[] | null): Promise<string[]>;
     /**
      * The subjects that hold a `Draft` application and a document whose reading finished (`Complete`
      * or `Failed`, which still commits what it found) at or after `since`: the boot-time pass that
@@ -123,4 +124,12 @@ export interface ReadingData {
     StandardsToRead(document: ReadingDocument): Promise<StandardToRead[]>;
     /** Runs `work` in one transaction holding the subject's lock, then the document's. */
     Commit<T>(subjectID: string, documentID: string, work: (scope: ReadingCommitScope) => Promise<T>): Promise<T>;
+}
+
+/** What {@link ReadingData.FindRequeueable} selects by. */
+export interface RequeueQuery {
+    MaxAttempts: number;
+    AtBoot: boolean;
+    Now: Date;
+    RetrySpacingMinutes: number;
 }

@@ -128,10 +128,12 @@ async function scratchSubject(ctx: IntegrationCheckContext, world: Credentialing
 /** Runs `work` with the queue seeing only `subjectIDs`; every seam is reset afterwards. */
 async function withQueueOn<T>(subjectIDs: string[], work: () => Promise<T>): Promise<T> {
     ReadingQueue.Seams.OnlySubjectIDs = subjectIDs;
+    ReadingQueue.Seams.RetrySpacingMinutes = 0;
     try {
         return await work();
     } finally {
         ReadingQueue.Seams.OnlySubjectIDs = undefined;
+        ReadingQueue.Seams.RetrySpacingMinutes = undefined;
         ReadingQueue.Seams.Now = undefined;
         ReadingQueue.Seams.BeforeCommit = undefined;
     }
@@ -224,7 +226,7 @@ function workerFor(fixtures: Fixtures, documentID: string, failCommit: boolean):
         ContextUser: system,
         NewClaimID: () => randomUUID().toUpperCase(),
         Seams: {},
-        Limits: { StaleAfterMinutes: ReadingQueue.StaleAfterMinutes, MaxAttempts: ReadingQueue.MaxAttempts, PrefillLookBackMinutes: ReadingQueue.PrefillLookBackMinutes },
+        Limits: { StaleAfterMinutes: ReadingQueue.StaleAfterMinutes, MaxAttempts: ReadingQueue.MaxAttempts, PrefillLookBackMinutes: ReadingQueue.PrefillLookBackMinutes, RetrySpacingMinutes: 0 },  // no wait between retries in checks; the spacing itself is unit-tested
         Committed: async () => undefined,
         SweepSteps: () => [],
         RemoveOrphans: async () => 0,

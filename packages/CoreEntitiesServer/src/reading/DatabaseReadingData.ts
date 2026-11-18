@@ -21,6 +21,7 @@ import type {
     ReadingDocument,
     ReadingStateChange,
     RecognizedTextChange,
+    RequeueQuery,
     StandardToRead,
 } from './ReadingData.js';
 
@@ -142,10 +143,8 @@ export class DatabaseReadingData implements ReadingData {
         return DatabaseReadingData.documentIDs(filter);
     }
 
-    public FindRequeueable(maxAttempts: number, includeCouldNotRun: boolean, subjectIDs: readonly string[] | null): Promise<string[]> {
-        const failed = `(ReadingStatus = 'Failed' AND ReadingAttempts < ${Math.trunc(maxAttempts)})`;
-        const filter = (includeCouldNotRun ? `(${failed} OR ReadingStatus = 'Could Not Run')` : failed) + subjectClause(subjectIDs);
-        return DatabaseReadingData.documentIDs(filter);
+    public FindRequeueable(query: RequeueQuery, subjectIDs: readonly string[] | null): Promise<string[]> {
+        return DatabaseReadingData.documentIDs(RequeueFilter(query) + subjectClause(subjectIDs));
     }
 
     public FindRecentlyReadSubjects(since: Date, subjectIDs: readonly string[] | null): Promise<string[]> {
@@ -340,4 +339,22 @@ export class DatabaseReadingData implements ReadingData {
         extraction.IsSuperseded = false;
         await scope.Save(extraction);
     }
+}
+
+/**
+ * The view filter of {@link DatabaseReadingData.FindRequeueable}. At boot every `Failed` and `Could Not
+ * Run` document; otherwise `Failed` documents with attempts left whose last write is at least
+ * `ReadingAttempts * RetrySpacingMinutes` minutes old. Every value is a number or an ISO date the
+ * server made, never caller text.
+ */
+export function RequeueFilter(query: RequeueQuery): string {
+    if (query.AtBoot) {
+        return `(ReadingStatus IN ('Failed', 'Could Not Run'))`;
+    }
+    const spacing = Math.max(0, Math.trunc(query.RetrySpacingMinutes));
+    const failed = `ReadingStatus = 'Failed' AND ReadingAttempts < ${Math.trunc(query.MaxAttempts)}`;
+    if (spacing === 0) {
+        return `(${failed})`;
+    }
+    return `(${failed} AND DATEADD(minute, ReadingAttempts * ${spacing}, __mj_UpdatedAt) <= '${query.Now.toISOString()}')`;
 }

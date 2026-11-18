@@ -50,6 +50,8 @@ export class ReadingQueue {
      * and its hook leaves nothing else to say the hook did not run.
      */
     public static readonly PrefillLookBackMinutes = 24 * 60;
+    /** Minutes a failed reading waits, per attempt already made, before the sweep tries it again. */
+    public static readonly RetrySpacingMinutes = 10;
     /** Test seams (see {@link ReadingQueueSeams}). */
     public static readonly Seams: ReadingQueueSeams = {};
 
@@ -92,6 +94,7 @@ export class ReadingQueue {
                     StaleAfterMinutes: ReadingQueue.StaleAfterMinutes,
                     MaxAttempts: ReadingQueue.MaxAttempts,
                     PrefillLookBackMinutes: ReadingQueue.PrefillLookBackMinutes,
+                    RetrySpacingMinutes: ReadingQueue.RetrySpacingMinutes,
                 },
                 Committed: (subjectID) => CredentialingServices.RunReadingCommitted(subjectID),
                 SweepSteps: () => CredentialingServices.SweepSteps,
