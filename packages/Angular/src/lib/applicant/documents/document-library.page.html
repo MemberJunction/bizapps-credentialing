@@ -105,23 +105,21 @@
                                                     <button
                                                         mjButton
                                                         Variant="primary"
-                                                        Size="sm"
                                                         type="button"
                                                         [disabled]="RequeueingDocumentID !== null"
                                                         (click)="OnReadAgain(doc)">
                                                         {{ RequeueingDocumentID === doc.EvidenceDocumentID ? 'Asking...' : 'Read again' }}
                                                     </button>
                                                 }
-                                                <button mjButton Variant="outline" Size="sm" type="button" (click)="OpenViewer(doc)">
+                                                <button mjButton Variant="outline" type="button" (click)="OpenViewer(doc)">
                                                     View
                                                 </button>
-                                                <button mjButton Variant="outline" Size="sm" type="button" (click)="OpenVersions(doc)">
+                                                <button mjButton Variant="outline" type="button" (click)="OpenVersions(doc)">
                                                     Versions ({{ doc.Versions.length }})
                                                 </button>
                                                 <button
                                                     mjButton
                                                     Variant="outline"
-                                                    Size="sm"
                                                     type="button"
                                                     [disabled]="DownloadingDocumentID !== null"
                                                     (click)="DownloadDocument(doc)">

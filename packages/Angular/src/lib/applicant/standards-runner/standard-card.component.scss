@@ -129,7 +129,7 @@
 
 .cred-card__citation-chip {
     padding: 0.25rem 0.65rem;
-    min-height: 32px;
+    min-height: 44px;
     border-radius: 999px;
     border: 1px solid var(--mj-border-default);
     background: var(--mj-bg-surface-sunken, var(--mj-bg-surface));
@@ -260,7 +260,8 @@
     display: inline-flex;
     align-items: center;
     gap: var(--mj-space-1, 0.25rem);
-    min-height: 36px;
+    min-height: 44px;
+    min-width: 44px;
     cursor: pointer;
     font-size: var(--mj-text-sm, 0.875rem);
 }

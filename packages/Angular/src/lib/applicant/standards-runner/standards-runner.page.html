@@ -47,7 +47,6 @@
                     <button
                         mjButton
                         Variant="outline"
-                        Size="sm"
                         type="button"
                         (click)="OpenWithdrawDialog()">
                         Withdraw application
@@ -56,7 +55,6 @@
                 <button
                     mjButton
                     Variant="primary"
-                    Size="sm"
                     type="button"
                     (click)="OnReviewAndSubmit()">
                     Review and submit
@@ -118,7 +116,6 @@
                         <button
                             mjButton
                             Variant="outline"
-                            Size="sm"
                             type="button"
                             [disabled]="IsRefreshingPrefills"
                             [attr.aria-busy]="IsRefreshingPrefills ? 'true' : null"

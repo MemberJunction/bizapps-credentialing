@@ -32,7 +32,6 @@
                 <button
                     mjButton
                     Variant="outline"
-                    Size="sm"
                     type="button"
                     (click)="OnBackToStandards()">
                     Back to standards
@@ -106,11 +105,12 @@
                         Variant="primary"
                         type="button"
                         [disabled]="!state.CanSubmit || IsSubmitting"
+                        [attr.aria-describedby]="state.DisabledReason ? 'cred-submit-disabled-reason' : null"
                         (click)="OpenConfirmDialog()">
                         {{ IsSubmitting ? 'Submitting...' : 'Submit application' }}
                     </button>
                     @if (state.DisabledReason; as reason) {
-                        <p class="cred-submit__disabled-reason" role="status">{{ reason }}</p>
+                        <p id="cred-submit-disabled-reason" class="cred-submit__disabled-reason" role="status">{{ reason }}</p>
                     }
                 </div>
             </footer>

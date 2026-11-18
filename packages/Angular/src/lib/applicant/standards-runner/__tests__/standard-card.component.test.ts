@@ -1,5 +1,5 @@
 import '@angular/compiler';
-import { ChangeDetectorRef, Injector, runInInjectionContext } from '@angular/core';
+import { ChangeDetectorRef, ElementRef, Injector, runInInjectionContext } from '@angular/core';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
     ConfirmResponseOperation,
@@ -149,6 +149,27 @@ describe('StandardCardComponent', () => {
         );
         expect(card.IsConfirmDialogOpen).toBe(false);
         expect(emitted).toHaveBeenCalledWith(confirmed);
+    });
+
+    it('moves keyboard focus into the answer box on Edit answer and back to Edit answer on Cancel', () => {
+        vi.useFakeTimers();
+        try {
+            const card = createCard(APP_DRAFT, makeStandard('Drafted'));
+            const answerBox = { focus: vi.fn() };
+            const editButton = { focus: vi.fn() };
+            card.AnswerInputRef = new ElementRef(answerBox);
+            card.EditTriggerRef = new ElementRef(editButton);
+
+            card.StartEdit();
+            vi.runAllTimers();
+            expect(answerBox.focus).toHaveBeenCalledTimes(1);
+
+            card.CancelEdit();
+            vi.runAllTimers();
+            expect(editButton.focus).toHaveBeenCalledTimes(1);
+        } finally {
+            vi.useRealTimers();
+        }
     });
 
     it('refuses StartEdit when response is Confirmed or application is Submitted', () => {

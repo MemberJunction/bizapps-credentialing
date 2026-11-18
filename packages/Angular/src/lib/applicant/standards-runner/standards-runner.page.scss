@@ -66,7 +66,7 @@
 }
 
 .cred-runner__app-select {
-    min-height: 36px;
+    min-height: 44px;
     padding: 0.25rem 0.5rem;
     border: 1px solid var(--mj-border-default);
     border-radius: var(--mj-radius-sm, 4px);
@@ -133,7 +133,8 @@
 }
 
 .cred-runner__filter-btn {
-    min-height: 36px;
+    min-height: 44px;
+    min-width: 44px;
     padding: 0.25rem 0.75rem;
     border: 0;
     border-radius: var(--mj-radius-sm, 4px);

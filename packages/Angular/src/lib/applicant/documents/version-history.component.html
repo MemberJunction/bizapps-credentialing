@@ -12,7 +12,7 @@
                 </h2>
                 <p class="cred-versions__subtitle">Focus any SHA-256 hash to read the full digest.</p>
             </div>
-            <button mjButton Variant="outline" Size="sm" type="button" (click)="Close()">Close</button>
+            <button mjButton Variant="outline" type="button" (click)="Close()">Close</button>
         </header>
 
         @if (ErrorMessage) {
@@ -60,7 +60,6 @@
                                     <button
                                         mjButton
                                         Variant="outline"
-                                        Size="sm"
                                         type="button"
                                         [disabled]="DownloadingID !== null"
                                         (click)="DownloadVersion(v)">

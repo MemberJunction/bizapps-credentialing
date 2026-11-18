@@ -71,6 +71,10 @@ export class StandardCardComponent extends BaseAngularComponent {
 
     @ViewChild('confirmDialog') public ConfirmDialogRef?: ElementRef<HTMLDialogElement>;
     @ViewChild('confirmTrigger', { read: ElementRef }) public ConfirmTriggerRef?: ElementRef<HTMLButtonElement>;
+    /** The answer box; it takes keyboard focus when editing starts. */
+    @ViewChild('answerInput', { read: ElementRef }) public AnswerInputRef?: ElementRef<Pick<HTMLElement, 'focus'>>;
+    /** `Edit answer`; it takes focus back when editing ends, so a keyboard user keeps their place. */
+    @ViewChild('editTrigger', { read: ElementRef }) public EditTriggerRef?: ElementRef<Pick<HTMLElement, 'focus'>>;
 
     @Input({ required: true }) public Application!: WorkspaceApplication;
 
@@ -199,6 +203,7 @@ export class StandardCardComponent extends BaseAngularComponent {
         this.IsEditing = true;
         this.ErrorMessage = '';
         this.cdr.markForCheck();
+        this.focusAfterRender(() => this.AnswerInputRef);
     }
 
     public CancelEdit(): void {
@@ -207,6 +212,15 @@ export class StandardCardComponent extends BaseAngularComponent {
         this.DraftText = this.Standard.Response.ResponseText ?? '';
         this.DraftSelfAssessment = this.Standard.Response.SelfAssessment;
         this.cdr.markForCheck();
+        this.focusAfterRender(() => this.EditTriggerRef);
+    }
+
+    /**
+     * Focuses an element once the view has re-rendered: the button that was pressed is removed by the
+     * same change, and without this the focus falls back to the page body.
+     */
+    private focusAfterRender(target: () => ElementRef<Pick<HTMLElement, 'focus'>> | undefined): void {
+        setTimeout(() => target()?.nativeElement.focus(), 0);
     }
 
     public async SaveDraft(): Promise<void> {
@@ -233,6 +247,7 @@ export class StandardCardComponent extends BaseAngularComponent {
             }
             this.IsEditing = false;
             this.ResponseUpdated.emit(res.Output.Response);
+            this.focusAfterRender(() => this.EditTriggerRef);
         } catch (e) {
             this.ErrorMessage = ApplicantMessages.FromError(e, 'save');
         } finally {

@@ -20,13 +20,12 @@
                 <button
                     mjButton
                     Variant="outline"
-                    Size="sm"
                     type="button"
                     [disabled]="IsDownloading || !DocumentID"
                     (click)="DownloadOriginal()">
                     {{ IsDownloading ? 'Downloading...' : 'Download original' }}
                 </button>
-                <button mjButton Variant="outline" Size="sm" type="button" (click)="Close()">
+                <button mjButton Variant="outline" type="button" (click)="Close()">
                     Close
                 </button>
             </div>

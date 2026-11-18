@@ -71,7 +71,6 @@
                 <button
                     mjButton
                     Variant="outline"
-                    Size="sm"
                     type="button"
                     (click)="ToggleEvidenceUpload()">
                     {{ ShowEvidenceUpload ? 'Hide upload' : 'Upload evidence' }}
@@ -83,7 +82,7 @@
             @if (UploadedDocument; as uploaded) {
                 <div class="cred-card__upload-done" role="status">
                     <span>Uploaded to your Document Library. @if (uploaded.TextNote) {{{ uploaded.TextNote }}}</span>
-                    <button mjButton Variant="outline" Size="sm" type="button" (click)="OpenUploadedDocument()">
+                    <button mjButton Variant="outline" type="button" (click)="OpenUploadedDocument()">
                         View
                     </button>
                 </div>
@@ -125,6 +124,7 @@
                     Answer
                 </label>
                 <textarea
+                    #answerInput
                     [id]="'cred-answer-input-' + Standard.StandardID"
                     class="cred-card__textarea"
                     rows="5"
@@ -162,6 +162,7 @@
                     Variant="primary"
                     type="button"
                     [disabled]="IsSaving || Actions.SaveDisabled"
+                    [attr.aria-describedby]="Actions.SaveDisabledReason ? 'cred-save-hint-' + Standard.StandardID : null"
                     (click)="SaveDraft()">
                     {{ IsSaving ? 'Saving...' : 'Save draft' }}
                 </button>
@@ -177,15 +178,16 @@
                     mjButton
                     Variant="outline"
                     type="button"
-                    [disabled]="true">
+                    [disabled]="true"
+                    [attr.aria-describedby]="Actions.ConfirmDisabledReason ? 'cred-confirm-hint-' + Standard.StandardID : null">
                     Read and confirm
                 </button>
             </div>
             @if (Actions.SaveDisabledReason) {
-                <p class="cred-card__hint">{{ Actions.SaveDisabledReason }}</p>
+                <p class="cred-card__hint" [id]="'cred-save-hint-' + Standard.StandardID">{{ Actions.SaveDisabledReason }}</p>
             }
             @if (Actions.ConfirmDisabledReason) {
-                <p class="cred-card__hint">{{ Actions.ConfirmDisabledReason }}</p>
+                <p class="cred-card__hint" [id]="'cred-confirm-hint-' + Standard.StandardID">{{ Actions.ConfirmDisabledReason }}</p>
             }
         </div>
     } @else {
@@ -218,6 +220,7 @@
                 <div class="cred-card__actions">
                     @if (Actions.ShowEditButton) {
                         <button
+                            #editTrigger
                             mjButton
                             Variant="outline"
                             type="button"
@@ -232,13 +235,14 @@
                             Variant="primary"
                             type="button"
                             [disabled]="Actions.ConfirmDisabled"
+                            [attr.aria-describedby]="Actions.ConfirmDisabled && Actions.ConfirmDisabledReason ? 'cred-confirm-hint-' + Standard.StandardID : null"
                             (click)="OpenConfirmDialog()">
                             Read and confirm
                         </button>
                     }
                 </div>
                 @if (Actions.ConfirmDisabled && Actions.ConfirmDisabledReason) {
-                    <p class="cred-card__hint">{{ Actions.ConfirmDisabledReason }}</p>
+                    <p class="cred-card__hint" [id]="'cred-confirm-hint-' + Standard.StandardID">{{ Actions.ConfirmDisabledReason }}</p>
                 }
             </div>
         }
