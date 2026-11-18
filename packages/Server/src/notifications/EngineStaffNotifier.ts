@@ -22,6 +22,14 @@ export class EngineStaffNotifier implements StaffNotifier {
         private readonly notificationTypeName: string = APPLICATION_SUBMITTED_NOTIFICATION_TYPE,
     ) {}
 
+    /**
+     * The notification's sentence. A subject is a person or an organization, so the sentence names
+     * the application with "the", never a pronoun.
+     */
+    public static SubmittedMessage(e: { SubjectName: string; ProgramName: string; VersionLabel: string }): string {
+        return `${e.SubjectName} submitted the ${e.ProgramName} ${e.VersionLabel} application.`;
+    }
+
     public async ApplicationSubmitted(e: {
         ApplicationID: string;
         SubjectName: string;
@@ -36,7 +44,7 @@ export class EngineStaffNotifier implements StaffNotifier {
         const provider = Metadata.Provider;
         await NotificationEngine.Instance.Config(false, system, provider);
         const recordsTypeID = await this.resolveRecordsResourceTypeID();
-        const message = `${e.SubjectName} submitted its ${e.ProgramName} ${e.VersionLabel} application.`;
+        const message = EngineStaffNotifier.SubmittedMessage(e);
 
         for (const userId of e.StaffUserIDs) {
             const result = await NotificationEngine.Instance.SendNotification(

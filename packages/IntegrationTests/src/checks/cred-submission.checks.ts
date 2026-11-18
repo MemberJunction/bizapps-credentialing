@@ -846,7 +846,7 @@ const checks: NamedCheck[] = [
                     system(),
                 );
                 AssertEqual(notes.length, 1, `staff ${staffID} got exactly one notification`);
-                Assert(notes[0].Message.includes('submitted its'), 'notification message has submitted wording');
+                Assert(notes[0].Message.includes(' submitted the '), 'notification message has submitted wording');
             }
 
             const staffBNotes = await FindRows<{ ID: string }>(
