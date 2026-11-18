@@ -41,7 +41,7 @@ function makeGate(overrides: Partial<GetSubmissionGateOutput> = {}): GetSubmissi
         ],
         Gaps: [],
         CanSubmit: false,
-        Reason: '1 items still need attention before you can submit.',
+        Reason: '1 item still needs attention before you can submit.',
         RequiresAttestation: true,
         AttestationStatement:
             "I attest that the information in this application is accurate and complete, and that Sample Applicant's governing body has approved its submission.",
@@ -99,6 +99,23 @@ describe('submit-model', () => {
         expect(state.CanSubmit).toBe(false);
         expect(state.DisabledReason).toBe('2 items still need attention before you can submit.');
         expect(state.Gaps).toHaveLength(2);
+    });
+
+    it('says "1 item still needs attention" for a single gap', () => {
+        const items: GateItem[] = [
+            {
+                Kind: 'Section',
+                Label: '1. Governance',
+                Passed: false,
+                Detail: '1 of 2 confirmed',
+                Target: { Screen: 'Standards', SectionID: 'SEC-1' },
+            },
+        ];
+        const state = EvaluateSubmitState(
+            makeGate({ Items: items, Gaps: items, CanSubmit: false, RequiresAttestation: false }),
+            { OfficerName: null, OfficerRole: null, ApprovalDate: null, Accepted: false },
+        );
+        expect(state.DisabledReason).toBe('1 item still needs attention before you can submit.');
     });
 
     it('updates attestation gate item live and surfaces the attestation reason until complete', () => {

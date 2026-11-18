@@ -79,6 +79,13 @@ export class SubmissionGate {
     /**
      * Formats the fixed governing-body attestation statement with the subject's display name.
      */
+    /** The sentence under a blocked Submit button: how many gate items still need attention. */
+    public static GapsSentence(count: number): string {
+        return count === 1
+            ? '1 item still needs attention before you can submit.'
+            : `${count} items still need attention before you can submit.`;
+    }
+
     public static FormatAttestationStatement(subjectName: string): string {
         const name = subjectName.trim() || 'the applicant';
         return `I attest that the information in this application is accurate and complete, and that ${name}'s governing body has approved its submission.`;
@@ -107,7 +114,7 @@ export class SubmissionGate {
             CanSubmit: canSubmit,
             Reason: canSubmit
                 ? null
-                : `${gaps.length} items still need attention before you can submit.`,
+                : SubmissionGate.GapsSentence(gaps.length),
         };
     }
 

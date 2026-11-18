@@ -479,7 +479,7 @@ const checks: NamedCheck[] = [
                 { ApplicationID: scratch.ApplicationID, Attestation: null },
                 { provider: ctx.Provider, user: scratch.Contact },
             );
-            expectRefused(res, 'items still need attention before you can submit.', 'blocked submit');
+            expectRefused(res, 'attention before you can submit.', 'blocked submit');
             AssertEqual((await readApplication(ctx, scratch.ApplicationID)).Status, 'Draft', 'Status remains Draft');
         },
     },
@@ -797,7 +797,7 @@ const checks: NamedCheck[] = [
                 { ApplicationID: scratch.ApplicationID, Attestation: VALID_ATTESTATION },
                 { provider: ctx.Provider, user: scratch.Contact },
             );
-            expectRefused(res, 'items still need attention before you can submit.', 'submit after reopen');
+            expectRefused(res, 'attention before you can submit.', 'submit after reopen');
             AssertEqual((await readApplication(ctx, scratch.ApplicationID)).Status, 'Draft', 'Status remains Draft');
         },
     },

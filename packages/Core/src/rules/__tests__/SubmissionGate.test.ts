@@ -120,6 +120,11 @@ describe('SubmissionGate', () => {
             expect(result.Reason).toBe('5 items still need attention before you can submit.');
         });
 
+        it('counts the gaps in a grammatical sentence, one item or several', () => {
+            expect(SubmissionGate.GapsSentence(1)).toBe('1 item still needs attention before you can submit.');
+            expect(SubmissionGate.GapsSentence(2)).toBe('2 items still need attention before you can submit.');
+        });
+
         it('passes when all sections, required documents, and optional attestation are satisfied', () => {
             const result = SubmissionGate.Evaluate(
                 {

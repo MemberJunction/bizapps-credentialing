@@ -110,7 +110,7 @@ export function EvaluateSubmitState(
     const nonAttestationGaps = gaps.filter((item) => item.Kind !== 'Attestation');
     let disabledReason: string | null = null;
     if (nonAttestationGaps.length > 0) {
-        disabledReason = `${gaps.length} items still need attention before you can submit.`;
+        disabledReason = SubmissionGate.GapsSentence(gaps.length);
     } else if (gaps.length > 0) {
         disabledReason = gaps[0].Detail;
     }
