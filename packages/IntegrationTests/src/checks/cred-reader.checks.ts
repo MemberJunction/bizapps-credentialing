@@ -191,6 +191,10 @@ class OneDocumentData implements ReadingData {
         return [];
     }
 
+    public async FindRecentlyReadSubjects(): Promise<string[]> {
+        return [];
+    }
+
     public UnderDocumentLock<T>(documentID: string, work: (scope: DocumentLockScope) => Promise<T>): Promise<T> {
         return this.inner.UnderDocumentLock(documentID, work);
     }
@@ -220,7 +224,7 @@ function workerFor(fixtures: Fixtures, documentID: string, failCommit: boolean):
         ContextUser: system,
         NewClaimID: () => randomUUID().toUpperCase(),
         Seams: {},
-        Limits: { StaleAfterMinutes: ReadingQueue.StaleAfterMinutes, MaxAttempts: ReadingQueue.MaxAttempts },
+        Limits: { StaleAfterMinutes: ReadingQueue.StaleAfterMinutes, MaxAttempts: ReadingQueue.MaxAttempts, PrefillLookBackMinutes: ReadingQueue.PrefillLookBackMinutes },
         Committed: async () => undefined,
         SweepSteps: () => [],
         RemoveOrphans: async () => 0,
@@ -508,6 +512,37 @@ const checks: NamedCheck[] = [
                 AssertEqual(fixtures.Recognizer.Calls, 1, 'not recognized again');
                 AssertEqual(later.ExtractedText, RECOGNIZED_SCAN, 'ExtractedText is unchanged');
                 AssertEqual(later.ReadingStatus, 'Complete', 'read again from the stored text');
+            });
+        },
+    },
+    {
+        Id: 'cred-reader.12',
+        Name: 'a transient failure of one read stores what was found, reads Failed with the retry sentence, and the next Sweep reads it to Complete with one current extraction per standard',
+        RequiresMutation: true,
+        Fn: async (ctx: IntegrationCheckContext) => {
+            const { Fixtures: fixtures, Scratch: scratch } = await setUp(ctx);
+            fixtures.Reader.Answers.set('R.2', { Kind: 'Failed', Reason: 'The assistant service could not be reached.' });
+            await withQueueOn([scratch.SubjectID], async () => {
+                const documentID = await upload(fixtures, ctx.Provider, scratch, scratch.Bound, POLICY_TEXT, 'policy');
+                const counts = await ReadingQueue.DrainOnce();
+                AssertEqual(counts.Failed, 1, 'the drain counts the reading as failed');
+                const failed = await documentRow(ctx, documentID);
+                AssertEqual(failed.ReadingStatus, 'Failed', 'not Could Not Run');
+                AssertEqual(failed.ReadingNote, 'The assistant could not finish reading this document. It will try again.', 'the retry sentence');
+                AssertEqual(failed.ReadingAttempts, 1, 'one attempt used');
+                const found = await extractions(ctx, documentID);
+                AssertEqual(found.length, 1, 'the passage found for R.1 is stored');
+                AssertEqual(found[0].StandardID.toLowerCase(), scratch.StandardIDs.get('R.1')?.toLowerCase(), 'it is R.1\'s');
+
+                fixtures.Reader.Answers.set('R.2', FixtureFound(MINUTES_SENTENCE));
+                await ReadingQueue.Sweep();
+                const complete = await documentRow(ctx, documentID);
+                AssertEqual(complete.ReadingStatus, 'Complete', 'the sweep requeued and read it');
+                AssertEqual(complete.ReadingAttempts, 2, 'as its second attempt');
+                const current = await extractions(ctx, documentID);
+                AssertEqual(current.length, 2, 'one current extraction per standard');
+                AssertEqual(new Set(current.map((r) => r.StandardID.toLowerCase())).size, 2, 'R.1 and R.2 each have exactly one');
+                assertSpans(current, complete.ExtractedText ?? '', 'cred-reader.12');
             });
         },
     },

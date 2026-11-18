@@ -26,6 +26,16 @@ export interface StoredPromptRunner {
     Run(promptName: string, request: StoredPromptRequest, contextUser: UserInfo): Promise<StoredPromptRun>;
 }
 
+/**
+ * How a run that did not answer is reported: `CouldNotRun` when no model or the prompt is available
+ * on this server (an administrator must act; the boot sweep and `Read again` retry it), `Failed` for
+ * every other failure — a rate limit, a timeout, a vendor or transport error — which the queue retries
+ * on its own (`ReadingQueue.MaxAttempts`).
+ */
+export function FailedRunResult(run: FailedPromptRun): { Kind: 'CouldNotRun' | 'Failed'; Reason: string } {
+    return { Kind: run.Kind === 'Failed' ? 'Failed' : 'CouldNotRun', Reason: CouldNotRunReason(run) };
+}
+
 /** The plain-words reason a reading shows for a failed run (FR-5.4: never "nothing found"). */
 export function CouldNotRunReason(run: FailedPromptRun): string {
     switch (run.Kind) {

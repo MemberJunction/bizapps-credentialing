@@ -5,7 +5,7 @@
     "Description": "Verify review and submit: gate evaluation, attestation validation, concurrent double-submit exclusion, post-submit freeze of responses/evidence/attestations/prefills/late-reading, applicant-only authorization, staff notifications (best effort), and durable ApplicationEvents dispatch/redispatch.",
     "InputDefinition": {},
     "ExpectedOutcomes": {
-      "summary": "All fourteen cred-submission checks pass."
+      "summary": "All fifteen cred-submission checks pass."
     },
     "Configuration": {
       "tier": "deterministic",

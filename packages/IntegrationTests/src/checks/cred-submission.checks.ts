@@ -35,17 +35,18 @@ import {
     ApplicationEvents,
     CredentialingServices,
     EvidenceIntake,
+    OperationWrite,
     ReadingQueue,
     SystemUser,
     type InvitationIssuer,
     type StaffNotifier,
 } from '@mj-biz-apps/credentialing-core-entities-server';
-import type { mjBizAppsCredentialingProgramVersionEntity } from '@mj-biz-apps/credentialing-entities';
+import type { mjBizAppsCredentialingApplicationEntity, mjBizAppsCredentialingProgramVersionEntity } from '@mj-biz-apps/credentialing-entities';
 import {
     APPLICATION_SUBMITTED_NOTIFICATION_TYPE,
     EngineStaffNotifier,
 } from '@mj-biz-apps/credentialing-server/notifications';
-import { FindRows, Quote, RequireSave } from '../wire.js';
+import { FindRows, LoadEntity, Quote, RequireSave } from '../wire.js';
 import { EnsureWorldSubject } from '../world/applicant-world.js';
 import {
     FixtureEvidenceStore,
@@ -1100,6 +1101,64 @@ const checks: NamedCheck[] = [
 
                 AssertEqual(await ApplicationEvents.Dispatch(scratch.ApplicationID), 'GaveUp', 'sixth Dispatch returns GaveUp');
                 AssertEqual(await ApplicationEvents.Redispatch(), 0, 'Redispatch selects nothing');
+            } finally {
+                ApplicationEvents.OffSubmitted(subName);
+                ApplicationEvents.Seams.OnlyApplicationIDs = undefined;
+            }
+        },
+    },
+    {
+        Id: 'cred-submission.15',
+        Name: 'a process that crashed during the final dispatch attempt (attempts 5, stale claim, no note) gets the gave-up note from the next Redispatch; a further Redispatch selects nothing',
+        RequiresMutation: true,
+        Fn: async (ctx: IntegrationCheckContext) => {
+            const world = await GetOrLoadWorld(ctx);
+            const fixtures = await registerFixtures(ctx, { async ApplicationSubmitted() {} });
+            const scratch = await createScratchApplication(ctx, world, { RequiresAttestation: false });
+            await confirmAllStandards(ctx, scratch);
+            await fulfillRequiredDocuments(ctx, fixtures, scratch);
+
+            const subName = `cred-sub-15-${runHex()}`;
+            ApplicationEvents.OnSubmitted(subName, async (e) => {
+                if (UUIDsEqual(e.ApplicationID, scratch.ApplicationID)) {
+                    throw new Error('permanent failure');
+                }
+            });
+            ApplicationEvents.Seams.OnlyApplicationIDs = [scratch.ApplicationID];
+            try {
+                expectSuccess(
+                    await new SubmitApplicationOperation().Execute(
+                        { ApplicationID: scratch.ApplicationID, Attestation: null },
+                        { provider: ctx.Provider, user: scratch.Contact },
+                    ),
+                    'submit succeeds',
+                );
+                Assert(
+                    await waitForCondition(async () => {
+                        const row = await readApplication(ctx, scratch.ApplicationID);
+                        return row.SubmissionDispatchAttempts >= 1 && row.SubmissionDispatchClaimID == null;
+                    }),
+                    'attempt 1 settled',
+                );
+                // The state a process leaves when it dies inside the handlers of attempt 5: claim() raised the
+                // attempts to the cap and stored its claim; finish() never ran.
+                const staleClaimedAt = new Date(Date.now() - (ApplicationEvents.ClaimStaleAfterMinutes + 5) * 60_000);
+                await OperationWrite.Run(ctx.Provider, async (scope) => {
+                    const app = await LoadEntity<mjBizAppsCredentialingApplicationEntity>(ctx, CredentialingEntity.Application, scratch.ApplicationID, system());
+                    app.SubmissionDispatchAttempts = ApplicationEvents.MaxAttempts;
+                    app.SubmissionDispatchClaimID = randomUUID().toUpperCase();
+                    app.SubmissionDispatchClaimedAt = staleClaimedAt;
+                    app.SubmissionDispatchNote = null;
+                    await scope.Save(app);
+                });
+
+                AssertEqual(await ApplicationEvents.Redispatch(), 1, 'Redispatch selects the crashed application');
+                const after = await readApplication(ctx, scratch.ApplicationID);
+                AssertEqual(after.SubmissionDispatchNote, SUBMISSION_DISPATCH_GAVE_UP_NOTE, 'the gave-up note is written');
+                AssertEqual(after.SubmissionDispatchClaimID, null, 'the dead claim is cleared');
+                AssertEqual(after.SubmissionDispatchedAt, null, 'still not dispatched');
+                AssertEqual(after.SubmissionDispatchAttempts, ApplicationEvents.MaxAttempts, 'no attempt beyond the cap');
+                AssertEqual(await ApplicationEvents.Redispatch(), 0, 'a further Redispatch selects nothing');
             } finally {
                 ApplicationEvents.OffSubmitted(subName);
                 ApplicationEvents.Seams.OnlyApplicationIDs = undefined;

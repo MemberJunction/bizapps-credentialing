@@ -1,6 +1,6 @@
 import { LogError, type UserInfo } from '@memberjunction/core';
 import type { EvidenceReader, ReadingRequest, ReadingResult } from '@mj-biz-apps/credentialing-core-entities-server';
-import { CouldNotRunReason, MJStoredPromptRunner, type StoredPromptRunner } from './PromptRunner.js';
+import { FailedRunResult, MJStoredPromptRunner, type StoredPromptRunner } from './PromptRunner.js';
 
 /** The stored prompt that reads a document for one standard (`metadata/prompts/.credentialing-reading-prompts.json`). */
 export const EVIDENCE_READER_PROMPT = 'Credentialing: Evidence Reader';
@@ -135,7 +135,7 @@ export class PromptEvidenceReader implements EvidenceReader {
             const run = await this.runner.Run(EVIDENCE_READER_PROMPT, { Data: PromptEvidenceReader.data(request, window), Messages: null }, contextUser);
             if (run.Kind !== 'Ran') {
                 LogError(`Credentialing: reading document ${request.Document.ID} for ${request.Standard.Code} could not run: ${run.ErrorMessage}`);
-                return { Kind: 'CouldNotRun', Reason: CouldNotRunReason(run) };
+                return FailedRunResult(run);
             }
             const result = ParseReaderAnswer(run.Text, run.PromptRunID);
             if (result.Kind === 'Found') {

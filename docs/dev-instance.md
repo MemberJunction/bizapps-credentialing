@@ -1291,7 +1291,12 @@ restored, it passed.
 - **No model or credential.** Selection throws `No suitable model found for prompt …`, caught by
   `ExecutePrompt` (`success: false`, no prompt run). `MJStoredPromptRunner` maps that prefix to
   `No AI model is available on this server.`; any other failure to `The assistant service could not be
-  reached.`; a missing prompt to `The assistant is not set up on this server.`
+  reached.`; a missing prompt to `The assistant is not set up on this server.` Only no model and a
+  missing prompt are `CouldNotRun` (the document reads `Could Not Run` when recognition, or every read,
+  returned it; the boot sweep and `Read again` retry it). Every other failure (rate limit, timeout,
+  vendor or transport error) is `Failed` (`FailedRunResult`): the queue commits what the other reads
+  found, marks the document `Failed` with the retry sentence, and the 5-minute sweep reads it again
+  until `ReadingQueue.MaxAttempts`.
 - **`RequireSpecificModels: true` on both prompts.** With it false, `SelectionStrategy: 'Specific'`
   appends power-matched fallback models when the listed ones lack credentials
   (`BaseModelRunner.ts:711-726`). Measured: with both of the reader's prompt-model rows pointed at

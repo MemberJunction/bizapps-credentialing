@@ -30,6 +30,9 @@ const DOC = 'D0000000-0000-4000-8000-000000000001';
 const TEXT = '[Page 1]\nSafety policy\nThe practice reviews its written safety policy every twelve months.\nSigned minutes are kept for seven years.';
 const EXCERPT_ONE = 'The practice reviews its written safety policy every twelve months.';
 const EXCERPT_TWO = 'Signed minutes are kept for seven years.';
+const EXCERPT_THREE = 'Signed minutes are kept';
+const UNREACHABLE = 'The assistant service could not be reached.';
+const NO_MODEL = 'No AI model is available on this server.';
 
 /** A promise and the function that settles it. */
 function gate(): { Promise: Promise<void>; Open: () => void } {
@@ -80,6 +83,9 @@ class MemoryData implements ReadingData {
     public FindCandidateCalls = 0;
     public FailRequeue = false;
     public CommitCount = 0;
+    /** When each document last reached a final reading state (the database's `__mj_UpdatedAt`). */
+    public readonly ReadAt = new Map<string, Date>();
+    public Clock: { Now: Date } = { Now: new Date() };
     private readonly locks = new Locks();
     private nextExtraction = 1;
 
@@ -97,6 +103,13 @@ class MemoryData implements ReadingData {
         return [...this.Documents.values()]
             .filter((d) => (d.ReadingStatus === 'Failed' && d.ReadingAttempts < maxAttempts) || (includeCouldNotRun && d.ReadingStatus === 'Could Not Run'))
             .map((d) => d.ID);
+    }
+
+    public async FindRecentlyReadSubjects(since: Date): Promise<string[]> {
+        const subjects = [...this.Documents.values()]
+            .filter((d) => (d.ReadingStatus === 'Complete' || d.ReadingStatus === 'Failed') && (this.ReadAt.get(d.ID)?.getTime() ?? 0) >= since.getTime())
+            .map((d) => d.SubjectID);
+        return [...new Set(subjects)];
     }
 
     public UnderDocumentLock<T>(documentID: string, work: (scope: DocumentLockScope) => Promise<T>): Promise<T> {
@@ -184,6 +197,7 @@ class MemoryData implements ReadingData {
         const document = this.Documents.get(documentID);
         if (document == null) throw new Error(`no document ${documentID}`);
         this.Documents.set(documentID, { ...document, ...change });
+        this.ReadAt.set(documentID, this.Clock.Now);
     }
 }
 
@@ -199,22 +213,36 @@ class TableReader implements EvidenceReader {
     public Calls: string[] = [];
     public Hold: Promise<void> | null = null;
     public Throw = false;
+    /** Answers given once, before {@link Answers}, keyed by standard code. */
+    public Once: Record<string, ReadingResult> = {};
     public constructor(public Answers: Record<string, ReadingResult>) {}
 
     public async Read(request: ReadingRequest): Promise<ReadingResult> {
         this.Calls.push(request.Standard.Code);
         if (this.Hold != null) await this.Hold;
         if (this.Throw) throw new Error('reader exploded');
+        const once = this.Once[request.Standard.Code];
+        if (once != null) {
+            delete this.Once[request.Standard.Code];
+            return once;
+        }
         return this.Answers[request.Standard.Code] ?? { Kind: 'NothingFound', PromptRunID: null };
     }
 }
 
 class FixedRecognizer implements TextRecognizer {
     public Calls = 0;
+    /** Answered once, before {@link Result}. */
+    public Once: RecognitionResult | null = null;
     public constructor(public Result: RecognitionResult) {}
 
     public async Recognize(): Promise<RecognitionResult> {
         this.Calls++;
+        const once = this.Once;
+        if (once != null) {
+            this.Once = null;
+            return once;
+        }
         return this.Result;
     }
 }
@@ -228,6 +256,9 @@ class Process {
     public readonly Worker: ReadingWorker;
     public readonly Seams: ReadingQueueSeams = {};
     public Committed: string[] = [];
+    /** How many of the next reading-committed hook calls throw. */
+    public CommittedFailures = 0;
+    public CommittedAttempts = 0;
     public OrphanRuns = 0;
     public Steps: SweepStep[] = [];
     private claims = 0;
@@ -242,8 +273,13 @@ class Process {
             ContextUser: () => new UserInfo(null, { ID: 'U0000000-0000-4000-8000-000000000001' }),
             NewClaimID: () => `C${name}000000-0000-4000-8000-${String(++this.claims).padStart(12, '0')}`,
             Seams: this.Seams,
-            Limits: { StaleAfterMinutes: 15, MaxAttempts: 3 },
+            Limits: { StaleAfterMinutes: 15, MaxAttempts: 3, PrefillLookBackMinutes: 24 * 60 },
             Committed: async (subjectID) => {
+                this.CommittedAttempts++;
+                if (this.CommittedFailures > 0) {
+                    this.CommittedFailures--;
+                    throw new Error('prefill exploded');
+                }
                 this.Committed.push(subjectID);
             },
             SweepSteps: () => this.Steps,
@@ -271,6 +307,7 @@ describe('ReadingQueue', () => {
         data.Applications.set(APP_ONE, 'Draft');
         data.Standards = [standard('R.1'), standard('R.2')];
         clock = { Now: new Date('2026-11-17T10:00:00Z') };
+        data.Clock = clock;
         reader = new TableReader({ 'R.1': found(EXCERPT_ONE), 'R.2': found(EXCERPT_TWO) });
         recognizer = new FixedRecognizer({ Kind: 'Recognized', Text: TEXT, PageCount: 1, Truncated: false, PromptRunID: 'P-1' });
         one = new Process(data, clock, reader, recognizer, '1');
@@ -391,6 +428,121 @@ describe('ReadingQueue', () => {
             expect(data.Doc().ReadingAttempts).toBe(3);
             expect(data.Doc().ReadingStatus).toBe('Failed');
             expect(reader.Calls).toHaveLength(3);
+        });
+    });
+
+    describe('transient failures', () => {
+        it('one of three reads failing transiently keeps the two found, marks the document Failed, and the next Sweep re-reads it to Complete', async () => {
+            data.Standards = [standard('R.1'), standard('R.2'), standard('R.3')];
+            reader.Answers['R.3'] = found(EXCERPT_THREE);
+            reader.Once['R.3'] = { Kind: 'Failed', Reason: UNREACHABLE };
+            data.AddDocument();
+            const counts = await one.Worker.DrainOnce();
+            expect(counts).toEqual({ Claimed: 1, Completed: 0, Failed: 1, Discarded: 0 });
+            expect(data.Doc().ReadingStatus).toBe('Failed');
+            expect(data.Doc().ReadingNote).toBe(READING_FAILED_RETRY_NOTE);
+            expect(data.Doc().ReadingAttempts).toBe(1);
+            expect(data.Doc().ReadingClaimID).toBeNull();
+            expect(data.Current().map((e) => e.StandardID).sort()).toEqual(['S-R.1', 'S-R.2']);
+            expect(one.Committed).toEqual([SUBJECT]);
+
+            await one.Worker.Sweep(false);
+            expect(data.Doc().ReadingStatus).toBe('Complete');
+            expect(data.Doc().ReadingNote).toBe('3 passages found for 3 standards.');
+            expect(data.Doc().ReadingAttempts).toBe(2);
+            const current = data.Current();
+            expect(current.map((e) => e.StandardID).sort()).toEqual(['S-R.1', 'S-R.2', 'S-R.3']);
+            for (const id of ['S-R.1', 'S-R.2', 'S-R.3']) {
+                expect(current.filter((e) => e.StandardID === id)).toHaveLength(1);
+            }
+        });
+
+        it('a transient failure keeps the earlier extraction of the standard it could not read', async () => {
+            data.AddDocument();
+            await one.Worker.DrainOnce();
+            const before = data.Current().find((e) => e.StandardID === 'S-R.2');
+            data.Documents.set(DOC, { ...data.Doc(), ReadingStatus: 'Pending' });
+            reader.Once['R.2'] = { Kind: 'Failed', Reason: UNREACHABLE };
+            await one.Worker.DrainOnce();
+            expect(data.Doc().ReadingStatus).toBe('Failed');
+            expect(data.Current().find((e) => e.StandardID === 'S-R.2')?.ID).toBe(before?.ID);
+            expect(data.Current()).toHaveLength(2);
+        });
+
+        it('a transient failure on the last attempt gives the final note and is not requeued', async () => {
+            reader.Answers['R.2'] = { Kind: 'Failed', Reason: UNREACHABLE };
+            data.AddDocument({ ReadingAttempts: 2 });
+            await one.Worker.DrainOnce();
+            expect(data.Doc().ReadingStatus).toBe('Failed');
+            expect(data.Doc().ReadingAttempts).toBe(3);
+            expect(data.Doc().ReadingNote).toBe(READING_FAILED_FINAL_NOTE);
+            await one.Worker.Sweep(false);
+            expect(data.Doc().ReadingAttempts).toBe(3);
+            expect(reader.Calls).toEqual(['R.1', 'R.2']);
+        });
+
+        it('some reads with no model and others answered → Failed (retried), not Could Not Run', async () => {
+            reader.Answers['R.2'] = { Kind: 'CouldNotRun', Reason: NO_MODEL };
+            data.AddDocument();
+            await one.Worker.DrainOnce();
+            expect(data.Doc().ReadingStatus).toBe('Failed');
+            expect(data.Doc().ReadingNote).toBe(READING_FAILED_RETRY_NOTE);
+            expect(data.Current().map((e) => e.StandardID)).toEqual(['S-R.1']);
+        });
+
+        it('recognizer failing transiently → Failed with the retry note, text still awaiting recognition, recognized on the retry', async () => {
+            recognizer.Once = { Kind: 'Failed', Reason: UNREACHABLE };
+            data.AddDocument({ ExtractedText: null, TextStatus: 'Awaiting Recognition' });
+            const counts = await one.Worker.DrainOnce();
+            expect(counts.Failed).toBe(1);
+            expect(data.Doc().ReadingStatus).toBe('Failed');
+            expect(data.Doc().ReadingNote).toBe(READING_FAILED_RETRY_NOTE);
+            expect(data.Doc().TextStatus).toBe('Awaiting Recognition');
+            expect(reader.Calls).toEqual([]);
+            await one.Worker.Sweep(false);
+            expect(recognizer.Calls).toBe(2);
+            expect(data.Doc().TextStatus).toBe('Recognized');
+            expect(data.Doc().ReadingStatus).toBe('Complete');
+            expect(data.Current()).toHaveLength(2);
+        });
+    });
+
+    describe('prefill after a reading', () => {
+        it('a reading-committed hook that throws is run again by the next Sweep, and a further Sweep runs nothing', async () => {
+            one.CommittedFailures = 1;
+            data.AddDocument();
+            await one.Worker.DrainOnce();
+            expect(data.Doc().ReadingStatus).toBe('Complete');
+            expect(one.CommittedAttempts).toBe(1);
+            expect(one.Committed).toEqual([]);
+            await one.Worker.Sweep(false);
+            expect(one.Committed).toEqual([SUBJECT]);
+            await one.Worker.Sweep(false);
+            expect(one.CommittedAttempts).toBe(2);
+            expect(one.Committed).toEqual([SUBJECT]);
+        });
+
+        it('a hook that keeps failing stays pending until it succeeds', async () => {
+            one.CommittedFailures = 2;
+            data.AddDocument();
+            await one.Worker.DrainOnce();
+            await one.Worker.Sweep(false);
+            expect(one.Committed).toEqual([]);
+            await one.Worker.Sweep(false);
+            expect(one.Committed).toEqual([SUBJECT]);
+            expect(one.CommittedAttempts).toBe(3);
+        });
+
+        it('at boot (a new process after a crash) the hook runs for subjects read within the look-back, not for older readings', async () => {
+            data.AddDocument({ ReadingStatus: 'Complete' });
+            data.ReadAt.set(DOC, new Date(clock.Now.getTime() - 60 * 60_000));
+            data.AddDocument({ ID: 'D0000000-0000-4000-8000-000000000002', SubjectID: 'A0000000-0000-4000-8000-000000000002', ReadingStatus: 'Complete' });
+            data.ReadAt.set('D0000000-0000-4000-8000-000000000002', new Date(clock.Now.getTime() - 25 * 60 * 60_000));
+            const rebooted = new Process(data, clock, reader, recognizer, '2');
+            await rebooted.Worker.Sweep(false);
+            expect(rebooted.Committed).toEqual([]);
+            await rebooted.Worker.Sweep(true);
+            expect(rebooted.Committed).toEqual([SUBJECT]);
         });
     });
 

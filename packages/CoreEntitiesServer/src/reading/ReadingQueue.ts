@@ -29,7 +29,8 @@ class ReadingQueueStore extends BaseSingleton<ReadingQueueStore> {
  * - {@link Nudge}: after an upload commits (fire and forget).
  * - {@link DrainOnce}: claim and read every candidate; single-flight per process.
  * - {@link Sweep}: at boot and every {@link SweepEveryMinutes}: contributed steps, the requeue rules,
- *   orphan removal, the drain.
+ *   orphan removal, the drain, and the re-run of a reading-committed hook that failed (at boot, of
+ *   every reading finished within {@link PrefillLookBackMinutes}).
  *
  * Every database write is an entity save under an application lock after a re-read, made as the
  * system user on a fresh isolated provider per unit of work (`DatabaseReadingData`); the model calls
@@ -43,6 +44,12 @@ export class ReadingQueue {
     public static readonly SweepEveryMinutes = 5;
     /** A document is tried this many times before it stays `Failed`. */
     public static readonly MaxAttempts = 3;
+    /**
+     * At boot, the sweep runs the reading-committed hook (prefill) again for subjects with a Draft
+     * application whose document finished reading within this many minutes: a crash between a commit
+     * and its hook leaves nothing else to say the hook did not run.
+     */
+    public static readonly PrefillLookBackMinutes = 24 * 60;
     /** Test seams (see {@link ReadingQueueSeams}). */
     public static readonly Seams: ReadingQueueSeams = {};
 
@@ -81,8 +88,12 @@ export class ReadingQueue {
                 ContextUser: () => SystemUser.Get('Reading uploaded evidence'),
                 NewClaimID: () => randomUUID().toUpperCase(),
                 Seams: ReadingQueue.Seams,
-                Limits: { StaleAfterMinutes: ReadingQueue.StaleAfterMinutes, MaxAttempts: ReadingQueue.MaxAttempts },
-                Committed: (subjectID) => CredentialingServices.NotifyReadingCommitted(subjectID),
+                Limits: {
+                    StaleAfterMinutes: ReadingQueue.StaleAfterMinutes,
+                    MaxAttempts: ReadingQueue.MaxAttempts,
+                    PrefillLookBackMinutes: ReadingQueue.PrefillLookBackMinutes,
+                },
+                Committed: (subjectID) => CredentialingServices.RunReadingCommitted(subjectID),
                 SweepSteps: () => CredentialingServices.SweepSteps,
                 RemoveOrphans: () => DatabaseReadingData.RemoveOrphans(ORPHAN_FILE_MINUTES),
             });

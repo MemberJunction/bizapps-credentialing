@@ -56,7 +56,7 @@ export {
 export { StorageEvidenceStore } from './evidence/StorageEvidenceStore.js';
 export { WorkerTextExtractor, MAX_EXTRACTED_CHARACTERS, EXTRACTION_TIME_LIMIT_MS, EXTRACTION_HEAP_LIMIT_MB, TEXT_NOTE } from './evidence/WorkerTextExtractor.js';
 export { LocalDiskFileStorage, LOCAL_DISK_STORAGE_DRIVER_KEY, LOCAL_DISK_PRODUCTION_REASON } from './storage/LocalDiskFileStorage.js';
-export { CouldNotRunReason, MJStoredPromptRunner, type StoredPromptRequest, type StoredPromptRun, type StoredPromptRunner } from './reading/PromptRunner.js';
+export { CouldNotRunReason, FailedRunResult, MJStoredPromptRunner, type StoredPromptRequest, type StoredPromptRun, type StoredPromptRunner } from './reading/PromptRunner.js';
 export { CountMarkedPages, IsEmptyTranscription, MAX_RECOGNIZED_CHARACTERS, NOT_A_SCAN_REASON, PromptTextRecognizer, SCAN_READER_PROMPT } from './reading/PromptTextRecognizer.js';
 export {
     EVIDENCE_READER_PROMPT,

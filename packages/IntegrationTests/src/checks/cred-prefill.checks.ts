@@ -924,6 +924,52 @@ const checks: NamedCheck[] = [
             }
         },
     },
+    {
+        Id: 'cred-prefill.13',
+        Name: 'a reading-committed hook that throws once is run again by the next sweep, which drafts the answer; a further sweep and the boot sweep write nothing',
+        RequiresMutation: true,
+        Fn: async (ctx: IntegrationCheckContext) => {
+            const world = await GetOrLoadWorld(ctx);
+            const fixtures = await registerFixtures(ctx);
+            const scratch = await scratchReadingSubject(ctx, world);
+            const r1 = scratch.StandardIDs.get('R.1');
+            Assert(r1 != null, 'the reading program has R.1');
+            let calls = 0;
+            CredentialingServices.Register({
+                OnReadingCommitted: async (subjectID) => {
+                    calls++;
+                    if (calls === 1) {
+                        throw new Error('The prefill hook was told to fail once.');
+                    }
+                    await PrefillRunner.RunForSubject(subjectID);
+                },
+            });
+            try {
+                await withQueueOn([scratch.SubjectID], async () => {
+                    await uploadAndDrain(fixtures, ctx.Provider, scratch, scratch.Bound, POLICY_TEXT, 'hook-once');
+                    AssertEqual(calls, 1, 'the drain ran the hook once');
+                    AssertEqual((await responseFor(ctx, scratch.ApplicationID, r1)).Status, 'Empty', 'nothing drafted: the hook threw');
+
+                    await ReadingQueue.Sweep();
+                    AssertEqual(calls, 2, 'the sweep ran the hook again');
+                    const drafted = await responseFor(ctx, scratch.ApplicationID, r1);
+                    AssertEqual(drafted.Status, 'Prefilled', 'the sweep drafted the answer');
+                    AssertEqual(drafted.AuthorType, 'Agent', 'drafted by the assistant');
+
+                    await ReadingQueue.Sweep();
+                    AssertEqual(calls, 2, 'a further sweep runs nothing');
+                    await ReadingQueue.Sweep({ AtBoot: true });
+                    AssertEqual(calls, 3, 'the boot sweep runs the hook for the recent reading');
+                    const after = await responseFor(ctx, scratch.ApplicationID, r1);
+                    AssertEqual(toIso(after.__mj_UpdatedAt), toIso(drafted.__mj_UpdatedAt), 'running the hook again wrote nothing');
+                });
+            } finally {
+                CredentialingServices.Register({
+                    OnReadingCommitted: (subjectID) => PrefillRunner.RunForSubject(subjectID),
+                });
+            }
+        },
+    },
 ];
 
 for (const check of checks) {

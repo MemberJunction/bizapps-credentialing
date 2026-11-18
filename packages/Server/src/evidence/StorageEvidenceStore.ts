@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { CompositeKey, LogError, RunView, type IMetadataProvider, type UserInfo } from '@memberjunction/core';
 import type { MJFileEntity, MJFileStorageAccountEntity } from '@memberjunction/core-entities';
-import { FileStorageEngine, StorageObjectKeyOf } from '@memberjunction/storage';
+import { FileStorageEngine, StorageObjectKeyOf, type FileStorageBase } from '@memberjunction/storage';
 import {
     CredentialingServices,
     EVIDENCE_OBJECT_PREFIX,
@@ -13,6 +13,41 @@ const FILES_ENTITY = 'MJ: Files';
 
 /** The `MJ: Files` columns the store reads. */
 type FileRow = Pick<MJFileEntity, 'ID' | 'Name' | 'ProviderID' | 'ProviderKey'>;
+
+/** The two driver calls removal uses. */
+export type EvidenceObjectDriver = Pick<FileStorageBase, 'DeleteObject' | 'ObjectExists'>;
+
+/**
+ * Deletes one stored object and then, only when the object is gone, its row (`deleteRow`). True when
+ * both are gone. `FileStorageBase.DeleteObject` (MJ v6.2.2) returns false on a failure, and the drivers
+ * differ on an object that is already absent: the S3, Google Cloud, Box, Dropbox, Google Drive,
+ * SharePoint and local-disk drivers return true, but Azure's `deleteIfExists` returns false. So a
+ * false answer is checked with `ObjectExists`: an object that no longer exists does not hold its row
+ * back forever; one that still exists keeps its row, so a later sweep tries it again.
+ */
+export async function RemoveEvidenceFile(driver: EvidenceObjectDriver, objectKey: string, deleteRow: () => Promise<void>): Promise<boolean> {
+    if (!(await driver.DeleteObject(objectKey)) && (await driver.ObjectExists(objectKey))) {
+        LogError(`StorageEvidenceStore: the storage provider did not delete ${objectKey}; its MJ: Files row is kept for the next sweep.`);
+        return false;
+    }
+    await deleteRow();
+    return true;
+}
+
+/** Runs `remove` for each candidate, logging one that throws and going on; returns how many were removed. */
+export async function RemoveEachCandidate<T extends { ID: string }>(candidates: readonly T[], remove: (candidate: T) => Promise<boolean>): Promise<number> {
+    let removed = 0;
+    for (const candidate of candidates) {
+        try {
+            if (await remove(candidate)) {
+                removed++;
+            }
+        } catch (err: unknown) {
+            LogError(`StorageEvidenceStore: removing the orphaned file ${candidate.ID} failed: ${err instanceof Error ? err.message : String(err)}`);
+        }
+    }
+    return removed;
+}
 
 /**
  * The server's {@link EvidenceStore}: evidence bytes kept through MJ Storage, on ONE storage account
@@ -79,28 +114,26 @@ export class StorageEvidenceStore implements EvidenceStore {
                 return 0;
             }
             const referenced = new Set([...(await referencedFileIDs(candidates.map((c) => c.ID)))].map((id) => id.toLowerCase()));
-            let removed = 0;
-            for (const file of candidates) {
-                if (!referenced.has(file.ID.toLowerCase()) && (await this.removeOne(file.ID, account, provider, system))) {
-                    removed++;
-                }
-            }
-            return removed;
+            const orphans = candidates.filter((file) => !referenced.has(file.ID.toLowerCase()));
+            return RemoveEachCandidate(orphans, (file) => this.removeOne(file.ID, account, provider, system));
         });
     }
 
-    /** Deletes one evidence object and its `MJ: Files` row; false when the ID names no evidence file of the account. */
+    /**
+     * Deletes one evidence object and, once it is gone, its `MJ: Files` row ({@link RemoveEvidenceFile});
+     * false when the ID names no evidence file of the account or the object is still stored.
+     */
     private async removeOne(fileID: string, account: MJFileStorageAccountEntity, provider: IMetadataProvider, system: UserInfo): Promise<boolean> {
         const file = await provider.GetEntityObject<MJFileEntity>(FILES_ENTITY, system);
         if (!(await file.InnerLoad(CompositeKey.FromID(fileID))) || !StorageEvidenceStore.isEvidenceObject(file, account)) {
             return false;
         }
         const driver = await FileStorageEngine.Instance.GetDriver(account.ID, system);
-        await driver.DeleteObject(StorageObjectKeyOf(file));
-        if (!(await file.Delete())) {
-            throw new Error(`Deleting the MJ: Files row ${fileID} failed: ${file.LatestResult?.CompleteMessage ?? 'unknown error'}`);
-        }
-        return true;
+        return RemoveEvidenceFile(driver, StorageObjectKeyOf(file), async () => {
+            if (!(await file.Delete())) {
+                throw new Error(`Deleting the MJ: Files row ${fileID} failed: ${file.LatestResult?.CompleteMessage ?? 'unknown error'}`);
+            }
+        });
     }
 
     /** The configured account, read as the system user; refreshed once when the cache does not hold it. */

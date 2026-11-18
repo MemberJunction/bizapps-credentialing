@@ -148,6 +148,24 @@ export class DatabaseReadingData implements ReadingData {
         return DatabaseReadingData.documentIDs(filter);
     }
 
+    public FindRecentlyReadSubjects(since: Date, subjectIDs: readonly string[] | null): Promise<string[]> {
+        const drafts = `SELECT a.SubjectID FROM [__mj_BizAppsCredentialing].[vwApplications] a WHERE a.Status = 'Draft'`;
+        const filter =
+            `ReadingStatus IN ('Complete', 'Failed') AND __mj_UpdatedAt >= '${since.toISOString()}' AND SubjectID IN (${drafts})` + subjectClause(subjectIDs);
+        return CredentialingServices.InBackground(async (provider) => {
+            const rows = await readRows<{ SubjectID: string }>(provider, SystemUser.Get(PURPOSE), {
+                EntityName: CredentialingEntity.EvidenceDocument,
+                ExtraFilter: filter,
+                Fields: ['SubjectID'],
+            });
+            const subjects = new Map<string, string>();
+            for (const row of rows) {
+                subjects.set(row.SubjectID.toLowerCase(), row.SubjectID);
+            }
+            return [...subjects.values()];
+        });
+    }
+
     public UnderDocumentLock<T>(documentID: string, work: (scope: DocumentLockScope) => Promise<T>): Promise<T> {
         return CredentialingServices.InBackground((provider) =>
             OperationWrite.Run(provider, async (scope) => {

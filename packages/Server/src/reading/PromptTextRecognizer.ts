@@ -2,7 +2,7 @@ import { LogError, type UserInfo } from '@memberjunction/core';
 import type { ChatMessage, ChatMessageContentBlock } from '@memberjunction/ai';
 import { RecognitionRules } from '@mj-biz-apps/credentialing-core';
 import type { RecognitionResult, TextRecognizer } from '@mj-biz-apps/credentialing-core-entities-server';
-import { CouldNotRunReason, MJStoredPromptRunner, type StoredPromptRunner } from './PromptRunner.js';
+import { FailedRunResult, MJStoredPromptRunner, type StoredPromptRunner } from './PromptRunner.js';
 
 /** The stored prompt that transcribes a scan (`metadata/prompts/.credentialing-reading-prompts.json`). */
 export const SCAN_READER_PROMPT = 'Credentialing: Scan Reader';
@@ -57,7 +57,7 @@ export class PromptTextRecognizer implements TextRecognizer {
         const run = await this.runner.Run(SCAN_READER_PROMPT, { Data: {}, Messages: [PromptTextRecognizer.message(file, kind)] }, contextUser);
         if (run.Kind !== 'Ran') {
             LogError(`Credentialing: recognizing ${file.FileName} could not run: ${run.ErrorMessage}`);
-            return { Kind: 'CouldNotRun', Reason: CouldNotRunReason(run) };
+            return FailedRunResult(run);
         }
         return PromptTextRecognizer.result(run.Text, run.PromptRunID);
     }

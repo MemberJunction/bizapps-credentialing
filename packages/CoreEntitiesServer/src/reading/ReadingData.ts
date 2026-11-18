@@ -108,6 +108,12 @@ export interface ReadingData {
      * attempts and, when `includeCouldNotRun`, every `Could Not Run`.
      */
     FindRequeueable(maxAttempts: number, includeCouldNotRun: boolean, subjectIDs: readonly string[] | null): Promise<string[]>;
+    /**
+     * The subjects that hold a `Draft` application and a document whose reading finished (`Complete`
+     * or `Failed`, which still commits what it found) at or after `since`: the boot-time pass that
+     * re-runs the reading-committed hook a crash may have skipped.
+     */
+    FindRecentlyReadSubjects(since: Date, subjectIDs: readonly string[] | null): Promise<string[]>;
     /** Runs `work` in one short transaction holding the document's lock. */
     UnderDocumentLock<T>(documentID: string, work: (scope: DocumentLockScope) => Promise<T>): Promise<T>;
     /**

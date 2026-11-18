@@ -5,7 +5,7 @@
     "Description": "Verify document response sources, prefill resolution, citations, concurrency, and authorization: staff binds standards to requirements via SaveResponseSources (with isolation, Draft-only, and CloneVersionToDraft propagation), reading drain triggers RunForSubject to prefill or locate with verbatim span citations while leaving Manual untouched, human edits and confirmations are preserved and marked stale when source values change, lost extractions clear Prefilled back to Empty, concurrent SaveResponse and RunForApplication serialize cleanly, no response is ever Confirmed by the runner, and 150-standard prefill completes under the 5 s subject lock budget.",
     "InputDefinition": {},
     "ExpectedOutcomes": {
-      "summary": "All twelve cred-prefill checks pass."
+      "summary": "All thirteen cred-prefill checks pass."
     },
     "Configuration": {
       "tier": "deterministic",

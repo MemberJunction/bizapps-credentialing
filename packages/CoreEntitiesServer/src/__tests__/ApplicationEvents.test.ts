@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import {
     ApplicationEvents,
     ApplicationEventsWorker,
+    IsRedispatchCandidate,
     type ApplicationEventsData,
     type ApplicationSubmittedHandler,
     type DispatchApplicationPatch,
@@ -75,16 +76,7 @@ class MemoryEventsData implements ApplicationEventsData {
         const ids: string[] = [];
         for (const app of this.Apps.values()) {
             if (onlyApplicationIDs != null && !onlyApplicationIDs.includes(app.ID)) continue;
-            if (app.SubmittedAt == null || app.SubmissionDispatchedAt != null) continue;
-            if (app.SubmissionDispatchAttempts >= maxAttempts) continue;
-            if (
-                app.SubmissionDispatchClaimID != null &&
-                app.SubmissionDispatchClaimedAt != null &&
-                app.SubmissionDispatchClaimedAt.getTime() >= staleBefore.getTime()
-            ) {
-                continue;
-            }
-            ids.push(app.ID);
+            if (IsRedispatchCandidate(app, staleBefore, maxAttempts)) ids.push(app.ID);
         }
         return ids;
     }
@@ -209,5 +201,39 @@ describe('ApplicationEventsWorker', () => {
         release.Open();
         expect(await first).toBe('Busy');
         expect(calls).toBe(2);
+    });
+
+    it('a crash during the final attempt still gets the gave-up note from the next Redispatch once the claim is stale', async () => {
+        data.AddSubmitted('APP-1', { SubmissionDispatchAttempts: 4 });
+        const entered = gate();
+        subscribers.push({
+            Name: 'crashes',
+            Handler: async () => {
+                entered.Open();
+                await new Promise<void>(() => undefined);
+            },
+        });
+        void worker.Dispatch('APP-1');
+        await entered.Promise;
+        expect(data.Apps.get('APP-1')!.SubmissionDispatchAttempts).toBe(5);
+        expect(data.Apps.get('APP-1')!.SubmissionDispatchClaimID).not.toBeNull();
+        subscribers.length = 0;
+
+        expect(await worker.Redispatch()).toBe(0);
+        clockNow = new Date(clockNow.getTime() + (ApplicationEvents.ClaimStaleAfterMinutes + 1) * 60_000);
+        expect(await worker.Redispatch()).toBe(1);
+        const stored = data.Apps.get('APP-1')!;
+        expect(stored.SubmissionDispatchNote).toBe('Follow-up work for this submission could not be started. Tell your administrator.');
+        expect(stored.SubmissionDispatchClaimID).toBeNull();
+        expect(stored.SubmissionDispatchedAt).toBeNull();
+        expect(await data.FindPendingRedispatch(new Date(clockNow.getTime() - 15 * 60_000), ApplicationEvents.MaxAttempts, null)).toEqual([]);
+        expect(await worker.Redispatch()).toBe(0);
+    });
+
+    it('a row at the cap with no claim and no note is selected once so the note is written', async () => {
+        data.AddSubmitted('APP-1', { SubmissionDispatchAttempts: 5 });
+        expect(await worker.Redispatch()).toBe(1);
+        expect(data.Apps.get('APP-1')!.SubmissionDispatchNote).not.toBeNull();
+        expect(await worker.Redispatch()).toBe(0);
     });
 });

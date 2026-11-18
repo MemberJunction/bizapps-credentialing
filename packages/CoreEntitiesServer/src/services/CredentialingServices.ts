@@ -54,12 +54,16 @@ export interface EvidenceStore {
 /**
  * What text recognition of a scan gave (Task 9). `Truncated` is true when the transcription was cut
  * at the stored-text limit; `Unreadable` means the model answered but found no text; `CouldNotRun`
- * means no model ran at all (no model or credential, a vendor refusal, a transport failure).
+ * means it cannot run on this server as configured (no model or credential, the prompt not set up, a
+ * file the assistant does not read), so retrying will not help until an administrator acts;
+ * `Failed` means a run was attempted and failed in a way a retry can cure (a rate limit, a timeout,
+ * a vendor or transport error), so the queue retries it.
  */
 export type RecognitionResult =
     | { Kind: 'Recognized'; Text: string; PageCount: number | null; Truncated: boolean; PromptRunID: string | null }
     | { Kind: 'Unreadable'; PromptRunID: string | null }
-    | { Kind: 'CouldNotRun'; Reason: string };
+    | { Kind: 'CouldNotRun'; Reason: string }
+    | { Kind: 'Failed'; Reason: string };
 
 /** Recognizes the text of a scanned PDF or an image (Task 9). */
 export interface TextRecognizer {
@@ -72,11 +76,15 @@ export interface ReadingRequest {
     Standard: { ID: string; Code: string; Statement: string; Guidance: string | null; EvidenceHint: string | null; IntakeMode: 'Locate' | 'Prefill' };
 }
 
-/** What reading one document for one standard gave (Task 9). */
+/**
+ * What reading one document for one standard gave (Task 9). `CouldNotRun` and `Failed` mean what they
+ * mean in {@link RecognitionResult}: no model or setup on this server, versus a failure a retry can cure.
+ */
 export type ReadingResult =
     | { Kind: 'Found'; Value: string; Excerpt: string; PageReference: string | null; HeadingPath: string | null; Confidence: number; Reasoning: string; PromptRunID: string | null }
     | { Kind: 'NothingFound'; PromptRunID: string | null }
-    | { Kind: 'CouldNotRun'; Reason: string };
+    | { Kind: 'CouldNotRun'; Reason: string }
+    | { Kind: 'Failed'; Reason: string };
 
 /** Reads a document for evidence of one standard (Task 9). */
 export interface EvidenceReader {
@@ -106,7 +114,8 @@ export interface RegisteredServices {
     /**
      * Called after the reading queue committed a document's reading, with the subject's ID: the prefill
      * runner registers itself here (Task 10) so a reading drafts answers with no call from the browser.
-     * Optional: with nothing registered, nothing runs. Awaited by the queue; a failure is logged there.
+     * Optional: with nothing registered, nothing runs. Awaited by the queue; a failure is logged there
+     * and the hook is run again for that subject by the queue's next sweep.
      */
     OnReadingCommitted: (subjectID: string) => Promise<void>;
 }
@@ -199,19 +208,15 @@ export class CredentialingServices {
 
     /**
      * Runs the registered {@link RegisteredServices.OnReadingCommitted} hook for `subjectID`. Nothing
-     * registered is not an error; a hook that throws is logged here and never reaches the caller,
-     * whose reading has already committed.
+     * registered is not an error. A hook that throws throws here: the reading queue, whose reading has
+     * already committed, logs it and runs the hook again from its next sweep.
      */
-    public static async NotifyReadingCommitted(subjectID: string): Promise<void> {
+    public static async RunReadingCommitted(subjectID: string): Promise<void> {
         const hook = ServiceStore.Instance.Services.OnReadingCommitted;
         if (hook == null) {
             return;
         }
-        try {
-            await hook(subjectID);
-        } catch (err: unknown) {
-            LogError(`The reading-committed hook failed for subject ${subjectID}: ${err instanceof Error ? err.message : String(err)}`);
-        }
+        await hook(subjectID);
     }
 
     /**

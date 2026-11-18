@@ -58,10 +58,12 @@ export interface ReadingQueueSeams {
     OnlySubjectIDs?: readonly string[];
 }
 
-/** The limits of the queue (`ReadingQueue.StaleAfterMinutes`, `MaxAttempts`). */
+/** The limits of the queue (`ReadingQueue.StaleAfterMinutes`, `MaxAttempts`, `PrefillLookBackMinutes`). */
 export interface ReadingLimits {
     StaleAfterMinutes: number;
     MaxAttempts: number;
+    /** How far back the boot sweep looks for finished readings whose reading-committed hook a crash may have skipped. */
+    PrefillLookBackMinutes: number;
 }
 
 /** What a worker needs; the server's come from `CredentialingServices`, the unit tests' from memory. */
@@ -76,7 +78,10 @@ export interface ReadingWorkerOptions {
     NewClaimID: () => string;
     Seams: ReadingQueueSeams;
     Limits: ReadingLimits;
-    /** Runs after a reading committed (the prefill runner's hook); never throws. */
+    /**
+     * Runs after a reading committed (the prefill runner's hook). When it throws, the worker logs it
+     * and runs it again for that subject from the next sweep, until it succeeds.
+     */
     Committed: (subjectID: string) => Promise<void>;
     /** The sweep steps other parts of the app contribute. */
     SweepSteps: () => readonly SweepStep[];
@@ -105,6 +110,9 @@ type WorkOutcome =
     | { Kind: 'Recognition'; Text: RecognizedTextChange | null; Status: DocumentReadingStatus; Note: string | null }
     | { Kind: 'Read'; Text: RecognizedTextChange | null; ReadText: string; Readings: StandardReading[] };
 
+/** What a committed reading counts as in {@link DrainCounts}. */
+type CommitOutcome = { Kind: 'Discarded' } | { Kind: 'Committed'; Status: DocumentReadingStatus };
+
 /** The writes a commit decided, after dropping what non-Draft applications must not receive. */
 interface CommitPlan {
     Status: DocumentReadingStatus;
@@ -131,6 +139,8 @@ export class ReadingWorker {
     private running: Promise<DrainCounts> | null = null;
     private again = false;
     private sweeping: Promise<void> | null = null;
+    /** Subjects whose reading-committed hook threw, by lower-case ID; the sweep runs the hook for them again. */
+    private readonly hookPending = new Map<string, string>();
 
     public constructor(private readonly options: ReadingWorkerOptions) {}
 
@@ -216,17 +226,32 @@ export class ReadingWorker {
     private async readClaimed(claim: Claim, counts: DrainCounts): Promise<void> {
         try {
             const outcome = await this.work(claim);
-            const committed = outcome.Kind !== 'Lost' && (await this.commit(claim, outcome));
-            if (!committed) {
+            const committed: CommitOutcome = outcome.Kind === 'Lost' ? { Kind: 'Discarded' } : await this.commit(claim, outcome);
+            if (committed.Kind === 'Discarded') {
                 counts.Discarded++;
                 return;
             }
-            counts.Completed++;
-            await this.options.Committed(claim.Document.SubjectID);
+            if (committed.Status === 'Failed') {
+                counts.Failed++;
+            } else {
+                counts.Completed++;
+            }
+            await this.runCommittedHook(claim.Document.SubjectID);
         } catch (err: unknown) {
             LogError(`ReadingQueue: reading document ${claim.Document.ID} failed: ${errorText(err)}`);
             counts.Failed++;
             await this.markFailed(claim);
+        }
+    }
+
+    /** Runs the reading-committed hook; a failure is logged and the subject is kept for the next sweep. */
+    private async runCommittedHook(subjectID: string): Promise<void> {
+        try {
+            await this.options.Committed(subjectID);
+            this.hookPending.delete(subjectID.toLowerCase());
+        } catch (err: unknown) {
+            this.hookPending.set(subjectID.toLowerCase(), subjectID);
+            LogError(`ReadingQueue: the reading-committed hook failed for subject ${subjectID}; the next sweep runs it again: ${errorText(err)}`);
         }
     }
 
@@ -297,12 +322,16 @@ export class ReadingWorker {
                 if (!this.ownsClaim(current, claim)) {
                     return;
                 }
-                const note = current.ReadingAttempts >= this.options.Limits.MaxAttempts ? READING_FAILED_FINAL_NOTE : READING_FAILED_RETRY_NOTE;
-                await scope.Save({ ReadingStatus: 'Failed', ReadingNote: note, ReadingClaimID: null, ReadingClaimedAt: null });
+                await scope.Save({ ReadingStatus: 'Failed', ReadingNote: this.failedNote(current), ReadingClaimID: null, ReadingClaimedAt: null });
             });
         } catch (err: unknown) {
             LogError(`ReadingQueue: recording the failure of document ${claim.Document.ID} failed: ${errorText(err)}`);
         }
+    }
+
+    /** The note of a `Failed` reading: it will be tried again, or (attempts used up) it will not. */
+    private failedNote(document: ReadingDocument): string {
+        return document.ReadingAttempts >= this.options.Limits.MaxAttempts ? READING_FAILED_FINAL_NOTE : READING_FAILED_RETRY_NOTE;
     }
 
     // ─── Work (outside any transaction) ────────────────────────────────────────
@@ -344,6 +373,10 @@ export class ReadingWorker {
         if (result.Kind === 'CouldNotRun') {
             return { Kind: 'Recognition', Text: null, Status: 'Could Not Run', Note: result.Reason };
         }
+        if (result.Kind === 'Failed') {
+            // A failure a retry can cure: the text stays `Awaiting Recognition` and the sweep requeues the document.
+            return { Kind: 'Recognition', Text: null, Status: 'Failed', Note: this.failedNote(document) };
+        }
         const text: RecognizedTextChange = { ExtractedText: null, TextStatus: 'No Text Found', TextNote: NO_TEXT_FOUND_NOTE, PageCount: document.PageCount };
         return { Kind: 'Recognition', Text: text, Status: 'Not Applicable', Note: null };
     }
@@ -370,19 +403,19 @@ export class ReadingWorker {
     /**
      * One short transaction (subject lock, then document lock): discards everything when the claim is
      * no longer this worker's; otherwise writes the scan's text (once), supersedes and inserts the
-     * extractions of applications still in Draft, and sets the final state. True when it wrote.
+     * extractions of applications still in Draft, and sets the final state.
      */
-    private async commit(claim: Claim, outcome: Exclude<WorkOutcome, { Kind: 'Lost' }>): Promise<boolean> {
+    private async commit(claim: Claim, outcome: Exclude<WorkOutcome, { Kind: 'Lost' }>): Promise<CommitOutcome> {
         const document = claim.Document;
         await this.options.Seams.BeforeCommit?.(document.ID);
-        return this.options.Data.Commit(document.SubjectID, document.ID, async (scope) => {
+        return this.options.Data.Commit(document.SubjectID, document.ID, async (scope): Promise<CommitOutcome> => {
             const current = await scope.ReadDocument();
             if (!this.ownsClaim(current, claim)) {
-                return false;
+                return { Kind: 'Discarded' };
             }
-            const plan = outcome.Kind === 'Read' ? await this.planReadings(scope, outcome) : this.planRecognition(outcome);
+            const plan = outcome.Kind === 'Read' ? await this.planReadings(scope, current, outcome) : this.planRecognition(outcome);
             await this.writePlan(scope, current, outcome.Text, plan);
-            return true;
+            return { Kind: 'Committed', Status: plan.Status };
         });
     }
 
@@ -390,18 +423,27 @@ export class ReadingWorker {
         return { Status: outcome.Status, Note: outcome.Note, SupersedeStandardIDs: [], Inserts: [] };
     }
 
-    /** Decides the writes from the readings of applications that are still `Draft`, re-read inside the locks. */
-    private async planReadings(scope: ReadingCommitScope, outcome: Extract<WorkOutcome, { Kind: 'Read' }>): Promise<CommitPlan> {
+    /**
+     * Decides the writes from the readings of applications that are still `Draft`, re-read inside the
+     * locks. Every answered standard (Found or NothingFound) is superseded and its extraction written.
+     * A standard that did not answer keeps its current extraction. The document is `Could Not Run` only
+     * when every read returned `CouldNotRun`; any other unanswered read makes it `Failed`, so the sweep
+     * reads it again (re-reading every standard: an answered one is superseded again, so each standard
+     * keeps exactly one current extraction).
+     */
+    private async planReadings(scope: ReadingCommitScope, current: ReadingDocument, outcome: Extract<WorkOutcome, { Kind: 'Read' }>): Promise<CommitPlan> {
         const applicationIDs = [...new Set(outcome.Readings.map((r) => r.ApplicationID.toLowerCase()))];
         const statuses = applicationIDs.length > 0 ? await scope.ApplicationStatuses(applicationIDs) : new Map<string, ApplicationStatus>();
         const kept = outcome.Readings.filter((r) => statuses.get(r.ApplicationID.toLowerCase()) === 'Draft');
         const plan: CommitPlan = { Status: 'Complete', Note: null, SupersedeStandardIDs: [], Inserts: [] };
         let discarded = 0;
         let couldNotRun: string | null = null;
+        let unanswered = 0;
         for (const reading of kept) {
             const result = reading.Result;
-            if (result.Kind === 'CouldNotRun') {
-                couldNotRun = couldNotRun ?? result.Reason;
+            if (result.Kind === 'CouldNotRun' || result.Kind === 'Failed') {
+                unanswered++;
+                if (result.Kind === 'CouldNotRun') couldNotRun = couldNotRun ?? result.Reason;
                 continue;
             }
             plan.SupersedeStandardIDs.push(reading.StandardID);
@@ -411,8 +453,16 @@ export class ReadingWorker {
                 else plan.Inserts.push(row);
             }
         }
-        plan.Status = couldNotRun != null ? 'Could Not Run' : 'Complete';
-        plan.Note = couldNotRun ?? CompleteReadingNote(plan.Inserts.length, kept.length, discarded);
+        if (couldNotRun != null && kept.every((r) => r.Result.Kind === 'CouldNotRun')) {
+            plan.Status = 'Could Not Run';
+            plan.Note = couldNotRun;
+        } else if (unanswered > 0) {
+            plan.Status = 'Failed';
+            plan.Note = this.failedNote(current);
+        } else {
+            plan.Status = 'Complete';
+            plan.Note = CompleteReadingNote(plan.Inserts.length, kept.length, discarded);
+        }
         return plan;
     }
 
@@ -463,6 +513,7 @@ export class ReadingWorker {
         await this.step('drain', async () => {
             await this.DrainOnce();
         });
+        await this.step('prefill recovery', () => this.recoverCommittedHooks(atBoot));
         for (const step of contributed.filter((s) => s.Phase === 'AfterQueue')) {
             await this.step(step.Name, step.Run);
         }
@@ -473,6 +524,24 @@ export class ReadingWorker {
             await run();
         } catch (err: unknown) {
             LogError(`ReadingQueue: the sweep step "${name}" failed: ${errorText(err)}`);
+        }
+    }
+
+    /**
+     * Runs the reading-committed hook again for every subject whose hook threw and, at boot, for every
+     * subject with a Draft application and a reading finished within `PrefillLookBackMinutes` (a crash
+     * between a commit and its hook leaves no in-memory record). The prefill runner writes nothing for
+     * a row that is already up to date, so running it again is harmless.
+     */
+    private async recoverCommittedHooks(atBoot: boolean): Promise<void> {
+        if (atBoot) {
+            const since = new Date(this.now().getTime() - this.options.Limits.PrefillLookBackMinutes * 60_000);
+            for (const subjectID of await this.options.Data.FindRecentlyReadSubjects(since, this.options.Seams.OnlySubjectIDs ?? null)) {
+                this.hookPending.set(subjectID.toLowerCase(), subjectID);
+            }
+        }
+        for (const subjectID of [...this.hookPending.values()]) {
+            await this.runCommittedHook(subjectID);
         }
     }
 

@@ -80,6 +80,30 @@ export interface ApplicationEventsData {
     ): Promise<string[]>;
 }
 
+/**
+ * Whether `Redispatch` selects an application: submitted, not dispatched, holding no live claim, and
+ * either with attempts left or at the cap without its gave-up note yet (a process that crashed during
+ * the final attempt raised the attempts in `claim()` and never reached `finish()`; `claim()` then
+ * writes the note). {@link ApplicationEventsData.FindPendingRedispatch} applies the same rule in SQL.
+ */
+export function IsRedispatchCandidate(record: DispatchApplicationRecord, staleBefore: Date, maxAttempts: number): boolean {
+    if (record.SubmittedAt == null || record.SubmissionDispatchedAt != null) {
+        return false;
+    }
+    const liveClaim =
+        record.SubmissionDispatchClaimID != null &&
+        record.SubmissionDispatchClaimedAt != null &&
+        record.SubmissionDispatchClaimedAt.getTime() >= staleBefore.getTime();
+    if (liveClaim) {
+        return false;
+    }
+    return (
+        record.SubmissionDispatchAttempts < maxAttempts ||
+        record.SubmissionDispatchClaimID != null ||
+        record.SubmissionDispatchNote !== SUBMISSION_DISPATCH_GAVE_UP_NOTE
+    );
+}
+
 class ApplicationEventsStore extends BaseSingleton<ApplicationEventsStore> {
     public Subscribers: ApplicationSubmittedSubscriber[] = [];
 
@@ -309,9 +333,13 @@ class DatabaseEventsData implements ApplicationEventsData {
                 }
                 idFilter = ` AND ID IN (${onlyApplicationIDs.map((id) => `'${id}'`).join(', ')})`;
             }
+            const gaveUpNote = SUBMISSION_DISPATCH_GAVE_UP_NOTE.replace(/'/g, "''");
+            // The rule of IsRedispatchCandidate: no live claim, and attempts left or (at the cap) the gave-up note not yet written.
             const filter =
-                `SubmittedAt IS NOT NULL AND SubmissionDispatchedAt IS NULL AND SubmissionDispatchAttempts < ${Math.trunc(maxAttempts)}` +
+                `SubmittedAt IS NOT NULL AND SubmissionDispatchedAt IS NULL` +
                 ` AND (SubmissionDispatchClaimID IS NULL OR SubmissionDispatchClaimedAt IS NULL OR SubmissionDispatchClaimedAt < '${staleIso}')` +
+                ` AND (SubmissionDispatchAttempts < ${Math.trunc(maxAttempts)} OR SubmissionDispatchClaimID IS NOT NULL` +
+                ` OR SubmissionDispatchNote IS NULL OR SubmissionDispatchNote <> N'${gaveUpNote}')` +
                 idFilter;
             const res = await RunView.FromMetadataProvider(provider).RunView<{ ID: string }>(
                 {
@@ -364,7 +392,10 @@ export class ApplicationEvents {
         return ApplicationEvents.worker().Dispatch(applicationID);
     }
 
-    /** Dispatches every submitted application whose dispatch has not succeeded or given up and has no live claim. */
+    /**
+     * Dispatches every submitted application whose dispatch has not succeeded and has no live claim,
+     * including one at the attempt cap that has no gave-up note yet (so the note gets written).
+     */
     public static Redispatch(): Promise<number> {
         return ApplicationEvents.worker().Redispatch();
     }

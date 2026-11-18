@@ -130,6 +130,23 @@ describe('PromptEvidenceReader', () => {
         const runner = new ScriptedRunner([{ Kind: 'NoModel', ErrorMessage: 'No suitable model found for prompt X', PromptRunID: null }]);
         expect(await new PromptEvidenceReader(runner).Read(request('t'), user)).toEqual({ Kind: 'CouldNotRun', Reason: 'No AI model is available on this server.' });
     });
+
+    it('a prompt that is not installed is CouldNotRun', async () => {
+        const runner = new ScriptedRunner([{ Kind: 'NotInstalled', ErrorMessage: 'The prompt is not installed or not active.', PromptRunID: null }]);
+        expect(await new PromptEvidenceReader(runner).Read(request('t'), user)).toEqual({ Kind: 'CouldNotRun', Reason: 'The assistant is not set up on this server.' });
+    });
+
+    it('a vendor, rate-limit or transport failure is Failed (retried), not CouldNotRun', async () => {
+        const runner = new ScriptedRunner([{ Kind: 'Failed', ErrorMessage: '429 Too Many Requests', PromptRunID: 'R9' }]);
+        expect(await new PromptEvidenceReader(runner).Read(request('t'), user)).toEqual({ Kind: 'Failed', Reason: 'The assistant service could not be reached.' });
+    });
+
+    it('a transient failure on a later window is Failed', async () => {
+        const nothing: StoredPromptRun = { Kind: 'Ran', Text: '{"found": false, "value": "", "excerpt": "", "page": null, "heading": null, "confidence": 0, "reasoning": "none"}', PromptRunID: 'R1' };
+        const runner = new ScriptedRunner([nothing, { Kind: 'Failed', ErrorMessage: 'socket hang up', PromptRunID: null }]);
+        const result = await new PromptEvidenceReader(runner).Read(request('y'.repeat(300_000)), user);
+        expect(result.Kind).toBe('Failed');
+    });
 });
 
 describe('PromptTextRecognizer', () => {
@@ -178,5 +195,12 @@ describe('PromptTextRecognizer', () => {
         expect(big).toEqual({ Kind: 'CouldNotRun', Reason: 'This scan is too large to be read. Scans of up to 18 MB are read.' });
         expect(await recognizer.Recognize({ ...pdf, ContentType: 'text/plain' }, user)).toEqual({ Kind: 'CouldNotRun', Reason: NOT_A_SCAN_REASON });
         expect(runner.Requests).toHaveLength(0);
+    });
+
+    it('no model is CouldNotRun; a vendor or transport failure is Failed', async () => {
+        const noModel = new ScriptedRunner([{ Kind: 'NoModel', ErrorMessage: 'No suitable model found for prompt X', PromptRunID: null }]);
+        expect(await new PromptTextRecognizer(noModel).Recognize(pdf, user)).toEqual({ Kind: 'CouldNotRun', Reason: 'No AI model is available on this server.' });
+        const failed = new ScriptedRunner([{ Kind: 'Failed', ErrorMessage: 'ETIMEDOUT', PromptRunID: null }]);
+        expect(await new PromptTextRecognizer(failed).Recognize(pdf, user)).toEqual({ Kind: 'Failed', Reason: 'The assistant service could not be reached.' });
     });
 });
