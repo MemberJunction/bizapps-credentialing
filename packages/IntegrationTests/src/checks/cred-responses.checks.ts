@@ -506,7 +506,7 @@ const checks: NamedCheck[] = [
             Assert(narrativeStd != null, 'Narrative standard exists');
             const responseID = await responseIDForStandard(ctx, world.Applicants.SubjectOne.ApplicationID, narrativeStd.ID);
             const submittedAt = new Date('2026-11-17T12:00:00.000Z');
-            const expectedLocked = 'This application was submitted on Nov 17, 2026. Its answers and documents are locked.';
+            const expectedLocked = 'This application was submitted on Nov 17, 2026 (UTC). Its answers and documents are locked.';
 
             try {
                 const initial = await readResponse(ctx, responseID);

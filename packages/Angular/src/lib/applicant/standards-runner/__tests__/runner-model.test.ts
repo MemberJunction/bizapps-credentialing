@@ -247,7 +247,7 @@ describe('runner-model copy and card actions', () => {
         expect(actions.ShowEditButton).toBe(false);
         expect(actions.ShowConfirmButton).toBe(false);
         expect(actions.ApplicationLockedReason).toBe(
-            'This application was submitted on Nov 17, 2026. Its answers and documents are locked.',
+            'This application was submitted on Nov 17, 2026 (UTC). Its answers and documents are locked.',
         );
     });
 });

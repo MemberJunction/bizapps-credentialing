@@ -31,7 +31,7 @@ describe('ApplicantMessages', () => {
         const sentences = [
             'Record not found.',
             'This area is not available to your account.',
-            'This application was submitted on November 17, 2026. Its answers and documents are locked.',
+            'This application was submitted on Nov 17, 2026 (UTC). Its answers and documents are locked.',
             'Write an answer before confirming.',
             STALE,
         ];

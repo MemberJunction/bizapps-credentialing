@@ -167,7 +167,9 @@ export class ResponseRules {
         if (submittedAt != null) {
             return {
                 Allowed: false,
-                Reason: `This application was submitted on ${UTC_DATE_FORMATTER.format(submittedAt)}. Its answers and documents are locked.`,
+                // The same sentence is built by the server and the browser, so the date is UTC and says so:
+                // an evening submission west of UTC falls on the next UTC day.
+                Reason: `This application was submitted on ${UTC_DATE_FORMATTER.format(submittedAt)} (UTC). Its answers and documents are locked.`,
             };
         }
         return {

@@ -10,10 +10,18 @@ const draftResponse: ResponseState = {
 
 const submittedAt = new Date('2026-11-17T12:00:00Z');
 const expectedSubmittedLock =
-    'This application was submitted on Nov 17, 2026. Its answers and documents are locked.';
+    'This application was submitted on Nov 17, 2026 (UTC). Its answers and documents are locked.';
 
 describe('ResponseRules', () => {
     describe('CanEdit', () => {
+        it('names the time zone of the submission date, so a late-evening submission is not read as the wrong day', () => {
+            const lateEvening = new Date('2026-11-18T03:25:00Z');
+            expect(ResponseRules.CanEdit('Submitted', draftResponse, lateEvening)).toEqual({
+                Allowed: false,
+                Reason: 'This application was submitted on Nov 18, 2026 (UTC). Its answers and documents are locked.',
+            });
+        });
+
         it('allows editing an unconfirmed response on a Draft application', () => {
             expect(ResponseRules.CanEdit('Draft', draftResponse, null)).toEqual({ Allowed: true });
         });
