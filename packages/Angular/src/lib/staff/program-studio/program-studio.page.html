@@ -90,6 +90,8 @@
                                                     <bizapps-cred-standard-editor
                                                         [Provider]="Provider"
                                                         [CanAuthor]="View.CanAuthor"
+                                                        [VersionStatus]="SelectedVersion?.Status ?? 'Retired'"
+                                                        [Requirements]="SelectedVersionRequirements"
                                                         [StandardID]="SelectedStandardID"
                                                         [NewStandard]="NewStandard"
                                                         (Saved)="OnStandardSaved($event)"

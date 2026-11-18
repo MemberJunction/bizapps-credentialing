@@ -1,0 +1,449 @@
+<div class="cred-pipeline">
+    <header class="cred-pipeline__header">
+        <div>
+            <h1 class="cred-pipeline__title">Pipeline</h1>
+            <p class="cred-pipeline__subtitle">Applications and applicant invitations for your accrediting organizations.</p>
+        </div>
+        <button mjButton Variant="primary" type="button" (click)="OpenInviteWizard()">
+            <i class="fa-solid fa-envelope-open-text" aria-hidden="true"></i>
+            Invite applicant
+        </button>
+    </header>
+
+    @if (RequestedNotFoundMessage) {
+        <mj-alert Variant="warning" Role="status" [Message]="RequestedNotFoundMessage" [Dismissible]="true" (Dismissed)="RequestedNotFoundMessage = ''"></mj-alert>
+    }
+
+    @if (ReissueError) {
+        <mj-alert Variant="error" [Message]="ReissueError" [Dismissible]="true" (Dismissed)="ReissueError = ''"></mj-alert>
+    }
+
+    <div class="cred-pipeline__filters">
+        <div class="cred-pipeline__filter-item">
+            <label id="cred-pipeline-status-label" class="cred-pipeline__filter-label">Status</label>
+            <mj-dropdown
+                name="StatusFilter"
+                AriaLabelledBy="cred-pipeline-status-label"
+                [Data]="StatusChoices"
+                TextField="Label"
+                ValueField="ID"
+                [ValuePrimitive]="true"
+                [(ngModel)]="StatusFilter">
+            </mj-dropdown>
+        </div>
+        <div class="cred-pipeline__filter-item">
+            <label id="cred-pipeline-program-label" class="cred-pipeline__filter-label">Program</label>
+            <mj-dropdown
+                name="ProgramFilter"
+                AriaLabelledBy="cred-pipeline-program-label"
+                [Data]="ProgramChoices"
+                TextField="Label"
+                ValueField="ID"
+                [ValuePrimitive]="true"
+                [(ngModel)]="ProgramFilter">
+            </mj-dropdown>
+        </div>
+    </div>
+
+    @if (IsLoading) {
+        <mj-loading Text="Loading applications..."></mj-loading>
+    } @else if (ErrorMessage) {
+        <mj-alert Variant="error" Title="Pipeline could not load" [Message]="ErrorMessage"></mj-alert>
+    } @else if (Snapshot.Applications.length === 0) {
+        <mj-empty-state
+            Icon="fa-solid fa-inbox"
+            Title="No applications yet"
+            Message="Invite an applicant to start an application on an active program version.">
+        </mj-empty-state>
+    } @else if (FilteredApplications.length === 0) {
+        <mj-empty-state
+            Icon="fa-solid fa-filter-circle-xmark"
+            Title="No matching applications"
+            Message="No applications match the selected status and program filters.">
+        </mj-empty-state>
+    } @else {
+        <div class="cred-pipeline__table-wrap">
+            <table class="cred-pipeline__table">
+                <thead>
+                    <tr>
+                        <th scope="col">Applicant</th>
+                        <th scope="col">Program &amp; version</th>
+                        <th scope="col">Status</th>
+                        <th scope="col">Submitted</th>
+                        <th scope="col">Contacts</th>
+                        <th scope="col">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @for (row of Page.Items; track row.ID) {
+                        <tr [class.cred-pipeline__row--selected]="SelectedApplication?.ID === row.ID">
+                            <td class="cred-pipeline__subject">{{ row.SubjectName }}</td>
+                            <td>
+                                <span class="cred-pipeline__program">{{ row.ProgramName }}</span>
+                                <span class="cred-pipeline__version">{{ row.VersionLabel }}</span>
+                            </td>
+                            <td>
+                                <span class="cred-pipeline__status">{{ FormatStatus(row.Status) }}</span>
+                            </td>
+                            <td class="cred-pipeline__date">{{ FormatSubmittedDate(row.SubmittedAt) }}</td>
+                            <td>
+                                @if (row.Contacts.length === 0) {
+                                    <span class="cred-pipeline__muted">No contacts</span>
+                                } @else {
+                                    <ul class="cred-pipeline__contacts">
+                                        @for (contact of row.Contacts; track contact.ID) {
+                                            <li class="cred-pipeline__contact-row">
+                                                <span class="cred-pipeline__contact-email">{{ contact.Email }}</span>
+                                                <span class="cred-pipeline__contact-role">({{ contact.ContactRole }})</span>
+                                                <button
+                                                    mjButton
+                                                    Variant="outline"
+                                                    Size="sm"
+                                                    type="button"
+                                                    [disabled]="ReissuingContactID !== null"
+                                                    (click)="Reissue(contact)">
+                                                    @if (ReissuingContactID === contact.ID) {
+                                                        <i class="fa-solid fa-spinner fa-spin" aria-hidden="true"></i>
+                                                    }
+                                                    Send a new link
+                                                </button>
+                                            </li>
+                                        }
+                                    </ul>
+                                }
+                            </td>
+                            <td>
+                                <button
+                                    mjButton
+                                    Variant="outline"
+                                    Size="sm"
+                                    type="button"
+                                    (click)="OpenDetail(row)">
+                                    View answers
+                                </button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        @if (Page.TotalCount > PageSize) {
+            <div class="cred-pipeline__pager" role="navigation" aria-label="Pipeline pagination">
+                <span class="cred-pipeline__pager-summary">
+                    Showing {{ Page.StartIndex }}–{{ Page.EndIndex }} of {{ Page.TotalCount }}
+                </span>
+                <div class="cred-pipeline__pager-actions">
+                    <button mjButton Variant="outline" Size="sm" type="button" [disabled]="Page.PageIndex === 0" (click)="PreviousPage()">
+                        Previous
+                    </button>
+                    <button mjButton Variant="outline" Size="sm" type="button" [disabled]="Page.PageIndex + 1 >= Page.TotalPages" (click)="NextPage()">
+                        Next
+                    </button>
+                </div>
+            </div>
+        }
+    }
+
+    @if (SelectedApplication; as selected) {
+        <section #detailSection class="cred-pipeline__detail" aria-label="Application details">
+            <header class="cred-pipeline__detail-header">
+                <div>
+                    <h2 class="cred-pipeline__detail-title">
+                        {{ selected.SubjectName }} — {{ selected.ProgramName }} ({{ selected.VersionLabel }})
+                    </h2>
+                    @if (DetailWorkspace; as detail) {
+                        <p class="cred-pipeline__subtitle">
+                            Status: {{ FormatStatus(detail.Application.Status) }} · {{ detail.Application.ConfirmedCount }} of {{ detail.Application.StandardCount }} confirmed
+                            @if (detail.Application.SubmittedAt) {
+                                · Submitted on {{ FormatSubmittedDate(detail.Application.SubmittedAt) }}
+                            }
+                        </p>
+                    }
+                </div>
+                <div class="cred-pipeline__detail-actions">
+                    @if (DetailWorkspace && CanWithdraw(DetailWorkspace.Application.Status)) {
+                        <button mjButton Variant="outline" Size="sm" type="button" (click)="OpenWithdrawDialog()">
+                            Withdraw
+                        </button>
+                    }
+                    <button mjButton Variant="outline" Size="sm" type="button" (click)="CloseDetail()">
+                        Close
+                    </button>
+                </div>
+            </header>
+
+            @if (DetailLoading) {
+                <mj-loading Text="Loading answers..."></mj-loading>
+            } @else if (DetailError) {
+                <mj-alert Variant="error" Title="Could not load answers" [Message]="DetailError"></mj-alert>
+            } @else if (DetailWorkspace; as detail) {
+                @if (detail.Application.WithdrawalReason) {
+                    <mj-alert Variant="warning" [Message]="'Withdrawal reason: ' + detail.Application.WithdrawalReason"></mj-alert>
+                }
+                @if (selected.SubmissionDispatchNote) {
+                    <mj-alert Variant="warning" Title="Post-submission processing note" [Message]="selected.SubmissionDispatchNote"></mj-alert>
+                }
+                @if (DetailGate; as gate) {
+                    @if (gate.Application.Status === 'Submitted') {
+                        <section class="cred-pipeline__frozen-summary" aria-label="Submission record">
+                            <h3 class="cred-pipeline__detail-section-title">Documents frozen at submission</h3>
+                            @if (gate.Documents.length === 0) {
+                                <p class="cred-pipeline__muted">No documents or attestations were frozen.</p>
+                            } @else {
+                                <ul class="cred-pipeline__frozen-list">
+                                    @for (doc of gate.Documents; track (doc.EvidenceDocumentID ?? doc.DocumentAttestationID ?? doc.Title)) {
+                                        <li class="cred-pipeline__frozen-item">
+                                            <span class="cred-pipeline__frozen-kind">{{ doc.Kind }}</span>
+                                            <strong>{{ doc.Title }}</strong>
+                                            @if (doc.RequirementName) {
+                                                <span class="cred-pipeline__muted">({{ doc.RequirementName }})</span>
+                                            }
+                                            <span class="cred-pipeline__muted">{{ doc.Detail }}</span>
+                                        </li>
+                                    }
+                                </ul>
+                            }
+                            @if (gate.RecordedAttestation; as att) {
+                                <div class="cred-pipeline__attestation-record">
+                                    <h4 class="cred-pipeline__detail-subsection-title">Governing body attestation</h4>
+                                    <p class="cred-pipeline__muted">
+                                        @if (att.OfficerName && att.OfficerRole) {
+                                            Signed by {{ att.OfficerName }} ({{ att.OfficerRole }})
+                                        }
+                                        @if (att.ApprovalDate) {
+                                            · Approved {{ att.ApprovalDate }}
+                                        }
+                                    </p>
+                                    <p class="cred-pipeline__attestation-statement">{{ gate.AttestationStatement }}</p>
+                                </div>
+                            }
+                        </section>
+                    }
+                }
+
+                <section class="cred-pipeline__detail-docs" aria-label="Application documents">
+                    <h3 class="cred-pipeline__detail-section-title">Documents</h3>
+                    @if (DetailDocumentsError) {
+                        <mj-alert Variant="error" [Message]="DetailDocumentsError"></mj-alert>
+                    } @else {
+                        @if (DetailLedger; as ledger) {
+                            <bizapps-cred-requirement-ledger
+                                [Provider]="ProviderToUse"
+                                [Ledger]="ledger"
+                                [SubjectID]="detail.Application.SubjectID"
+                                [IsApplicant]="false"
+                                [DownloadingDocumentID]="DownloadingDocumentID"
+                                (ViewDocument)="OpenDocumentViewer($event)"
+                                (ViewVersions)="OpenVersions($event)"
+                                (DownloadDocument)="DownloadDocument($event)">
+                            </bizapps-cred-requirement-ledger>
+                        }
+
+                        @if (DetailLibrary && DetailLibrary.General.length > 0) {
+                            <div class="cred-pipeline__general-docs">
+                                <h4 class="cred-pipeline__detail-subsection-title">General uploads</h4>
+                                <ul class="cred-pipeline__general-list">
+                                    @for (doc of DetailLibrary.General; track doc.EvidenceDocumentID) {
+                                        <li class="cred-pipeline__general-item">
+                                            <div>
+                                                <strong>{{ doc.FileName }}</strong>
+                                                <div class="cred-pipeline__muted">
+                                                    Uploaded {{ FormatDocumentDate(doc.UploadedAt) }} · {{ doc.Status }} · {{ WhatWasRead(doc) }}
+                                                </div>
+                                            </div>
+                                            <div class="cred-pipeline__detail-actions">
+                                                <button mjButton Variant="outline" Size="sm" type="button" (click)="OpenDocumentViewer(doc)">
+                                                    View
+                                                </button>
+                                                <button mjButton Variant="outline" Size="sm" type="button" (click)="OpenVersions(doc)">
+                                                    Versions ({{ doc.Versions.length }})
+                                                </button>
+                                                <button
+                                                    mjButton
+                                                    Variant="outline"
+                                                    Size="sm"
+                                                    type="button"
+                                                    [disabled]="DownloadingDocumentID !== null"
+                                                    (click)="DownloadDocument(doc)">
+                                                    {{ DownloadingDocumentID === doc.EvidenceDocumentID ? 'Downloading...' : 'Download original' }}
+                                                </button>
+                                            </div>
+                                        </li>
+                                    }
+                                </ul>
+                            </div>
+                        }
+                    }
+                </section>
+
+                @for (section of detail.Sections; track section.SectionID) {
+                    <div class="cred-pipeline__detail-section">
+                        <h3 class="cred-pipeline__detail-section-title">{{ section.Number }}. {{ section.Name }}</h3>
+                        <ul class="cred-pipeline__detail-standards">
+                            @for (std of section.Standards; track std.StandardID) {
+                                <li class="cred-pipeline__detail-card">
+                                    <div class="cred-pipeline__detail-std-head">
+                                        <strong>{{ std.Code }}</strong>
+                                        <span class="cred-pipeline__status">{{ FormatResponseState(std.Response.Status) }}</span>
+                                    </div>
+                                    <p class="cred-pipeline__detail-statement">{{ std.Statement }}</p>
+                                    @if (std.Response.ResponseText) {
+                                        <p class="cred-pipeline__detail-answer">{{ std.Response.ResponseText }}</p>
+                                    } @else {
+                                        <p class="cred-pipeline__muted">No written answer.</p>
+                                    }
+                                    <p class="cred-pipeline__muted">
+                                        Self-assessment: {{ std.Response.SelfAssessment ?? 'Not selected' }}
+                                        @if (std.Response.ConfirmedByName && std.Response.ConfirmedAt) {
+                                            · Confirmed by {{ std.Response.ConfirmedByName }} on {{ FormatSubmittedDate(std.Response.ConfirmedAt) }}
+                                        }
+                                    </p>
+                                    @if (std.Response.ReopenReason) {
+                                        <p class="cred-pipeline__muted">Reopen reason: {{ std.Response.ReopenReason }}</p>
+                                    }
+                                    @if (std.Response.Citations.length > 0) {
+                                        <div class="cred-pipeline__detail-citations">
+                                            @for (citation of std.Response.Citations; track citation.CitationID) {
+                                                <button
+                                                    type="button"
+                                                    class="cred-pipeline__citation-btn"
+                                                    (click)="OpenCitationViewer(citation)">
+                                                    {{ citation.SourceLabel }}
+                                                    @if (citation.PageReference) {
+                                                        ({{ citation.PageReference }})
+                                                    }
+                                                </button>
+                                            }
+                                        </div>
+                                    }
+                                    @if (CanReopen(detail.Application.Status, std.Response.Status)) {
+                                        <div class="cred-pipeline__detail-std-actions">
+                                            <button
+                                                mjButton
+                                                Variant="outline"
+                                                Size="sm"
+                                                type="button"
+                                                (click)="OpenReopenDialog(std)">
+                                                Reopen answer
+                                            </button>
+                                        </div>
+                                    }
+                                </li>
+                            }
+                        </ul>
+                    </div>
+                }
+            }
+        </section>
+    }
+
+    <bizapps-cred-invite-wizard
+        [Provider]="ProviderToUse"
+        [Visible]="InviteDialogOpen"
+        [Targets]="Snapshot.ActiveTargets"
+        [Subjects]="Snapshot.Subjects"
+        (Closed)="CloseInviteWizard()"
+        (Invited)="OnInvited($event)">
+    </bizapps-cred-invite-wizard>
+
+    <mj-dialog [Visible]="ReissueDialogOpen" Title="New invitation link" Size="md" (Close)="CloseReissueDialog()">
+        <div class="cred-pipeline__reissue-body">
+            @if (ReissueOutcome) {
+                <mj-alert
+                    [Variant]="ReissueOutcome.InvitationUrl || !ReissueOutcome.Note ? 'success' : 'warning'"
+                    [Message]="ReissueOutcome.PrimaryMessage">
+                </mj-alert>
+                @if (ReissueOutcome.InvitationUrl) {
+                    <div class="cred-pipeline__copy-row">
+                        <input
+                            id="cred-pipeline-reissue-url"
+                            type="text"
+                            class="mj-input cred-pipeline__url-input"
+                            aria-label="New invitation link"
+                            [value]="ReissueOutcome.InvitationUrl"
+                            readonly />
+                        <button mjButton Variant="primary" Size="sm" type="button" (click)="CopyReissueLink()">
+                            {{ ReissueCopied ? 'Copied' : 'Copy link' }}
+                        </button>
+                    </div>
+                }
+            }
+        </div>
+        <mj-dialog-actions>
+            <button mjButton Variant="primary" type="button" (click)="CloseReissueDialog()">Done</button>
+        </mj-dialog-actions>
+    </mj-dialog>
+
+    <mj-dialog [Visible]="ReopenDialogOpen" Title="Reopen answer" Size="md" (Close)="CloseReopenDialog()">
+        <div class="cred-pipeline__reissue-body">
+            @if (ReopenTarget) {
+                <p class="cred-pipeline__subtitle">
+                    Reopening <strong>{{ ReopenTarget.Code }}</strong> returns it to Drafted so the applicant can edit and confirm again.
+                </p>
+            }
+            <label for="cred-pipeline-reopen-reason" class="cred-pipeline__filter-label">Reason</label>
+            <textarea
+                id="cred-pipeline-reopen-reason"
+                class="mj-input cred-pipeline__textarea"
+                rows="3"
+                [disabled]="IsReopening"
+                [(ngModel)]="ReopenReason"></textarea>
+            @if (ReopenError) {
+                <mj-alert Variant="error" [Message]="ReopenError"></mj-alert>
+            }
+        </div>
+        <mj-dialog-actions>
+            <button mjButton Variant="primary" type="button" [disabled]="IsReopening" (click)="ConfirmReopen()">
+                {{ IsReopening ? 'Reopening...' : 'Reopen answer' }}
+            </button>
+            <button mjButton Variant="outline" type="button" [disabled]="IsReopening" (click)="CloseReopenDialog()">
+                Cancel
+            </button>
+        </mj-dialog-actions>
+    </mj-dialog>
+
+    <mj-dialog [Visible]="WithdrawDialogOpen" Title="Withdraw application" Size="md" (Close)="CloseWithdrawDialog()">
+        <div class="cred-pipeline__reissue-body">
+            <p class="cred-pipeline__subtitle">
+                Withdrawing closes this application and records your reason.
+            </p>
+            <label for="cred-pipeline-withdraw-reason" class="cred-pipeline__filter-label">Reason</label>
+            <textarea
+                id="cred-pipeline-withdraw-reason"
+                class="mj-input cred-pipeline__textarea"
+                rows="3"
+                [disabled]="IsWithdrawing"
+                [(ngModel)]="WithdrawReason"></textarea>
+            @if (WithdrawError) {
+                <mj-alert Variant="error" [Message]="WithdrawError"></mj-alert>
+            }
+        </div>
+        <mj-dialog-actions>
+            <button mjButton Variant="primary" type="button" [disabled]="IsWithdrawing" (click)="ConfirmWithdraw()">
+                {{ IsWithdrawing ? 'Withdrawing...' : 'Withdraw' }}
+            </button>
+            <button mjButton Variant="outline" type="button" [disabled]="IsWithdrawing" (click)="CloseWithdrawDialog()">
+                Cancel
+            </button>
+        </mj-dialog-actions>
+    </mj-dialog>
+
+    <bizapps-cred-document-viewer
+        [Provider]="ProviderToUse"
+        [DocumentID]="ViewerDocumentID"
+        [FileNameHint]="ViewerFileName"
+        [ContentTypeHint]="ViewerContentType"
+        [Citation]="ViewerCitation"
+        [InitialTab]="ViewerInitialTab"
+        [Visible]="ViewerOpen"
+        (Closed)="CloseViewer()">
+    </bizapps-cred-document-viewer>
+
+    <bizapps-cred-version-history
+        [Provider]="ProviderToUse"
+        [Document]="VersionsDocument"
+        [Visible]="VersionsOpen"
+        (Closed)="CloseVersions()">
+    </bizapps-cred-version-history>
+</div>

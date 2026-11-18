@@ -25,7 +25,7 @@ import { DocumentRequirementsComponent } from './document-requirements.component
 import { ProgramListComponent } from './program-list.component';
 import { ProgramWizardComponent, type WizardOrganization } from './program-wizard.component';
 import { StandardEditorComponent, type NewStandardTarget } from './standard-editor.component';
-import { StudioData, type CommitteeRow, type ProgramBundle } from './studio-data';
+import { StudioData, type CommitteeRow, type ProgramBundle, type RequirementRow } from './studio-data';
 import { StudioTree } from './studio-tree';
 import { StudioUrl } from './studio-url';
 import { StudioViewModel, type StudioVersionView } from './studio-view-model';
@@ -140,6 +140,11 @@ export class ProgramStudioPage extends BaseAngularComponent {
 
     public get VersionChoices(): { ID: string; Text: string }[] {
         return (this.Bundle?.Versions ?? []).map((v) => ({ ID: v.ID, Text: `${v.Label} (${v.Status})` }));
+    }
+
+    public get SelectedVersionRequirements(): RequirementRow[] {
+        if (!this.Bundle || !this.SelectedVersionID) return [];
+        return StudioTree.Requirements(this.SelectedVersionID, this.Bundle.Requirements);
     }
 
     // ---- Events from the widgets ---------------------------------------------------------------

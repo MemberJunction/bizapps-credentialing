@@ -28,8 +28,10 @@ const ALL_BUNDLES = [
     'cred-smoke',
     'cred-schema',
     'cred-operations-wire',
+    'cred-invite-wire',
     'cred-world',
     'cred-users',
+    'cred-evidence',
 ];
 
 /** Bundles registered inside another bundle's `.checks.js` module. */
@@ -46,6 +48,11 @@ const SERVER_ONLY_BUNDLES = {
     'cred-standard-rules': 'CRD-03 - Standard rules',
     'cred-operations': 'CRD-04 - Operations',
     'cred-isolation': 'CRD-05 - Isolation',
+    'cred-invite': 'CRD-09 - Invitations',
+    'cred-evidence-rules': 'CRD-11 - Evidence',
+    'cred-reader': 'CRD-12 - Reader',
+    'cred-prefill': 'CRD-13 - Prefill',
+    'cred-submission': 'CRD-14 - Submission',
 };
 
 const args = process.argv.slice(2);

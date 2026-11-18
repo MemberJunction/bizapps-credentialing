@@ -5,7 +5,10 @@
  * cannot be bypassed: ownership fields that never change, the version lifecycle, one Draft per
  * program, unique labels, codes and requirement names, and tree edits only on a Draft. Writes under a
  * program version run under transaction-owned authoring locks (guards/AuthoringLock.ts) so a rule
- * checked in validation still holds when the row is written.
+ * checked in validation still holds when the row is written. The nine applicant-data entities are
+ * written only inside the application's own operations (guards/OperationWrite.ts); every other save
+ * or delete of them is refused. Services that need packages beyond this one's dependencies are
+ * reached through the registry `services/CredentialingServices.ts`, filled by the Server package.
  *
  * Client code must never import this package; it is a dependency of the Server package only. The
  * sibling entity package is an exact-pinned dependency (all app packages version together); every
@@ -18,11 +21,40 @@ import { ProgramEntityServer } from './ProgramEntityServer.js';
 import { ProgramVersionEntityServer } from './ProgramVersionEntityServer.js';
 import { SectionEntityServer } from './SectionEntityServer.js';
 import { StandardEntityServer } from './StandardEntityServer.js';
+import { SubjectEntityServer } from './SubjectEntityServer.js';
+import { SubjectContactEntityServer } from './SubjectContactEntityServer.js';
+import { ApplicationEntityServer } from './ApplicationEntityServer.js';
+import { StandardResponseEntityServer } from './StandardResponseEntityServer.js';
+import { ResponseCitationEntityServer } from './ResponseCitationEntityServer.js';
+import { EvidenceDocumentEntityServer } from './EvidenceDocumentEntityServer.js';
+import { DocumentAttestationEntityServer } from './DocumentAttestationEntityServer.js';
+import { ApplicationDocumentEntityServer } from './ApplicationDocumentEntityServer.js';
+import { ExtractionEntityServer } from './ExtractionEntityServer.js';
+import { ResponseSourceEntityServer } from './ResponseSourceEntityServer.js';
 import { CloneVersionToDraftServerOperation } from './operations/CloneVersionToDraftServerOperation.js';
 import { CreateCommitteeServerOperation } from './operations/CreateCommitteeServerOperation.js';
 import { CreateOrganizationServerOperation } from './operations/CreateOrganizationServerOperation.js';
 import { CreateProgramServerOperation } from './operations/CreateProgramServerOperation.js';
+import { InviteApplicantServerOperation } from './operations/InviteApplicantServerOperation.js';
+import { ReissueInvitationServerOperation } from './operations/ReissueInvitationServerOperation.js';
 import { ReorderVersionTreeServerOperation } from './operations/ReorderVersionTreeServerOperation.js';
+import { GetMySubjectsServerOperation } from './operations/GetMySubjectsServerOperation.js';
+import { GetApplicationWorkspaceServerOperation } from './operations/GetApplicationWorkspaceServerOperation.js';
+import { SaveResponseServerOperation } from './operations/SaveResponseServerOperation.js';
+import { ConfirmResponseServerOperation } from './operations/ConfirmResponseServerOperation.js';
+import { ReopenResponseServerOperation } from './operations/ReopenResponseServerOperation.js';
+import { WithdrawApplicationServerOperation } from './operations/WithdrawApplicationServerOperation.js';
+import { AttestInLieuServerOperation } from './operations/AttestInLieuServerOperation.js';
+import { ConfirmDocumentCurrentServerOperation } from './operations/ConfirmDocumentCurrentServerOperation.js';
+import { GetDocumentLibraryServerOperation } from './operations/GetDocumentLibraryServerOperation.js';
+import { RequeueReadingServerOperation } from './operations/RequeueReadingServerOperation.js';
+import { SaveResponseSourcesServerOperation } from './operations/SaveResponseSourcesServerOperation.js';
+import { RefreshPrefillsServerOperation } from './operations/RefreshPrefillsServerOperation.js';
+import { GetSubmissionGateServerOperation } from './operations/GetSubmissionGateServerOperation.js';
+import { SubmitApplicationServerOperation } from './operations/SubmitApplicationServerOperation.js';
+import { ApplicationEvents } from './events/ApplicationEvents.js';
+import { PrefillRunner } from './prefill/PrefillRunner.js';
+import { CredentialingServices } from './services/CredentialingServices.js';
 
 export {
     AccreditingOrganizationEntityServer,
@@ -35,7 +67,44 @@ export { ProgramEntityServer } from './ProgramEntityServer.js';
 export { ProgramVersionEntityServer } from './ProgramVersionEntityServer.js';
 export { SectionEntityServer } from './SectionEntityServer.js';
 export { StandardEntityServer } from './StandardEntityServer.js';
-export { AuthoringLock } from './guards/AuthoringLock.js';
+export { SubjectEntityServer } from './SubjectEntityServer.js';
+export { SubjectContactEntityServer } from './SubjectContactEntityServer.js';
+export { ApplicationEntityServer } from './ApplicationEntityServer.js';
+export { StandardResponseEntityServer } from './StandardResponseEntityServer.js';
+export { ResponseCitationEntityServer } from './ResponseCitationEntityServer.js';
+export { EvidenceDocumentEntityServer } from './EvidenceDocumentEntityServer.js';
+export { DocumentAttestationEntityServer } from './DocumentAttestationEntityServer.js';
+export { ApplicationDocumentEntityServer } from './ApplicationDocumentEntityServer.js';
+export { ExtractionEntityServer } from './ExtractionEntityServer.js';
+export { ResponseSourceEntityServer } from './ResponseSourceEntityServer.js';
+export {
+    AuthoringLock,
+    APPLICATION_LOCK_BUSY_REASON,
+    AUTHORING_LOCK_BUSY_REASON,
+    LOCK_TIMEOUT_MS,
+    USER_EMAIL_LOCK_BUSY_REASON,
+} from './guards/AuthoringLock.js';
+export { OperationWrite, OPERATION_ONLY_REASON, type OperationWriteScope } from './guards/OperationWrite.js';
+export { ApplicantRow, APPLICANT_ROW_NOT_SAVED_REASON } from './guards/ApplicantRow.js';
+export { SubjectAccess, type ApplicationAccess, type DocumentAccess, type ResponseAccess } from './guards/SubjectAccess.js';
+export {
+    CredentialingServices,
+    ServiceNotRegisteredReason,
+    type EvidenceReader,
+    type EvidenceStore,
+    type ExtractableKind,
+    type ExtractedText,
+    type InvitationIssuer,
+    type IsolatedProviderFactory,
+    type ReadingRequest,
+    type ReadingResult,
+    type RecognitionResult,
+    type RegisteredServices,
+    type StaffNotifier,
+    type SweepStep,
+    type TextExtractor,
+    type TextRecognizer,
+} from './services/CredentialingServices.js';
 export { SystemUser } from './guards/SystemUser.js';
 export { LockedWrite, type WriteKind } from './guards/LockedWrite.js';
 export {
@@ -58,6 +127,89 @@ export {
     ORGANIZATION_NAME_REQUIRED_REASON,
     STAFF_EMAIL_REQUIRED_REASON,
 } from './operations/CreateOrganizationServerOperation.js';
+export { InviteApplicantServerOperation } from './operations/InviteApplicantServerOperation.js';
+export { ReissueInvitationServerOperation } from './operations/ReissueInvitationServerOperation.js';
+export { INTERNAL_ACCOUNT_REASON, INVITATION_LINK_FAILED_NOTE } from './operations/InvitationSupport.js';
+export { GetMySubjectsServerOperation } from './operations/GetMySubjectsServerOperation.js';
+export { GetApplicationWorkspaceServerOperation } from './operations/GetApplicationWorkspaceServerOperation.js';
+export { SaveResponseServerOperation } from './operations/SaveResponseServerOperation.js';
+export { ConfirmResponseServerOperation } from './operations/ConfirmResponseServerOperation.js';
+export { ReopenResponseServerOperation } from './operations/ReopenResponseServerOperation.js';
+export { WithdrawApplicationServerOperation } from './operations/WithdrawApplicationServerOperation.js';
+export { AttestInLieuServerOperation } from './operations/AttestInLieuServerOperation.js';
+export { ConfirmDocumentCurrentServerOperation } from './operations/ConfirmDocumentCurrentServerOperation.js';
+export { GetDocumentLibraryServerOperation } from './operations/GetDocumentLibraryServerOperation.js';
+export { RequeueReadingServerOperation } from './operations/RequeueReadingServerOperation.js';
+export { SaveResponseSourcesServerOperation } from './operations/SaveResponseSourcesServerOperation.js';
+export { RefreshPrefillsServerOperation } from './operations/RefreshPrefillsServerOperation.js';
+export { GetSubmissionGateServerOperation } from './operations/GetSubmissionGateServerOperation.js';
+export { SubmitApplicationServerOperation } from './operations/SubmitApplicationServerOperation.js';
+export {
+    ApplicationEvents,
+    type ApplicationEventsSeams,
+    type ApplicationSubmittedEvent,
+    type ApplicationSubmittedHandler,
+    type DispatchResult,
+} from './events/ApplicationEvents.js';
+export {
+    DocumentExtractionEvaluator,
+    type PrefillContext,
+    type ResponseSourceRow,
+    type SourceEvaluator,
+} from './prefill/SourceEvaluators.js';
+export {
+    PrefillRunner,
+    PrefillWorker,
+    type PrefillApplicationRecord,
+    type PrefillCitationRecord,
+    type PrefillData,
+    type PrefillLoadedState,
+    type PrefillResponseRecord,
+    type PrefillSeams,
+    type PrefillTransactionScope,
+} from './prefill/PrefillRunner.js';
+export { ReadingQueue, ORPHAN_FILE_MINUTES } from './reading/ReadingQueue.js';
+export {
+    ReadingWorker,
+    CompleteReadingNote,
+    NO_TEXT_FOUND_NOTE,
+    READING_FAILED_FINAL_NOTE,
+    READING_FAILED_RETRY_NOTE,
+    RECOGNIZED_TEXT_NOTE,
+    RECOGNIZED_TRUNCATED_NOTE,
+    type DrainCounts,
+    type ReadingLimits,
+    type ReadingQueueSeams,
+    type ReadingWorkerOptions,
+} from './reading/ReadingWorker.js';
+export { DatabaseReadingData } from './reading/DatabaseReadingData.js';
+export type {
+    DocumentLockScope,
+    DocumentReadingStatus,
+    DocumentTextStatus,
+    NewExtraction,
+    ReadingCommitScope,
+    ReadingData,
+    ReadingDocument,
+    ReadingStateChange,
+    RecognizedTextChange,
+    StandardToRead,
+} from './reading/ReadingData.js';
+export {
+    EvidenceIntake,
+    EvidenceRefusal,
+    EVIDENCE_OBJECT_PREFIX,
+    type AcceptedEvidence,
+    type CurrentDocumentState,
+    type EvidenceIntakeData,
+    type EvidenceIntakeSeams,
+    type EvidenceIntakeTransaction,
+    type EvidenceRefusalKind,
+    type EvidenceUpload,
+    type NewEvidenceRow,
+} from './evidence/EvidenceIntake.js';
+export { DatabaseEvidenceIntakeData } from './evidence/EvidenceIntakeData.js';
+export { DocumentFreeze, type FrozenTarget } from './evidence/DocumentFreeze.js';
 
 /**
  * Bootstrap / anti-tree-shaking anchor, called by the server bootstrap. Referencing the classes keeps
@@ -75,6 +227,16 @@ export function LoadBizAppsCredentialingEntitiesServer(): void {
         SectionEntityServer,
         StandardEntityServer,
         DocumentRequirementEntityServer,
+        SubjectEntityServer,
+        SubjectContactEntityServer,
+        ApplicationEntityServer,
+        StandardResponseEntityServer,
+        ResponseCitationEntityServer,
+        EvidenceDocumentEntityServer,
+        DocumentAttestationEntityServer,
+        ApplicationDocumentEntityServer,
+        ExtractionEntityServer,
+        ResponseSourceEntityServer,
     ];
     const operations = [
         CreateProgramServerOperation,
@@ -82,8 +244,34 @@ export function LoadBizAppsCredentialingEntitiesServer(): void {
         ReorderVersionTreeServerOperation,
         CreateOrganizationServerOperation,
         CreateCommitteeServerOperation,
+        InviteApplicantServerOperation,
+        ReissueInvitationServerOperation,
+        GetMySubjectsServerOperation,
+        GetApplicationWorkspaceServerOperation,
+        SaveResponseServerOperation,
+        ConfirmResponseServerOperation,
+        ReopenResponseServerOperation,
+        WithdrawApplicationServerOperation,
+        AttestInLieuServerOperation,
+        ConfirmDocumentCurrentServerOperation,
+        GetDocumentLibraryServerOperation,
+        RequeueReadingServerOperation,
+        SaveResponseSourcesServerOperation,
+        RefreshPrefillsServerOperation,
+        GetSubmissionGateServerOperation,
+        SubmitApplicationServerOperation,
     ];
-    if (anchor.length !== 7 || operations.length !== 5) {
+    if (anchor.length !== 17 || operations.length !== 21) {
         throw new Error('credentialing server entity subclasses or operations missing');
     }
+    CredentialingServices.Register({
+        OnReadingCommitted: (subjectID) => PrefillRunner.RunForSubject(subjectID),
+    });
+    CredentialingServices.AddSweepStep({
+        Name: 'ApplicationEvents.Redispatch',
+        Phase: 'BeforeQueue',
+        Run: async () => {
+            await ApplicationEvents.Redispatch();
+        },
+    });
 }

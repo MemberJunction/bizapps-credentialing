@@ -1,0 +1,24 @@
+{
+  "fields": {
+    "TypeID": "@lookup:MJ: Test Types.Name=Integration Test",
+    "Name": "CRD-15 - Applicant world",
+    "Description": "Verify the B2 applicant world shape (subjects across OrgA and OrgB, Common party records, contacts, roles, Active versions, Draft applications, response sources) and idempotent reload.",
+    "InputDefinition": {},
+    "ExpectedOutcomes": {
+      "summary": "Both cred-applicant-world checks pass with 0 new rows on reload."
+    },
+    "Configuration": {
+      "tier": "deterministic",
+      "transport": "server",
+      "checks": [
+        {
+          "type": "cred-applicant-world"
+        }
+      ]
+    },
+    "Status": "Active"
+  },
+  "primaryKey": {
+    "ID": "01469955-CFFE-4663-B9E1-7FBE332CBA21"
+  }
+}

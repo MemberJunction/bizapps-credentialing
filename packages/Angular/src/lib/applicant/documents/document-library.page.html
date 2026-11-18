@@ -1,0 +1,199 @@
+<div class="cred-docs">
+    @if (Subject; as subject) {
+        <header class="cred-docs__header">
+            <div>
+                <h1 class="cred-docs__title">Document Library</h1>
+                <p class="cred-docs__subtitle">
+                    {{ subject.DisplayName }} · Documents you upload belong to your record and are reused across applications.
+                </p>
+            </div>
+        </header>
+
+        @if (ActionSuccessMessage) {
+            <mj-alert
+                Variant="success"
+                [Message]="ActionSuccessMessage"
+                [Dismissible]="true"
+                (Dismissed)="ActionSuccessMessage = ''">
+            </mj-alert>
+        }
+
+        @if (ActionErrorMessage) {
+            <mj-alert
+                Variant="error"
+                [Message]="ActionErrorMessage"
+                [Dismissible]="true"
+                (Dismissed)="ActionErrorMessage = ''">
+            </mj-alert>
+        }
+
+        @if (IsLoading && !Library) {
+            <mj-loading Text="Loading documents..."></mj-loading>
+        } @else if (ErrorMessage) {
+            <mj-alert Variant="error" Title="Documents could not load" [Message]="ErrorMessage"></mj-alert>
+        } @else if (Library; as lib) {
+            @for (ledger of lib.Ledgers; track ledger.ApplicationID) {
+                <bizapps-cred-requirement-ledger
+                    [Provider]="ProviderToUse"
+                    [Ledger]="ledger"
+                    [SubjectID]="subject.SubjectID"
+                    [IsApplicant]="true"
+                    [ActiveUploadRequirementID]="ActiveUploadRequirementID"
+                    [ConfirmingDocumentID]="ConfirmingDocumentID"
+                    [DownloadingDocumentID]="DownloadingDocumentID"
+                    [RequeueingDocumentID]="RequeueingDocumentID"
+                    (ReadAgain)="OnReadAgain($event)"
+                    (ToggleUpload)="OnToggleUpload($event)"
+                    (Uploaded)="OnUploaded($event)"
+                    (StillCurrent)="OnStillCurrent($event)"
+                    (ViewDocument)="OpenViewer($event)"
+                    (ViewVersions)="OpenVersions($event)"
+                    (DownloadDocument)="DownloadDocument($event)"
+                    (OpenAttest)="OpenAttestDialog($event)">
+                </bizapps-cred-requirement-ledger>
+            }
+
+            <section class="cred-docs__general" aria-labelledby="cred-docs-general-heading">
+                <header class="cred-docs__general-header">
+                    <div>
+                        <h2 id="cred-docs-general-heading" class="cred-docs__general-title">General uploads</h2>
+                        <p class="cred-docs__subtitle">Supporting evidence not tied to a single requirement.</p>
+                    </div>
+                </header>
+
+                <bizapps-cred-upload-dropzone
+                    [Provider]="ProviderToUse"
+                    [SubjectID]="subject.SubjectID"
+                    [RequirementID]="null"
+                    Label="Upload a general supporting document"
+                    (Uploaded)="OnUploaded($event)">
+                </bizapps-cred-upload-dropzone>
+
+                @if (lib.General.length === 0) {
+                    <mj-empty-state
+                        Icon="fa-solid fa-folder-open"
+                        Message="No general uploads yet."
+                        Role="status">
+                    </mj-empty-state>
+                } @else {
+                    <div class="cred-docs__table-wrap">
+                        <table class="cred-docs__table">
+                            <thead>
+                                <tr>
+                                    <th scope="col">Document on file</th>
+                                    <th scope="col">Uploaded</th>
+                                    <th scope="col">Status</th>
+                                    <th scope="col">What the assistant read</th>
+                                    <th scope="col">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @for (doc of lib.General; track doc.EvidenceDocumentID) {
+                                    <tr>
+                                        <td>
+                                            <div class="cred-docs__file-name">{{ doc.FileName }}</div>
+                                            @if (doc.TextNote) {
+                                                <p class="cred-docs__subnote">{{ doc.TextNote }}</p>
+                                            }
+                                        </td>
+                                        <td>{{ FormatDate(doc.UploadedAt) }}</td>
+                                        <td><span class="cred-docs__status">{{ doc.Status }}</span></td>
+                                        <td>{{ WhatWasRead(doc) }}</td>
+                                        <td>
+                                            <div class="cred-docs__actions">
+                                                @if (CanReadAgain(doc)) {
+                                                    <button
+                                                        mjButton
+                                                        Variant="primary"
+                                                        type="button"
+                                                        [disabled]="RequeueingDocumentID !== null"
+                                                        (click)="OnReadAgain(doc)">
+                                                        {{ RequeueingDocumentID === doc.EvidenceDocumentID ? 'Asking...' : 'Read again' }}
+                                                    </button>
+                                                }
+                                                <button mjButton Variant="outline" type="button" (click)="OpenViewer(doc)">
+                                                    View
+                                                </button>
+                                                <button mjButton Variant="outline" type="button" (click)="OpenVersions(doc)">
+                                                    Versions ({{ doc.Versions.length }})
+                                                </button>
+                                                <button
+                                                    mjButton
+                                                    Variant="outline"
+                                                    type="button"
+                                                    [disabled]="DownloadingDocumentID !== null"
+                                                    (click)="DownloadDocument(doc)">
+                                                    {{ DownloadingDocumentID === doc.EvidenceDocumentID ? 'Downloading...' : 'Download original' }}
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </section>
+        }
+    }
+
+    <bizapps-cred-document-viewer
+        [Provider]="ProviderToUse"
+        [DocumentID]="ViewerDocumentID"
+        [FileNameHint]="ViewerFileName"
+        [ContentTypeHint]="ViewerContentType"
+        [Visible]="ViewerOpen"
+        (Closed)="CloseViewer()">
+    </bizapps-cred-document-viewer>
+
+    <bizapps-cred-version-history
+        [Provider]="ProviderToUse"
+        [Document]="VersionsDocument"
+        [Visible]="VersionsOpen"
+        (Closed)="CloseVersions()">
+    </bizapps-cred-version-history>
+
+    <dialog
+        #attestDialog
+        class="cred-docs__dialog"
+        aria-labelledby="cred-attest-title"
+        (cancel)="OnAttestDialogCancel($event)"
+        (keydown)="OnAttestDialogKeydown($event)">
+        <div class="cred-docs__dialog-body">
+            <h2 id="cred-attest-title" class="cred-docs__dialog-title">
+                Attest instead of uploading@if (AttestTarget; as target) { — {{ target.Name }}}
+            </h2>
+            <p class="cred-docs__dialog-desc">
+                No file is stored. Sign this statement to record that the material exists and can be shown to a reviewer on request.
+            </p>
+            <label for="cred-attest-statement" class="cred-docs__dialog-label">Attestation statement</label>
+            <textarea
+                id="cred-attest-statement"
+                class="cred-docs__dialog-textarea"
+                rows="4"
+                [disabled]="IsAttesting"
+                [(ngModel)]="AttestStatement"></textarea>
+            @if (AttestError) {
+                <mj-alert Variant="error" [Message]="AttestError"></mj-alert>
+            }
+            <div class="cred-docs__dialog-actions">
+                <button
+                    mjButton
+                    Variant="primary"
+                    type="button"
+                    [disabled]="IsAttesting"
+                    (click)="ConfirmAttest()">
+                    {{ IsAttesting ? 'Recording...' : 'Record attestation' }}
+                </button>
+                <button
+                    mjButton
+                    Variant="outline"
+                    type="button"
+                    [disabled]="IsAttesting"
+                    (click)="CloseAttestDialog()">
+                    Cancel
+                </button>
+            </div>
+        </div>
+    </dialog>
+</div>

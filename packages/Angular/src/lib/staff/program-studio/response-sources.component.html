@@ -1,0 +1,112 @@
+<section class="cred-sources" aria-labelledby="cred-sources-heading">
+    <h4 id="cred-sources-heading" class="cred-sources__heading">Where the assistant looks</h4>
+
+    @if (ViewState.IsManual) {
+        <p class="cred-sources__note">{{ ViewState.ManualSentence }}</p>
+    } @else if (IsNew) {
+        <p class="cred-sources__note">Save this standard first to choose where the assistant looks.</p>
+    } @else if (IsLoading) {
+        <mj-loading Text="Loading sources..."></mj-loading>
+    } @else if (LoadError) {
+        <p class="cred-sources__error" role="alert">{{ LoadError }}</p>
+    } @else {
+        @if (Items.length === 0) {
+            <p class="cred-sources__empty">No required documents are bound to this standard yet.</p>
+        } @else {
+            <ol class="cred-sources__list">
+                @for (item of Items; track item.DocumentRequirementID; let i = $index) {
+                    <li class="cred-sources__row">
+                        <span class="cred-sources__sentence">{{ SentenceFor(i, item) }}</span>
+                        @if (ViewState.CanEdit) {
+                            <div class="cred-sources__row-actions">
+                                <button
+                                    mjButton
+                                    Variant="icon"
+                                    type="button"
+                                    AriaLabel="Move source up"
+                                    [disabled]="IsSaving || i === 0"
+                                    (click)="Move(i, -1)">
+                                    <i class="fa-solid fa-arrow-up" aria-hidden="true"></i>
+                                </button>
+                                <button
+                                    mjButton
+                                    Variant="icon"
+                                    type="button"
+                                    AriaLabel="Move source down"
+                                    [disabled]="IsSaving || i === Items.length - 1"
+                                    (click)="Move(i, 1)">
+                                    <i class="fa-solid fa-arrow-down" aria-hidden="true"></i>
+                                </button>
+                                <button
+                                    mjButton
+                                    Variant="outline"
+                                    Size="sm"
+                                    type="button"
+                                    [disabled]="IsSaving"
+                                    (click)="Remove(i)">
+                                    Remove
+                                </button>
+                            </div>
+                        }
+                    </li>
+                }
+            </ol>
+        }
+
+        @if (!ViewState.CanEdit && ViewState.ReadOnlySentence) {
+            <p class="cred-sources__note">{{ ViewState.ReadOnlySentence }}</p>
+        }
+
+        @if (ViewState.CanEdit) {
+            <div class="cred-sources__add">
+                <label for="cred-sources-req-select" class="cred-sources__add-label">
+                    Add a required document
+                </label>
+                <div class="cred-sources__add-controls">
+                    <select
+                        id="cred-sources-req-select"
+                        class="mj-input cred-sources__select"
+                        name="addRequirement"
+                        [disabled]="IsSaving || AvailableToAdd.length === 0"
+                        [(ngModel)]="SelectedRequirementID">
+                        <option value="">
+                            {{ AvailableToAdd.length === 0 ? 'All version requirements are already added' : 'Choose a required document...' }}
+                        </option>
+                        @for (req of AvailableToAdd; track req.ID) {
+                            <option [value]="req.ID">{{ req.Name }}</option>
+                        }
+                    </select>
+                    <button
+                        mjButton
+                        Variant="outline"
+                        Size="sm"
+                        type="button"
+                        [disabled]="IsSaving || !SelectedRequirementID"
+                        (click)="AddSelected()">
+                        Add
+                    </button>
+                </div>
+            </div>
+
+            <div class="cred-sources__actions">
+                <button
+                    mjButton
+                    Variant="primary"
+                    Size="sm"
+                    type="button"
+                    [disabled]="!CanSave"
+                    [attr.aria-busy]="IsSaving ? 'true' : null"
+                    (click)="SaveSources()">
+                    {{ IsSaving ? 'Saving sources...' : 'Save sources' }}
+                </button>
+                @if (SavedNotice) {
+                    <span class="cred-sources__saved" role="status">{{ SavedNotice }}</span>
+                }
+            </div>
+
+            @if (ErrorMessage) {
+                <mj-alert Variant="error" [Message]="ErrorMessage" [Dismissible]="true" (Dismissed)="ErrorMessage = ''"></mj-alert>
+            }
+        }
+    }
+</section>

@@ -88,5 +88,45 @@
     "primaryKey": {
       "ID": "9215F286-22DE-462B-AF4D-F4D3D9B225B1"
     }
+  },
+  {
+    "fields": {
+      "Name": "Credentialing: Applicant Subjects",
+      "Description": "Subjects the user is a contact of (Subject Contacts). Attached to Subjects for Credentialing Applicant, on read, create and update.",
+      "FilterText": "(ID IN (SELECT c.SubjectID FROM [__mj_BizAppsCredentialing].[vwSubjectContacts] c WHERE c.UserID = TRY_CAST('{{UserID}}' AS UNIQUEIDENTIFIER)))"
+    },
+    "primaryKey": {
+      "ID": "D736D794-6355-44F5-8B38-264D31FABC7F"
+    }
+  },
+  {
+    "fields": {
+      "Name": "Credentialing: Applicant Rows By Subject",
+      "Description": "Rows whose SubjectID is a subject the user is a contact of. Attached to Subject Contacts, Applications, Standard Responses, Response Citations, Evidence Documents, Document Attestations, Application Documents and Extractions for Credentialing Applicant, on read, create and update.",
+      "FilterText": "(SubjectID IN (SELECT c.SubjectID FROM [__mj_BizAppsCredentialing].[vwSubjectContacts] c WHERE c.UserID = TRY_CAST('{{UserID}}' AS UNIQUEIDENTIFIER)))"
+    },
+    "primaryKey": {
+      "ID": "B95679B9-7AC4-4131-ABB3-B4123FBEDAA7"
+    }
+  },
+  {
+    "fields": {
+      "Name": "Credentialing: Staff Subjects",
+      "Description": "Subjects of an accrediting organization the user is a member of. Attached to Subjects for Credentialing Staff, on read, create and update.",
+      "FilterText": "(AccreditingOrganizationID IN (SELECT m.AccreditingOrganizationID FROM [__mj_BizAppsCredentialing].[vwOrganizationMemberships] m WHERE m.UserID = TRY_CAST('{{UserID}}' AS UNIQUEIDENTIFIER)))"
+    },
+    "primaryKey": {
+      "ID": "C8374017-C4B9-460D-95D7-DC0F7AB8E0A5"
+    }
+  },
+  {
+    "fields": {
+      "Name": "Credentialing: Staff Rows By Subject",
+      "Description": "Rows whose subject belongs to an accrediting organization the user is a member of. Attached to Subject Contacts, Applications, Standard Responses, Response Citations, Evidence Documents, Document Attestations, Application Documents and Extractions for Credentialing Staff, on read, create and update.",
+      "FilterText": "(SubjectID IN (SELECT s.ID FROM [__mj_BizAppsCredentialing].[vwSubjects] s WHERE s.AccreditingOrganizationID IN (SELECT m.AccreditingOrganizationID FROM [__mj_BizAppsCredentialing].[vwOrganizationMemberships] m WHERE m.UserID = TRY_CAST('{{UserID}}' AS UNIQUEIDENTIFIER))))"
+    },
+    "primaryKey": {
+      "ID": "F4025BC4-1B1F-4BDA-AB3E-7C781B742D2E"
+    }
   }
 ]

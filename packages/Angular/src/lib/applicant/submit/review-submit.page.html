@@ -1,0 +1,148 @@
+<div class="cred-submit">
+    @if (Applications.length === 0) {
+        <mj-empty-state
+            Icon="fa-solid fa-file-signature"
+            Message="You have no applications yet."
+            Role="status">
+        </mj-empty-state>
+    } @else if (NotAvailable) {
+        <mj-empty-state
+            Icon="fa-solid fa-lock"
+            Message="This area is not available to your account."
+            Role="status">
+        </mj-empty-state>
+    } @else if (IsLoading) {
+        <mj-loading Text="Checking submission readiness..."></mj-loading>
+    } @else if (ErrorMessage) {
+        <mj-alert Variant="error" Title="Review and submit could not load" [Message]="ErrorMessage"></mj-alert>
+    } @else if (Gate; as gate) {
+        @let state = State;
+        <header class="cred-submit__header">
+            <div class="cred-submit__header-main">
+                <div class="cred-submit__title-row">
+                    <h1 class="cred-submit__title">Review and submit</h1>
+                    <span class="cred-submit__version">{{ gate.Application.ProgramName }} · {{ gate.Application.VersionLabel }}</span>
+                    <span class="cred-submit__status">{{ gate.Application.Status }}</span>
+                </div>
+                <p class="cred-submit__subtitle">
+                    {{ gate.Application.SubjectName }} · {{ gate.Application.OrganizationName }}
+                </p>
+            </div>
+            <div class="cred-submit__header-actions">
+                <button
+                    mjButton
+                    Variant="outline"
+                    type="button"
+                    (click)="OnBackToStandards()">
+                    Back to standards
+                </button>
+            </div>
+        </header>
+
+        @if (gate.Application.Status === 'Submitted' && state.SubmittedDateLabel; as submittedDate) {
+            <mj-alert
+                Variant="success"
+                [Message]="'Submitted on ' + submittedDate + '. Confirmed answers and listed documents are locked while staff review your application.'">
+            </mj-alert>
+        } @else if (gate.Application.Status === 'Withdrawn') {
+            <mj-alert
+                Variant="warning"
+                Message="This application has been withdrawn and can no longer be submitted.">
+            </mj-alert>
+        }
+
+        <section class="cred-submit__section" aria-labelledby="cred-submit-gate-heading">
+            <h2 id="cred-submit-gate-heading" class="cred-submit__section-title">Readiness checklist</h2>
+            <bizapps-cred-gate-list
+                [Items]="state.Items"
+                [IsSubmitted]="state.IsSubmitted"
+                (NavigateToGap)="OnNavigateToGap($event)">
+            </bizapps-cred-gate-list>
+        </section>
+
+        <section class="cred-submit__section" aria-labelledby="cred-submit-docs-heading">
+            <h2 id="cred-submit-docs-heading" class="cred-submit__section-title">
+                {{ state.IsSubmitted ? 'Documents frozen at submission' : 'Documents included in submission' }}
+            </h2>
+            <p class="cred-submit__freeze-note">{{ FreezeNote }}</p>
+            @if (gate.Documents.length === 0) {
+                <p class="cred-submit__empty-docs">No documents or attestations are on file yet.</p>
+            } @else {
+                <ul class="cred-submit__doc-list">
+                    @for (doc of gate.Documents; track (doc.EvidenceDocumentID ?? doc.DocumentAttestationID ?? doc.Title)) {
+                        <li class="cred-submit__doc-row">
+                            <span class="cred-submit__doc-kind">{{ doc.Kind }}</span>
+                            <span class="cred-submit__doc-title">{{ doc.Title }}</span>
+                            @if (doc.RequirementName) {
+                                <span class="cred-submit__doc-req">For {{ doc.RequirementName }}</span>
+                            } @else {
+                                <span class="cred-submit__doc-req">General upload</span>
+                            }
+                            <span class="cred-submit__doc-detail">{{ doc.Detail }}</span>
+                        </li>
+                    }
+                </ul>
+            }
+        </section>
+
+        @if (gate.RequiresAttestation) {
+            <bizapps-cred-attestation-form
+                [Statement]="gate.AttestationStatement"
+                [Attestation]="Attestation"
+                [Disabled]="state.IsSubmitted || IsSubmitting"
+                (AttestationChanged)="OnAttestationChanged($event)">
+            </bizapps-cred-attestation-form>
+        }
+
+        @if (!state.IsSubmitted) {
+            <footer class="cred-submit__footer">
+                @if (SubmitError) {
+                    <mj-alert Variant="error" [Message]="SubmitError"></mj-alert>
+                }
+                <div class="cred-submit__submit-bar">
+                    <button
+                        mjButton
+                        Variant="primary"
+                        type="button"
+                        [disabled]="!state.CanSubmit || IsSubmitting"
+                        [attr.aria-describedby]="state.DisabledReason ? 'cred-submit-disabled-reason' : null"
+                        (click)="OpenConfirmDialog()">
+                        {{ IsSubmitting ? 'Submitting...' : 'Submit application' }}
+                    </button>
+                    @if (state.DisabledReason; as reason) {
+                        <p id="cred-submit-disabled-reason" class="cred-submit__disabled-reason" role="status">{{ reason }}</p>
+                    }
+                </div>
+            </footer>
+        }
+    }
+
+    <dialog
+        #confirmSubmitDialog
+        class="cred-submit__dialog"
+        aria-labelledby="cred-confirm-submit-title"
+        (cancel)="OnConfirmDialogCancel($event)">
+        <div class="cred-submit__dialog-body">
+            <h3 id="cred-confirm-submit-title" class="cred-submit__dialog-title">Submit application?</h3>
+            <p class="cred-submit__dialog-desc">{{ FreezeNote }}</p>
+            <div class="cred-submit__dialog-actions">
+                <button
+                    mjButton
+                    Variant="primary"
+                    type="button"
+                    [disabled]="IsSubmitting"
+                    (click)="ConfirmSubmit()">
+                    {{ IsSubmitting ? 'Submitting...' : 'Submit application' }}
+                </button>
+                <button
+                    mjButton
+                    Variant="outline"
+                    type="button"
+                    [disabled]="IsSubmitting"
+                    (click)="CloseConfirmDialog()">
+                    Cancel
+                </button>
+            </div>
+        </div>
+    </dialog>
+</div>

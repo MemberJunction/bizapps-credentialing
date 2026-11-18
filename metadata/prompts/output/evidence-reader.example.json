@@ -1,0 +1,9 @@
+{
+  "found": true,
+  "value": "The practice reviews its written safety policy every twelve months.",
+  "excerpt": "The practice reviews its written safety policy every twelve months.",
+  "page": "1",
+  "heading": "Safety policy > Review",
+  "confidence": 0.9,
+  "reasoning": "The policy states its own review interval, which is what the standard asks for."
+}

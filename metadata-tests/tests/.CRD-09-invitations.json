@@ -1,0 +1,24 @@
+{
+  "fields": {
+    "TypeID": "@lookup:MJ: Test Types.Name=Integration Test",
+    "Name": "CRD-09 - Invitations",
+    "Description": "Verify applicant invitation and link re-issuance: InviteApplicant creates subject, Common party record, external user with Credentialing Applicant role and Credentialing app row, subject contact, Draft application, and empty standard responses in one transaction; refuses Draft versions, cross-organization targets, duplicate open applications, internal accounts, and non-staff callers; survives issuer outages with InvitationNote and succeeds on ReissueInvitation; updates UserCache immediately for existing external users; and leaves staff unable to create MJ: Magic Link Invites directly.",
+    "InputDefinition": {},
+    "ExpectedOutcomes": {
+      "summary": "All cred-invite checks pass with a fixture InvitationIssuer; live issuance, redemption, invite role/application check, and parallel shared-email races pass in cred-invite-wire against MJAPI."
+    },
+    "Configuration": {
+      "tier": "deterministic",
+      "transport": "server",
+      "checks": [
+        {
+          "type": "cred-invite"
+        }
+      ]
+    },
+    "Status": "Active"
+  },
+  "primaryKey": {
+    "ID": "40E6F00D-AF65-4169-A63F-CB124CF8012D"
+  }
+}

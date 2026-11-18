@@ -407,8 +407,8 @@ MJAPI after initial user creation, at the cost of recompiling MJExplorer.)
 
 ## Signing in as a persona
 
-`scripts/dev/personas.json` names the seven personas. Each has an email, a sign-in method and the
-account's origin:
+`scripts/dev/personas.json` names the development personas. Each has an email, a sign-in method and
+the account's origin:
 
 | Persona | Email | Sign-in | Role | Account created by |
 |---|---|---|---|---|
@@ -416,7 +416,12 @@ account's origin:
 | `staff-b` | `staff.b@example.test` | dev-login | Credentialing Staff (OrgB) | world |
 | `staff-none` | `staff.none@example.test` | dev-login | Credentialing Staff, no membership | world |
 | `admin` | `admin@example.test` | dev-login | Credentialing Admin | world |
-| `applicant-a` | `applicant.a@example.test` | magic link | Credentialing Applicant | world; the redemption adds its application row |
+| `applicant-a` | `applicant.a@example.test` | magic link | Credentialing Applicant (`Sample Applicant One`, OrgA) | world; the redemption adds its application row |
+| `applicant-b` | `applicant.b@example.test` | magic link | Credentialing Applicant (`Sample Applicant Two`, OrgA) | world |
+| `applicant-two` | `applicant.two@example.test` | magic link | Credentialing Applicant (both `Sample Applicant One` and `Two`, for the picker) | world |
+| `applicant-org-b` | `applicant.orgb@example.test` | magic link | Credentialing Applicant (`Sample Applicant Org B`, OrgB) | world |
+| `applicant-evidence` | `applicant.evidence@example.test` | magic link | Credentialing Applicant (`Sample Evidence Applicant`, OrgA) | world |
+| `applicant-reading` | `applicant.reading@example.test` | magic link | Credentialing Applicant (`Sample Reading Applicant`, OrgA) | world |
 | `reviewer-a` | `reviewer.a@example.test` | magic link | Credentialing Reviewer | the first redemption |
 | `committee-a` | `committee.a@example.test` | magic link | Credentialing Committee | the first redemption |
 
@@ -500,8 +505,9 @@ workspace parent during recovery, re-apply the `@typespec/ts-http-runtime` /
 at the workspace parent and `corepack pnpm --filter "@mj-biz-apps/common-*" run build`
 before `corepack pnpm run build`.
 
-Followed literally, top to bottom, for the B1 verification (`docs/verification/b1-2026-11.md`);
-every step below is the one that worked.
+Followed literally, top to bottom, for the B1 verification (`docs/verification/b1-2026-11.md`) and
+again for the B2 verification (`docs/verification/b2-2026-11.md`, 2026-11-17); every step below is the
+one that worked. Steps 3a, 7a and the counts were corrected by the B2 run.
 
 1. Stop MJAPI (`4050`) and MJExplorer (`4251`) so no open connections hold the database.
 2. Drop (if present) and recreate the database, with read-committed snapshot on:
@@ -524,6 +530,17 @@ every step below is the one that worked.
    corepack pnpm mj codegen --skipdb
    corepack pnpm run build
    ```
+   3a. The push in `mj/` rewrites the `sync` block (`lastModified`, `checksum`) of MJ's own committed
+   record files when its checksum differs from the database's (B2 run: `updated: 2`,
+   `metadata/component-libraries/.component-libraries.json` and `metadata/components/.components.json`,
+   only those two keys changed). Nothing in `mj/` may be committed, and `git status --short` in `mj/`
+   must show only the local registration files, so restore exactly the files the push rewrote, after
+   checking that their diff is `sync` keys only:
+   ```sh
+   git -C ../mj diff metadata/ | grep '^[-+] ' | grep -v -E '"(lastModified|checksum)"'   # expect: no output
+   git -C ../mj checkout -- metadata/component-libraries/.component-libraries.json metadata/components/.components.json
+   ```
+   MJ's migrate applied 162 migrations in about 250 s; `codegen --skipfiles` reported 446 entities.
 4. Migrate dependency apps leaf-first (with `.env` in each sibling root), and provision the local dev Owner user (`admin@memberjunction.org` with roles `Developer`, `Integration`, `UI`) from `bizapps-credentialing/`:
    ```sh
    (cd ../bizapps-common && corepack pnpm run mj:migrate)
@@ -553,7 +570,11 @@ every step below is the one that worked.
    a push wrote 3 `sync` blocks and dropped 7 files' final newlines; after the script, `git diff` held
    only the hand edit. On a fresh database the push reported `created: 100, updated: 1`; two records
    were added since (the committee-type catalog filter and its permission row: `created: 2,
-   unchanged: 101` on this instance), so a fresh push now creates 102.
+   unchanged: 101` on this instance), so a fresh push created 102 at the end of B1. With B2's records
+   (row-level security filters and permissions for the applicant-data entities, the two reading prompts
+   with their templates, the `Credentialing: Application Submitted` notification type) a fresh push
+   reports `created: 132, updated: 1` (B2 verification); `metadata:strip-sync` then removed 133 `sync`
+   blocks and `git status` was clean.
 6. Ensure `admin@memberjunction.org` has the `MJ: User Applications` row for `Credentialing` (either via `corepack pnpm run dev:owner` in `bizapps-credentialing/` when no browser is needed — idempotent via entity objects — or in Explorer via **Application launcher → Configure… → Available Applications → Add Credentialing → Save Changes**):
    ```sh
    corepack pnpm run dev:owner     # Granted MJ: User Applications 'Credentialing' to 'admin@memberjunction.org'.
@@ -562,20 +583,35 @@ every step below is the one that worked.
    (`MJ: Tests`) and strip their `sync` blocks the same way, then confirm CodeGen has nothing to change:
    ```sh
    corepack pnpm run build:packages
-   corepack pnpm exec mj sync push --dir=metadata-tests --ci     # created: 7
+   corepack pnpm exec mj sync push --dir=metadata-tests --ci     # created: 16 (CRD-00 … CRD-15)
    corepack pnpm run metadata:strip-sync
-   corepack pnpm run mj:codegen                                  # 520 entities
+   corepack pnpm run mj:codegen                                  # 530 entities
    git status --short                                            # nothing under migrations/ or src/generated/
    ```
    Build before starting MJAPI: `mj/mj.config.cjs` `dynamicPackages.server` loads
    `@mj-biz-apps/credentialing-server` from its `dist/`, and `mj/`'s own `corepack pnpm run build`
    (step 3) does not build this app's packages (no `@mj-biz-apps/credentialing-*` task in its turbo
    run). The `mj test` check module is `packages/IntegrationTests/dist/index.js`.
+7a. Reset the evidence store and set up its storage account. The files under the store root belong
+   to the dropped database: their `MJ: Files` rows are gone, and the orphan sweep only removes objects
+   that still have a row, so nothing would ever remove them. Move the root's contents away (or delete
+   them), then create the storage rows; `dev:storage` reads the root it recorded in `mj/.env` on an
+   earlier run (`CREDENTIALING_EVIDENCE_STORE_ROOT`) and rewrites `CREDENTIALING_EVIDENCE_STORAGE_ACCOUNT`
+   and the root there, touching no other line:
+   ```sh
+   mv <store root> <somewhere outside every repository>   # or delete it; it holds only test fixtures
+   corepack pnpm run dev:storage     # Created credential type … storage account … System-user permission row
+   ```
+   The first `dev:storage` of the B2 run failed with `Give the evidence root directory: --root …` because
+   the script read the root only from `--root` or the environment; it now falls back to the line in
+   `mj/.env`. See "Storage (Step 2 discovery)" for what it creates.
 8. From `mj/`, start MJAPI (`corepack pnpm run start:api`, port `4050`) and MJExplorer
    (`corepack pnpm run start:explorer`, port `4251`). Start them detached (for example with `nohup …
    &` and the output redirected to a log file) when they must outlive the shell that started them.
    MJAPI is up when `POST /auth/dev-login` answers; Explorer's first page load after a start compiles
-   for a few minutes.
+   for a few minutes. The MJAPI log then shows `Credentialing evidence routes mounted at /credentialing
+   (storage account: Credentialing Evidence (Local Disk))` and `Credentialing: reading queue started
+   (boot sweep in 10 s, then every 5 minutes).`
 9. Set `MJ_MAGIC_LINK_PRIVATE_KEY` in `mj/.env` once (it survives rebuilds, since it is not in the
    database), without printing it, then restart MJAPI:
    ```sh
@@ -609,6 +645,9 @@ every step below is the one that worked.
 
 Steps 9–11 are one-time `.env` settings; on a rebuild of an instance that already has them, check
 that each is present and non-empty (`grep -c '^MJ_MAGIC_LINK_PRIVATE_KEY=.' mj/.env`) and move on.
+The same holds for the AI key (`AI_VENDOR_API_KEY__GeminiLLM` in `mj/.env`, used by the reading queue,
+never printed) and the two `CREDENTIALING_EVIDENCE_*` lines step 7a writes. Keep a private copy of
+`mj/.env` before a rebuild: nothing in the database holds these values.
 
 ### First run on the rebuilt database
 
@@ -685,9 +724,20 @@ A user API key (`mj_sk_…`, `x-api-key` header) is not used by this harness.
 | `cred-standard-rules` | `CRD-03 - Standard rules` | server only |
 | `cred-operations` | `CRD-04 - Operations` | server only |
 | `cred-isolation` | `CRD-05 - Isolation` | server only |
-| `cred-world` | `CRD-06 - World` | server and client (`pnpm run seed:dev`) |
+| `cred-world` | `CRD-06 - World` | server and client (`pnpm run seed:dev`; the applicant world is written on the server transport only) |
+| `cred-applicant-schema` | `CRD-07 - Applicant schema` | server only |
+| `cred-subject-isolation` | `CRD-08 - Subject isolation` | server only (all 9 checks run; the integration test barrel registers `CreateIndependentInstance` / `ReleaseIndependentInstance`) |
+| `cred-invite` | `CRD-09 - Invitations` | server only (`packages/IntegrationTests/src/checks/cred-invite.checks.ts` registers a fixture `InvitationIssuer`) |
 | `cred-users` | — (client harness only) | client (`pnpm run seed:users`; registered in `cred-world.checks.ts`) |
 | `cred-operations-wire` | — (client harness only) | client only |
+| `cred-invite-wire` | — (client harness only) | client only (checks 7, 8 and 10 against MJAPI's live `MagicLinkService`) |
+| `cred-evidence-rules` | `CRD-11 - Evidence` | server only (fixture store and text extractor; the `EvidenceIntake.Seams.AfterStore` race) |
+| `cred-evidence` | — (client harness only) | client only (the evidence routes over HTTP against MJAPI, real storage and extraction) |
+| `cred-responses` | `CRD-10 - Responses` | server only |
+| `cred-reader` | `CRD-12 - Reader` | server only |
+| `cred-prefill` | `CRD-13 - Prefill` | server only |
+| `cred-submission` | `CRD-14 - Submission` | server only |
+| `cred-applicant-world` | `CRD-15 - Applicant world` | server only (asserts applicant world shape and reload idempotency) |
 
 ```sh
 MJ_INTEGRATION_TEST=1 RUN_MUTATION_TESTS=1 corepack pnpm mj test run --name "CRD-02 - Version rules"   # 12 checks
@@ -695,8 +745,19 @@ MJ_INTEGRATION_TEST=1 RUN_MUTATION_TESTS=1 corepack pnpm mj test run --name "CRD
 MJ_INTEGRATION_TEST=1 RUN_MUTATION_TESTS=1 corepack pnpm mj test run --name "CRD-04 - Operations"     # 20 checks
 MJ_INTEGRATION_TEST=1 RUN_MUTATION_TESTS=1 corepack pnpm mj test run --name "CRD-05 - Isolation"      # 9 checks
 MJ_INTEGRATION_TEST=1 RUN_MUTATION_TESTS=1 corepack pnpm mj test run --name "CRD-06 - World"          # 2 checks
+MJ_INTEGRATION_TEST=1 RUN_MUTATION_TESTS=1 corepack pnpm mj test run --name "CRD-07 - Applicant schema"  # 3 checks
+MJ_INTEGRATION_TEST=1 RUN_MUTATION_TESTS=1 corepack pnpm mj test run --name "CRD-08 - Subject isolation" # 12 checks
+MJ_INTEGRATION_TEST=1 RUN_MUTATION_TESTS=1 corepack pnpm mj test run --name "CRD-09 - Invitations"       # 9 checks
+MJ_INTEGRATION_TEST=1 RUN_MUTATION_TESTS=1 corepack pnpm mj test run --name "CRD-10 - Responses"         # 12 checks
+MJ_INTEGRATION_TEST=1 RUN_MUTATION_TESTS=1 corepack pnpm mj test run --name "CRD-11 - Evidence"          # 5 checks
+MJ_INTEGRATION_TEST=1 RUN_MUTATION_TESTS=1 corepack pnpm mj test run --name "CRD-12 - Reader"            # 10 checks
+MJ_INTEGRATION_TEST=1 RUN_MUTATION_TESTS=1 corepack pnpm mj test run --name "CRD-13 - Prefill"           # 9 checks
+MJ_INTEGRATION_TEST=1 RUN_MUTATION_TESTS=1 corepack pnpm mj test run --name "CRD-14 - Submission"        # 14 checks
+MJ_INTEGRATION_TEST=1 RUN_MUTATION_TESTS=1 corepack pnpm mj test run --name "CRD-15 - Applicant world"   # 2 checks
 corepack pnpm run test:integration cred-operations-wire                                               # 3 checks, GraphQL
-corepack pnpm run seed:dev                                                                            # 2 checks (cred-world), GraphQL
+corepack pnpm run test:integration cred-invite-wire                                                   # 3 checks, GraphQL
+corepack pnpm run test:integration                                                                    # 23 checks (every client bundle, cred-evidence's 12 included)
+corepack pnpm run seed:dev                                                                            # 2 checks (cred-world), GraphQL + sample document uploads
 corepack pnpm run seed:users                                                                          # 1 check (cred-users), GraphQL
 ```
 
@@ -705,15 +766,15 @@ the client transport (GraphQL against MJAPI on port `4050` using `MJ_API_KEY`, w
 `System` user, `Type = 'Owner'`, holding `Developer` and `Integration` so `MJ: Users`,
 `MJ: User Roles`, `MJ: User Applications`, Common/Committees entities, and all seven credentialing
 entities are writable over GraphQL):
-- `pnpm run seed:dev` (`node test-harnesses/integration.mjs cred-world`): loads the full
-  `CredentialingWorld` (`EnsureWorldUsers` + `EnsureWorldData` including `SampleProgram`,
-  `PlaceholderProgram` with 12 sections / 36 standards / 5 document requirements, and `ProgramB`),
-  verifies idempotent reload, and verifies `EnsureProgramTree` partial-delete repair on a run-unique
-  scratch tree (`Repair <hex>`), which it deletes again when the check ends (a Draft version's delete
-  removes its tree), so a second `seed:dev` leaves every row count unchanged. Measured: the row counts
-  of the seven credentialing tables, Common organizations, users, user roles, user applications and
-  committees were identical before and after two more runs. (Before this was fixed, every run left one
-  `Repair <hex>` program in `OrgA`; the earlier ones are still in this dev database.)
+- `pnpm run seed:dev` (`node test-harnesses/integration.mjs cred-world`): verifies the full
+  `CredentialingWorld` (`EnsureWorldUsers` + `EnsureWorldData` + `EnsureApplicantWorld`, where
+  applicant-data rows are written by the server-transport `CRD-06 - World` / `CRD-15 - Applicant world`
+  checks), idempotently uploads sample documents over HTTP against MJAPI into the real evidence store
+  for `applicant-b` (`Sample Applicant Two`, `degree-certificate.pdf` on `Degree certificate`, skipped
+  when a current document already exists for that requirement) and `applicant-a` (`Sample Applicant One`,
+  `applicant-a-notes.docx`, skipped when a current general document already exists), verifies idempotent
+  reload, and verifies `EnsureProgramTree` partial-delete repair on a run-unique scratch tree
+  (`Repair <hex>`), which it deletes again when the check ends.
 - `pnpm run seed:users` (`node test-harnesses/integration.mjs cred-users`): runs `EnsureWorldUsers`
   only (creates or finds the six world user accounts, their roles, and Credentialing application
   rows, with no accrediting organizations), for first-run setup verification. Restart MJAPI
@@ -981,3 +1042,383 @@ URL and browser title became `New organization` without a reload, with the succe
 The 0 → 1 transition itself (the label changing from `Set up organization`) is proven by unit test
 (`standing.service.test.ts`, "after the first organization is created …"); it was not re-run in the
 browser because this database has organizations and none is rebuilt for it.
+
+## Applicant world, the sample Active version and operation-only writes (B2 Task 3)
+
+**"The sample Active version"** is version `2026` of `Sample Applicant Program` (OrgA, prefix `SAP`,
+deciding committee `Sample Accrediting Body A Standards Committee`, one section of three standards,
+one document requirement). B1's world holds only Draft versions, one Draft per program is a rule, and
+B1's checks treat `Sample Certified Practitioner` 2027 as a Draft, so the Active version is a program
+of its own. The world loader builds it as a Draft and activates it once (`ensureActiveProgram`,
+`packages/IntegrationTests/src/world/load-world.ts`); later loads find it Active. OrgB has the same
+shape in `Sample Program B Applicants` 2026 (prefix `SPA`, two standards), whose deciding committee
+`Sample Accrediting Body B Standards Committee` is owned by OrgB's Common organization and created the
+way CommitteeA is. `cred-isolation.9` asserts staff-b reads exactly CommitteeB and never CommitteeA.
+
+**The applicant world** (`WorldApplicants`, `world/applicant-world.ts`):
+
+| Subject | Organization | Contacts (all `Credentialing Applicant` only, with the Credentialing app row) | Application |
+|---|---|---|---|
+| `Sample Applicant One` | OrgA | `applicant.a@example.test` (Primary), `applicant.two@example.test` (Staff) | Draft on `Sample Applicant Program` 2026, 3 Empty responses |
+| `Sample Applicant Two` | OrgA | `applicant.b@example.test` (Primary) | Draft on the same version, 3 Empty responses |
+| `Sample Applicant Org B` | OrgB | `applicant.orgb@example.test` (Primary) | Draft on `Sample Program B Applicants` 2026, 2 Empty responses |
+
+Each subject has a BizApps Common person as its party record (`PartyEntityID` = `MJ_BizApps_Common:
+People`, found by email) and contacts recorded as invited by staff-a (OrgA) or staff-b (OrgB): only
+states an invitation could create. Everything is found by natural key, so a second load creates
+nothing (`cred-world.1` compares the row counts of subjects, contacts, applications, responses,
+committees and Common people before and after a second load).
+
+**Applicant data is written only through an operation.** The nine applicant-data entity subclasses
+refuse every save and delete that is not made through `OperationWrite.Run`'s scope
+(`packages/CoreEntitiesServer/src/guards/OperationWrite.ts`) with `This record is changed only
+through the application's own actions.` — for staff and the system user too. So:
+
+- the world's applicant rows are written on the **server transport only**: the package barrel
+  (`packages/IntegrationTests/src/index.ts`, loaded by `mj test run`) registers a writer that runs
+  `OperationWrite.Run` as the system user. `pnpm run seed:dev` (GraphQL, client harness, which never
+  loads the barrel) **finds** the applicant world; when it is missing it fails with the
+  `mj test run --name "CRD-06 - World"` command to run first. On a rebuilt database run the `CRD-*`
+  rows before `seed:dev`, as "First run on the rebuilt database" already orders;
+- check code that needs applicant rows (`CRD-07`, `CRD-08`) writes them through `OperationWrite.Run`.
+
+**Common activity log in the test process.** Creating a Common person runs BizApps Common's
+`Common.LogActivity` entity action. Its class is in `@mj-biz-apps/common-server`, which MJAPI loads
+(`mj/mj.config.cjs` `dynamicPackages`) and the `mj test` process does not, so the first world load in
+that process logs `Could not find a class for action Common.LogActivity` once per new person; the
+person is saved, and no activity row is written for it. Through MJAPI (Task 4's invitations) the
+action runs.
+
+**Lock wait: 14 s, not 15 s.** `AuthoringLock` waits `LOCK_TIMEOUT_MS` = 14 000 ms
+(`packages/CoreEntitiesServer/src/guards/AuthoringLock.ts`). mssql's default request timeout is
+15 000 ms (`node_modules/mssql/lib/tedious/connection-pool.js:43`), which applies to any pool that sets
+none, the `mj test` harness pool among them
+(`mj/packages/TestingFramework/testing-integration/src/bootstrap.ts`); with a 15 000 ms lock wait, a
+waiter there failed with `Timeout: Request failed to complete in 15000ms` instead of the lock's
+sentence (measured, `cred-subject-isolation.9`). MJAPI's request timeout is 30 000 ms. Each lock family
+has its own sentence (`AUTHORING_LOCK_BUSY_REASON`, `USER_EMAIL_LOCK_BUSY_REASON`,
+`APPLICATION_LOCK_BUSY_REASON`): an applicant never reads one about changing a program.
+
+**Service registry and background providers.** `CredentialingServices`
+(`packages/CoreEntitiesServer/src/services/CredentialingServices.ts`) holds what `packages/Server`
+provides (provider factory, invitation issuer, evidence store, text extractor, recognizer, reader,
+notifier); a getter for a service nobody registered throws `The <name> service is not registered on
+this server.` `InBackground` gives each unit of work its own provider from the registered
+`IsolatedProviderFactory` and releases it through the factory. The factory interface has
+`Release(provider)` beside the plan's `Create()`, so `InBackground` releases exactly what it was
+given. Registering `CreateIndependentInstance` / `ReleaseIndependentInstance` on
+`CredentialingServices.Providers` in `packages/IntegrationTests/src/index.ts` lets
+`cred-subject-isolation.8` run and pass in `mj test run`.
+
+## Magic-link invitations and registered server services (B2 Task 4 Step 3 discovery)
+
+Verified from MJ v6.2.2 (`mj/packages/MJServer/src/index.ts:204-206, 1414-1428`,
+`mj/packages/MJServer/src/auth/magicLink/MagicLinkService.ts`, `mj/packages/MJServer/src/auth/magicLink/magicLinkCore.ts:72-85`,
+`mj/packages/MJServer/src/isolatedProvider.ts`, `mj/packages/MJCoreEntitiesServer/src/custom/MJUserEntityServer.server.ts:136-150`):
+
+- **Obtaining `MagicLinkService` in `packages/Server`:** Open App server packages load before `serve()`
+  creates `ServerExtensionLoader`. Calling
+  `GetServerExtensionLoader()?.Services.GetService<IServerExtensionMagicLinkService>(SERVER_EXTENSION_CORE_SERVICE_KEYS.MagicLink)`
+  (`'MJ:MagicLinkService'`) lazily inside `MagicLinkInvitationIssuer.IssueApplicantLink` retrieves the
+  running MJAPI `MagicLinkService` once HTTP serving starts.
+- **`mj test run` vs. MJAPI:** `bizapps-credentialing/mj.config.cjs` has no `dynamicPackages` block, so
+  `mj test run` does not load `@mj-biz-apps/credentialing-server` automatically and never starts MJAPI's
+  HTTP/`MagicLinkService` stack. However, `Metadata.Provider` (`SQLServerDataProvider` / `DatabaseProviderBase`)
+  supports `CreateIndependentInstance()` and `ReleaseIndependentInstance()` (the exact mechanism behind
+  `CreateIsolatedProvider`). `packages/IntegrationTests/src/index.ts` registers that `Providers` factory
+  for `mj test run` (without importing `@memberjunction/server`, which runs `LoadConfig()` at import time
+  and would break unit tests), so `cred-subject-isolation.8` runs and passes with 0 skips, while
+  `cred-invite` registers a fixture `InvitationIssuer` and `cred-invite-wire` verifies live link issuance,
+  `POST /magic-link/redeem?format=json`, invite metadata, and parallel new-email locking against running
+  MJAPI on port `4050`.
+- **Principal for provisioning and invites:** `MJUserEntityServer` refuses user creation unless
+  `contextUser.Type === 'Owner'`, and `CanIssueInvites` / `isInviterActive` require an active user whose
+  role is in `inviteIssuerRoleNames` or an `Owner`/`Developer` allowed by core entity permissions on
+  `MJ: Magic Link Invites`. The `System` user (`not.set@nowhere.com`, `Type = 'Owner'`, `IsActive = 1`)
+  and `magicLink.contextUserForProvisioning` pass all checks, while `'Credentialing Staff'` has been
+  removed from `magicLink.inviteIssuerRoleNames` (`[]` in local `../mj/mj.config.cjs`).
+- **Required host configuration (`mj.config.cjs`):** `magicLink.enabled: true`,
+  `magicLink.inviteIssuerRoleNames: []`, `magicLink.grantableRoleNames` including
+  `'Credentialing Applicant'` (plus `'Magic Link Baseline'` as baseline role), `magicLink.explorerUrl`
+  pointing to Explorer (`http://localhost:4251`), and `magicLink.contextUserForProvisioning` pointing to an
+  active `Owner` user (`System` when unset).
+
+## Evidence storage, routes and text extraction (B2 Task 7)
+
+### How the routes are published and who calls them (Step 1 discovery, MJ v6.2.2)
+
+- **Discovery from the package.** `mj/packages/ServerBootstrap/src/index.ts` (`collectServerExtensions`)
+  reads the `MJ_SERVER_EXTENSIONS` named export (`MJ_SERVER_EXTENSIONS_EXPORT`,
+  `mj/packages/ServerExtensionsCore/src/collect.ts:16`) of every Open App server package it loaded
+  from `dynamicPackages.server`; `package.json` `memberjunction.serverExtensions` is only the fallback
+  when the export yields nothing, so it is **not** needed. `packages/Server/src/index.ts` exports one
+  entry `{ Enabled: true, DriverClass: 'CredentialingEvidenceExtension', RootPath: '/credentialing',
+  Phase: 'post-auth' }` and `EvidenceRouteExtension` overrides `DefaultPhase` to `'post-auth'`. Nothing
+  was added to `mj/mj.config.cjs`. Measured in `logs/mjapi.log` after `servers.sh restart api`:
+  `@mj-biz-apps/credentialing-server: +1 resolver path +1 server extension`, `CredentialingEvidenceExtension
+  at /credentialing (enabled, POST-AUTH; …)`, `Server extension 'CredentialingEvidenceExtension'
+  initialized (post-auth): Credentialing evidence routes mounted at /credentialing (storage account:
+  Credentialing Evidence (Local Disk))`, `Routes: POST /credentialing/evidence, GET
+  /credentialing/evidence/:documentId/content`.
+- **The caller.** Post-auth extensions mount after `CreateUnifiedAuthMiddleware`
+  (`mj/packages/MJServer/src/index.ts:1549-1580`), which sets `req.userPayload` (`UserPayload`, its
+  `userRecord` the `UserInfo`) or answers `401` itself (`mj/packages/MJServer/src/context.ts:727-790`).
+  The route reads only `req.userPayload.userRecord` (checked to be a `UserInfo`); it never takes a user
+  ID from the request. A request without a token is answered `401 {"error":"Authentication required"}`
+  by MJAPI before the route runs (`cred-evidence.6`).
+- **Magic-link sessions.** `BuildMagicLinkSessionUser` (`context.ts:232`) returns the named user
+  (adding only a resource scope or anonymous roles); `mj_app_id` is a claim only, and nothing in
+  MJServer restricts which routes a magic-link session may call. Measured: every applicant request in
+  `cred-evidence` uses a magic-link session minted by the dev Owner and redeemed, and is admitted.
+- **The provider.** MJAPI creates per-request providers only in the GraphQL context
+  (`ContextFunction`, `context.ts`); an extension route gets none. Each request therefore takes a
+  provider from `CredentialingServices.Providers` (`CreateIsolatedProvider`) and releases it when the
+  request settles (`EvidenceRoutes.onOwnProvider`), so the upload's transaction and subject lock never
+  share a provider with another request.
+
+### Storage (Step 2 discovery)
+
+- `FileStorageEngine.UploadFile` (`mj/packages/MJStorage/src/FileStorageEngine.ts:463`) needs `content`,
+  `fileName`, `mimeType`, `contextUser`, and takes `storageAccountId`, `pathPrefix` and `provider`.
+  Without `storageAccountId` it uses `ResolveStorageAccount()`: the first active account, else the first
+  account of any kind (`:307-316`) — so the evidence store always names its account. It writes the object
+  through the account's driver (`GetDriver` → `InitializeDriverWithAccountCredentials`,
+  `mj/packages/MJStorage/src/util.ts:186`), then saves the `MJ: Files` row as `contextUser`.
+- A driver needs: an `MJ: File Storage Providers` row whose `ServerDriverKey` is the driver's
+  `@RegisterClass(FileStorageBase, …)` key (resolved by `ResolveStorageDriver`, `util.ts:62`), and an
+  `MJ: File Storage Accounts` row on it. `FileStorageAccount.CredentialID` is NOT NULL (sqlcmd,
+  `sys.columns`), so an account needs an `MJ: Credentials` row; its decrypted `Values` are passed to
+  the driver's `initialize`. An account with **no** `MJ: File Storage Account Permissions` rows is open
+  to every signed-in user (`StorageAccessEvaluator.ACCOUNT_WITHOUT_PERMISSION_ROWS_IS_OPEN`).
+- Before this task (sqlcmd): `__mj.FileStorageAccount` had **0 rows**, `__mj.[File]` 0 rows; the eight
+  provider rows were MJ's own (all inactive except `External URL`). No usable account existed.
+- `pnpm run dev:storage` (`scripts/dev/ensure-dev-storage.mjs`, root from `--root` or
+  `CREDENTIALING_EVIDENCE_STORE_ROOT`; this instance: `CREDENTIALING_EVIDENCE_STORE_ROOT=<mj-work>/evidence-store`)
+  creates, as the system user through entity objects: the credential type `Credentialing Local Disk
+  Storage` (`RootDirectory`), the credential `Credentialing Evidence Local Disk` (its `Values` stored
+  encrypted, `$ENC$…`, checked with sqlcmd), the provider `Credentialing Local Disk` (ServerDriverKey
+  `Credentialing Local Disk Storage`), the account `Credentialing Evidence (Local Disk)`, and one
+  permission row for the System user (Read and Write), which closes the account to everyone else. No
+  credentialing role gets a row. It sets `CREDENTIALING_EVIDENCE_STORAGE_ACCOUNT` and
+  `CREDENTIALING_EVIDENCE_STORE_ROOT` in `../mj/.env` (only those two lines). A second run finds every
+  row and creates nothing. Because it is the only account on this instance, any MJ feature that uploads
+  without naming an account would also use it (under its own `artifacts/` prefix, which the evidence
+  orphan sweep never touches).
+- With `CREDENTIALING_EVIDENCE_STORAGE_ACCOUNT` unset, MJAPI logs `Credentialing: evidence uploads answer
+  503 because no storage account is configured. Set CREDENTIALING_EVIDENCE_STORAGE_ACCOUNT …` and the
+  upload answers `503 {"Message":"Document storage is not configured on this server."}` (measured once by
+  commenting the line out, restarting, and posting the text PDF as the evidence contact; then restored).
+
+### Text extraction runs in a child process, not a worker thread
+
+Plan Task 7 named a `worker_thread` with `resourceLimits: { maxOldGenerationSizeMb: 512 }`. Measured on
+Node 24.15: three copies of the inflation-bomb DOCX (`word/document.xml` = 300 MB of tiny paragraphs)
+parsed at once in three workers ended the **whole process** in 2 of 10 runs with `FATAL ERROR: Reached
+heap limit … JavaScript heap out of memory`; the native stack ends in `node::worker::Worker::Run`, i.e.
+V8's `FatalProcessOutOfMemory` raised from a worker isolate. In MJAPI that would stop the server. So
+`WorkerTextExtractor` forks `text-extractor.worker.js` per file with `--max-old-space-size=512`, sends
+the bytes over IPC, kills it after 30 s, and runs at most two at once. With that: 10 of 10 runs of three
+concurrent bombs answered `Could Not Read`, the parent process stayed at about 100 MB RSS (it was
+1.7 GB with workers), and a 50 ms timer on the parent kept firing.
+
+**pdf.js and Node's Buffer pool.** `ParsePdf` failed with `bad XRef entry` on the 1 037-byte fixture
+PDF, and a later call returned another file's page count. Cause: pdf.js 1.10 (inside `pdf-parse`)
+builds sub-streams from `bytes.buffer` and ignores `byteOffset`; its message-port clone copies the input
+with `new Buffer(value)`, and a copy under 4 KB lands inside Node's shared 8 KB pool at a non-zero
+offset. The parser process sets `Buffer.poolSize = 0` first, after which every call parsed correctly.
+Files of 4 KB and more were never affected.
+
+### Fixtures
+
+`scripts/dev/make-evidence-fixtures.mjs` generates every evidence fixture (invented content only) into
+`packages/Server/src/evidence/__fixtures__/`. All are committed except `inflation-bomb.docx`: DEFLATE
+cannot compress better than about 1 000 : 1, so the bomb is about 0.9 MB; it is gitignored and generated
+on first use by the unit tests and `cred-evidence`.
+
+### Running the evidence checks
+
+```sh
+corepack pnpm --filter @mj-biz-apps/credentialing-server run test        # extractor, local disk driver, routes
+corepack pnpm --filter @mj-biz-apps/credentialing-core-entities-server exec vitest run src/__tests__/EvidenceIntake.test.ts
+MJ_INTEGRATION_TEST=1 RUN_MUTATION_TESTS=1 corepack pnpm mj test run --name "CRD-11 - Evidence"   # 5 checks
+../servers.sh restart api                  # from the workspace parent, once, after CRD-11 first creates applicant.evidence@example.test
+corepack pnpm run test:integration cred-evidence                                                  # 11 checks, HTTP
+```
+
+`cred-evidence-rules.14` was checked against a negative control: with the re-check inside the
+transaction removed (`EvidenceIntake.write`), it failed with `expected the upload to be refused`;
+restored, it passed.
+
+## The reading queue: scan recognition and evidence reading on Gemini (B2 Task 9)
+
+### Step 1 discovery: the prompt runner, file inputs and Gemini (MJ v6.2.2)
+
+- **Running a stored prompt from server code.** `AIPromptRunner.ExecutePrompt(params)`
+  (`mj/packages/AI/Prompts/src/AIPromptRunner.ts:302`, package `@memberjunction/ai-prompts`) with an
+  `AIPromptParams` (`@memberjunction/ai-core-plus`, `CorePlus/src/prompt.types.ts:368`): `prompt` (the
+  entity, from `AIEngineBase.Instance.Prompts` after `AIEngineBase.Instance.Config(false, user)`,
+  `@memberjunction/ai-engine-base`), `data` (template variables), `contextUser`,
+  `conversationMessages` + `templateMessageRole: 'system'` (the rendered template is the system message,
+  the conversation follows). The run's ID is `result.promptRun.ID` (`AIModelRunResult.promptRun`,
+  `CorePlus/src/model-run.types.ts:39`). `ExecutePrompt` does not throw: every failure returns
+  `success: false` with `errorMessage` (`AIPromptRunner.ts:478-539`). `packages/Server/src/reading/PromptRunner.ts`
+  wraps this as `MJStoredPromptRunner`.
+- **Template escaping.** The template engine HTML-escapes variables by default. Measured through
+  `RunAIPrompt`: a document text containing `&` reached Gemini as `&amp;` (`AIPromptRun.Messages`), so a
+  quoted excerpt would not be found in the stored text. `MJStoredPromptRunner` sets
+  `params.templateAutoescape = false` (`AIPromptRunner.RenderOptions`, `:171`).
+- **Attaching a PDF or image.** A user message whose `content` is an array of `ChatMessageContentBlock`
+  (`mj/packages/AI/Core/src/generic/chat.types.ts:28`): a `file_url` (PDF) or `image_url` block holding a
+  `data:<mime>;base64,…` URL, with `mimeType`. The Gemini driver turns any media block with a data URL
+  into an `inlineData` part with that MIME type (`mj/packages/AI/Providers/Gemini/src/index.ts:1201-1253`,
+  `mjContentBlockToGeminiPart`); it never uploads through Google's File API. Measured live through
+  MJAPI's `RunAIPrompt` mutation (system API key): `scanned-page.pdf` (2 029 bytes) and
+  `printed-paragraph.png` were transcribed exactly (`[Page 1] THE PRACTICE REVIEWS ITS / WRITTEN SAFETY
+  POLICY / EVERY TWELVE MONTHS.`), runs `98F2BE12-…`, `55DDA616-…`.
+- **Request size.** The prompt runner enforces no media size (modality limits are read for agents only,
+  `BaseAIEngine.ts:2700-2780`). The model row declares `File` input `application/pdf` with
+  `MaxSizeBytes` 20 971 520 (`__mj.AIModelModality`, Gemini 3.8 Flash). Measured: a one-page image-only
+  PDF of 18 750 668 bytes (just under `RecognitionRules.MaxBytes` = 18 874 368; 25 000 892 base64
+  characters inline) was accepted and answered (`[Page 1] [no text]`, run `63AB121B-…`, 5.1 s). So
+  `RecognitionRules.MaxBytes` is unchanged. Note: the runner stores the conversation messages, file
+  included, in `AIPromptRun.Messages` (`storedMessagesJSON`, `:4285`): that run's row holds 50 MB.
+  Credentialing roles hold no permission on `MJ: AI Prompt Runs`.
+- **JSON output in prompt metadata.** `ResponseFormat: 'JSON'`, `OutputType: 'object'` and an
+  `OutputExample` (the CHECK `OutputType <> 'object' OR OutputExample IS NOT NULL` requires it), with
+  `ValidationBehavior`. `Warn` is used: a reply that does not parse is returned as text and
+  `PromptEvidenceReader.ParseReaderAnswer` decides (`NothingFound` with the run ID), instead of the run
+  failing and reading as "could not run".
+- **No model or credential.** Selection throws `No suitable model found for prompt …`, caught by
+  `ExecutePrompt` (`success: false`, no prompt run). `MJStoredPromptRunner` maps that prefix to
+  `No AI model is available on this server.`; any other failure to `The assistant service could not be
+  reached.`; a missing prompt to `The assistant is not set up on this server.` Only no model and a
+  missing prompt are `CouldNotRun` (the document reads `Could Not Run` when recognition, or every read,
+  returned it; the boot sweep and `Read again` retry it). Every other failure (rate limit, timeout,
+  vendor or transport error) is `Failed` (`FailedRunResult`): the queue commits what the other reads
+  found, marks the document `Failed` with the retry sentence, and the 5-minute sweep reads it again
+  until `ReadingQueue.MaxAttempts`. Retries are spaced: a `Failed` document waits
+  `ReadingQueue.RetrySpacingMinutes` (10) per attempt already made, so three attempts span about half
+  an hour. A server start resets every `Failed` and `Could Not Run` document to `Pending` with its
+  attempts back to zero, the one automatic second chance a final failure gets.
+- **`RequireSpecificModels: true` on both prompts.** With it false, `SelectionStrategy: 'Specific'`
+  appends power-matched fallback models when the listed ones lack credentials
+  (`BaseModelRunner.ts:711-726`). Measured: with both of the reader's prompt-model rows pointed at
+  uncredentialed models, the run silently used Gemini 3.1 Flash-Lite. A fallback model need not accept a
+  PDF part, and "no model" could never surface as `Could Not Run`, so both prompts require their listed
+  models. A host with another vendor edits the prompts' model lists (metadata), not code.
+- **Gemini rows in this database.** Active `Google` inference rows (`GeminiLLM`): Gemini 2.5 Flash,
+  2.5 Flash-Lite, 2.5 Pro, 3 Flash, 3.1 Flash-Lite, 3.1 Pro, 3.5 Flash, 3.5 Flash-Lite, 3.6 Flash,
+  3.7 Flash, 3.8 Flash, 4 Argon (plus Gemma). Only **Gemini 3.8 Flash** has `MJ: AI Model Modalities`
+  rows, among them `File` input `application/pdf` and `Image` input. Both prompts list Gemini 3.8 Flash
+  (priority 10) then Gemini 3.5 Flash (priority 5), vendor Google; every live run recorded here was
+  served by Gemini 3.8 Flash. The key is `AI_VENDOR_API_KEY__GeminiLLM` in `../mj/.env` (never printed).
+- **Live confirmation, one run each through MJAPI's server code:** `Credentialing: Evidence Reader`
+  answered valid JSON with the excerpt verbatim (run `26C0A4EF-…`, 607 prompt tokens);
+  `Credentialing: Scan Reader` transcribed the scan (above).
+
+### How it runs
+
+- The prompts are metadata (`metadata/prompts/.credentialing-reading-prompts.json`, templates under
+  `metadata/prompts/templates/`, the reader's output example under `metadata/prompts/output/`), pushed
+  with `corepack pnpm exec mj sync push --dir=metadata --ci` then `corepack pnpm run metadata:strip-sync`.
+  The push creates the templates' `MJ: Template Params` rows itself. MJAPI caches prompts and prompt
+  models (`AIEngineBase`): **restart MJAPI after a push.** A change saved through MJAPI itself (its
+  GraphQL mutations) reaches the cache without a restart, but not at once: a `Read again` 1 s after
+  restoring the reader's model rows still saw the old list; one 35 s later used Gemini (measured).
+  No cache broadcast is configured on this instance, so a change from another process needs a restart.
+- MJAPI starts the queue from `EvidenceRouteExtension.OnAllExtensionsMounted`
+  (`packages/Server/src/reading/background.ts`): it registers the upload nudge, runs the boot sweep 10 s
+  later and then sweeps every 5 minutes (log: `Credentialing: reading queue started (boot sweep in 10 s,
+  then every 5 minutes).`). A server whose `serverRole` is `api` does not start it.
+- The first boot after this task read the 89 waiting documents of earlier checks: 82 with no bound
+  standard became `0 passages found for 0 standards.` with no model call, and the 7 waiting scans were
+  recognized on Gemini. Any later `Pending`/`Running`-stale document is picked up within 5 minutes
+  without a person acting; a document set to `Pending` before a restart was read at boot (measured:
+  process start 23:03:15Z, reader runs 23:04:06Z, attempt 1).
+- `mj test run` registers no nudge and no timer; checks call `ReadingQueue.DrainOnce` / `Sweep` with
+  `ReadingQueue.Seams.OnlySubjectIDs` set to their own scratch subjects, so fixture answers never reach
+  another document.
+
+```sh
+corepack pnpm --filter @mj-biz-apps/credentialing-core-entities-server exec vitest run src/__tests__/ReadingQueue.test.ts   # 22 tests
+corepack pnpm --filter @mj-biz-apps/credentialing-server exec vitest run src/reading                                       # 17 tests
+MJ_INTEGRATION_TEST=1 RUN_MUTATION_TESTS=1 corepack pnpm mj test run --name "CRD-12 - Reader"                               # 10 checks
+corepack pnpm run -s persona applicant-reading      # the reading persona (Sample Reading Applicant)
+```
+
+The world's `Sample Reading Program` 2026 (OrgA) has R.1 (Prefill) and R.2 (Locate) bound to `Safety
+policy` by one `Document Extraction` source each (written through the entity on the Draft version
+before the loader activates it), R.3 (Manual) unbound, and `Other record` with no bound standard. Its
+subject `Sample Reading Applicant` has the contact `applicant.reading@example.test`.
+
+## Prefill resolution: write cost and record-change overhead (B2 Task 10)
+
+- **Why `TransactionGroup` was slower than direct entity saves.** `PrefillRunner.RunForApplication`
+  runs inside `OperationWrite.Run` (`RunInEntityTransaction`), which already holds one SQL Server
+  transaction. Enlisting 300 writes (150 `StandardResponse` updates + 150 `ResponseCitation`
+  inserts on a 150-standard application) in `TransactionGroup` (`BatchedSubmit = true` or `false`,
+  chunk sizes 3–300) measured **5,400–7,559 ms** because `SQLServerTransactionGroup` replaces
+  parameters with inline SQL literals and appends unique `_<guid>` table suffixes on each item,
+  busting SQL Server's plan cache on every write (`mj/packages/SQLServerDataProvider/src/SQLServerTransactionGroup.ts`).
+- **Direct entity saves + pre-loaded authoring + concurrent reads.** Pre-loading the version's
+  `Standard` and `ResponseSource` rows before acquiring the subject lock (the lock does not protect
+  authoring), running `loadStateInsideLock` and `DocumentExtractionEvaluator.Evaluate` concurrently
+  inside the lock, skipping `Unchanged` rows, and calling `OperationWrite.Save` directly inside the
+  single ambient transaction (`SkipEntityAIActions: true`, `SaveReturnMode: 'datestamps_only'`)
+  dropped the isolated 150-standard run to **2,883 ms** (`SQL: 2,725 ms`, `JS/RunView: 158 ms`:
+  6 read queries completing by `+78 ms`, 150 `StandardResponse` updates `1,353 ms` / `9.0 ms` avg,
+  150 `ResponseCitation` inserts `~1,200 ms` / `8.0 ms` avg).
+- **Where the remaining time goes (`spCreateRecordChange_Internal`).** Profiling the same 300
+  entity saves with `EntitySaveOptions.SkipRecordChanges` isolates the platform audit cost on this
+  ARM64 Docker SQL Server instance:
+  - Both `StandardResponse` and `ResponseCitation` recording `RecordChange` (production NFR-3.1): **~2.9–3.6 s** warm (`3,572 ms` in paired save microbenchmark).
+  - `SkipRecordChanges: true` on `ResponseCitation` only: **2,007 ms** (`1,508 ms` responses + `448 ms` citations).
+  - `SkipRecordChanges: true` on both: **602 ms** (`318 ms` responses + `264 ms` citations).
+  Thus **~83% (~2.5–3.0 s)** of the 300-write lock duration is MJ's per-save `INSERT INTO
+  @ResultChangesTable EXEC [__mj].spCreateRecordChange_Internal` inside `WrapSaveCallWithRecordChange`.
+  We keep `TrackRecordChanges` active on every credentialing entity (including `ResponseCitation`) to
+  preserve NFR-3.1's complete audit trail; any future plan needing sub-second 150-standard bulk
+  prefills would need platform-level batched record-change writing.
+
+## Notifications without `UI` (B2 Task 11 Step 3 discovery)
+
+Verified from MJ v6.2.2 (`mj/packages/Communication/notifications/src/NotificationEngine.ts:118-300`,
+`mj/packages/MJCoreEntities/src/engines/UserInfoEngine.ts:170-257, 297-382, 1434-1436`,
+`mj/packages/Angular/Explorer/explorer-core/src/lib/user-notifications/user-notifications.component.ts:451-524, 655-813`,
+and `metadata/entity-permissions/.core-entity-permissions.json`):
+
+- **How `NotificationEngine` is configured and which user writes:** `NotificationEngine.Instance`
+  (package `@memberjunction/notifications`) is a `BaseEngine` singleton. Calling
+  `NotificationEngine.Instance.Config(false, systemUser, Metadata.Provider)` configures
+  `UserInfoEngine.Instance` (loading `MJ: User Notification Types`, `MJ: User Notification
+  Preferences`, etc. without a per-user filter on the server `Database` provider) and loads `MJ: Scoped
+  Notification Configs`. Passing `Metadata.Provider` (never a short-lived isolated provider from
+  `CreateIsolatedProvider()`, because `BaseEngine` caches `_provider` as `ProviderToUse` across
+  calls) ensures the engine's provider stays alive across requests. `createInAppNotification`
+  (`NotificationEngine.ts:276`) calls `md.GetEntityObject('MJ: User Notifications', contextUser)` and
+  saves as `contextUser` (`SystemUser`). An applicant holds `CanCreate: false` on `MJ: User
+  Notifications`, so running as `SystemUser` after the submission transaction commits is required.
+- **How staff without `UI` read and open the notification:**
+  - `Credentialing Staff` already holds `CanRead: true, CanUpdate: true` on `MJ: User Notifications`
+    with row filter `Magic Link: Own Rows by UserID` (`UserID = '{{UserID}}'`) and `CanRead: true` on
+    `MJ: Resource Types` (`Credentialing: Resource Type Catalog`, `1 = 1`). No new entity permission
+    was needed.
+  - `Credentialing Staff` holds `CanRead: true` on `MJ: User Notification Types` with
+    `Credentialing: Shell Empty` (`1 = 0`). `UserInfoEngine.NotificationTypes` returns `[]` without
+    throwing, and `UserNotificationsComponent` falls back to `'Notification'` / `'fa-bell'` while still
+    rendering every notification's `Title`, `Message`, and clickable link.
+  - `UserNotificationsComponent.navigateToResource` (`user-notifications.component.ts:783-813`)
+    routes only `Records` (`OpenEntityRecord`), `User Views`, `Dashboards`, and built-in chat/meeting
+    configs; it has no `Custom` nav-item target. Therefore `EngineStaffNotifier` targets `ResourceTypeID`
+    = `Records` (`DAAFCCEC-6A37-EF11-86D4-000D3A4E707E`), `ResourceRecordID` = `ApplicationID` (bare UUID;
+    the `MJ: User Notifications.ResourceRecordID` column is `uniqueidentifier`), and
+    `ResourceConfiguration` = `{ Entity: 'MJ_BizApps_Credentialing: Applications' }`. Because MJ 6.2.2
+    `SimpleLoadFromURLSegment` ignores bare UUIDs without `|` and routes to `/record/.../new` (which
+    allocates an unsaved `record.ID`), `packages/Angular` registers
+    `ApplicationRecordRedirectFormComponent` (`@RegisterClass(BaseFormComponent, CredentialingEntity.Application, 100)`)
+    extending `BaseFormComponent` to resolve the target `ApplicationID` (using `record.ID` when
+    `record.IsSaved`, or falling back to `SharedService.UserNotifications`), open `Credentialing`'s
+    `Pipeline` nav item with `applicationId`, and close the temporary Application record tab(s).
+- **Notification type metadata:** `metadata/user-notification-types/.credentialing-notification-types.json`
+  defines `Credentialing: Application Submitted` (`DefaultInApp: true`, `DefaultEmail: false`,
+  `DefaultSMS: false`, `AllowUserPreference: true`), pushed via `mj sync push --dir=metadata`.

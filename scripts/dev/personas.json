@@ -35,7 +35,42 @@
       "signIn": "magic-link",
       "role": "Credentialing Applicant",
       "account": "world",
-      "about": "external applicant; the world creates the account and its role, the redemption adds the application row"
+      "about": "external applicant; contact of Sample Applicant One only"
+    },
+    "applicant-b": {
+      "email": "applicant.b@example.test",
+      "signIn": "magic-link",
+      "role": "Credentialing Applicant",
+      "account": "world",
+      "about": "external applicant; contact of Sample Applicant Two only (OrgA)"
+    },
+    "applicant-two": {
+      "email": "applicant.two@example.test",
+      "signIn": "magic-link",
+      "role": "Credentialing Applicant",
+      "account": "world",
+      "about": "external applicant; contact of both Sample Applicant One and Sample Applicant Two (for the subject picker)"
+    },
+    "applicant-org-b": {
+      "email": "applicant.orgb@example.test",
+      "signIn": "magic-link",
+      "role": "Credentialing Applicant",
+      "account": "world",
+      "about": "external applicant; contact of Sample Applicant Org B only (OrgB)"
+    },
+    "applicant-evidence": {
+      "email": "applicant.evidence@example.test",
+      "signIn": "magic-link",
+      "role": "Credentialing Applicant",
+      "account": "world",
+      "about": "external applicant; contact of Sample Evidence Applicant (Sample Evidence Program with Normal and Restricted Allowed requirements)"
+    },
+    "applicant-reading": {
+      "email": "applicant.reading@example.test",
+      "signIn": "magic-link",
+      "role": "Credentialing Applicant",
+      "account": "world",
+      "about": "external applicant; contact of Sample Reading Applicant (Sample Reading Program: R.1 Prefill and R.2 Locate bound to Safety policy, R.3 Manual, Other record unbound)"
     },
     "reviewer-a": {
       "email": "reviewer.a@example.test",

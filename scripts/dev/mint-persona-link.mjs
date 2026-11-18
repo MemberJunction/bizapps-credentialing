@@ -49,7 +49,7 @@ export const MJAPI_BASE_URL = (process.env.MJAPI_URL?.trim() || 'http://localhos
 /** @typedef {{ email: string; signIn: 'dev-login'; about: string }} Issuer the account that issues magic links */
 /** @typedef {{ application: string; issuer: Issuer; personas: Record<string, Persona> }} PersonaFile */
 /** @typedef {import('@memberjunction/graphql-dataprovider').GraphQLDataProvider} Session */
-/** @typedef {{ Name: string; Email: string; Provider: Session }} PersonaSession */
+/** @typedef {{ Name: string; Email: string; Token: string; Provider: Session }} PersonaSession */
 /**
  * @typedef {object} CreateInviteResponse the body of `POST /magic-link/create` (MagicLinkService.CreateInvite)
  * @property {boolean} success
@@ -211,8 +211,9 @@ export function CloseSessions() {
  * @returns {Promise<PersonaSession>}
  */
 export async function OpenDevLoginSession(email) {
-  const provider = await openSession(await DevLogin(email), () => DevLogin(email));
-  return { Name: email, Email: email, Provider: provider };
+  const token = await DevLogin(email);
+  const provider = await openSession(token, () => DevLogin(email));
+  return { Name: email, Email: email, Token: token, Provider: provider };
 }
 
 /** @type {Session | null} the issuer's session, reused for every link this process mints */
@@ -284,7 +285,7 @@ export async function OpenPersonaSession(name) {
   const link = await MintMagicLink(name);
   const token = await RedeemMagicLink(link.rawToken, persona.email);
   const provider = await openSession(token, async () => token);
-  return { Name: name, Email: persona.email, Provider: provider };
+  return { Name: name, Email: persona.email, Token: token, Provider: provider };
 }
 
 /** CLI: `pnpm run persona <name>` prints `token=<jwt>` or `url=<redemptionUrl>`. */

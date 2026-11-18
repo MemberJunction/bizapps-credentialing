@@ -3,8 +3,13 @@ import { AreaNav, AreaNavItem, CredentialingResource, CredentialingRole, Standin
 
 const ORG_A = { ID: 'A1111111-1111-1111-1111-111111111111', Name: 'Organization A' };
 
-function standing(roleNames: string[], staffOrganizations: { ID: string; Name: string }[] = [], organizationCount: number | null = null): Standing {
-    return { RoleNames: roleNames, StaffOrganizations: staffOrganizations, OrganizationCount: organizationCount };
+function standing(
+    roleNames: string[],
+    staffOrganizations: { ID: string; Name: string }[] = [],
+    organizationCount: number | null = null,
+    subjectCount: number = 0,
+): Standing {
+    return { RoleNames: roleNames, StaffOrganizations: staffOrganizations, OrganizationCount: organizationCount, SubjectCount: subjectCount };
 }
 
 function labels(items: AreaNavItem[]): string[] {
@@ -16,11 +21,12 @@ function defaults(items: AreaNavItem[]): AreaNavItem[] {
 }
 
 describe('AreaNav', () => {
-    it('staff with a membership get Program Studio as the default item, state Ready', () => {
+    it('staff with a membership get Program Studio (default) and Pipeline, state Ready', () => {
         const s = standing([CredentialingRole.Staff], [ORG_A]);
         const items = AreaNav.ItemsFor(s);
         expect(items).toEqual([
             { Area: 'Staff', Label: 'Program Studio', Icon: expect.any(String), DriverClass: 'CredentialingProgramStudioResource', IsDefault: true },
+            { Area: 'Staff', Label: 'Pipeline', Icon: expect.any(String), DriverClass: 'CredentialingPipelineResource', IsDefault: false },
         ]);
         expect(AreaNav.StaffState(s)).toBe('Ready');
         expect(AreaNav.AreasFor(s)).toEqual(['Staff']);
@@ -47,13 +53,13 @@ describe('AreaNav', () => {
     it('New organization is not the default when the admin has another item', () => {
         const s = standing([CredentialingRole.Admin, CredentialingRole.Staff], [ORG_A], 3);
         const items = AreaNav.ItemsFor(s);
-        expect(labels(items)).toEqual(['Program Studio', 'New organization']);
+        expect(labels(items)).toEqual(['Program Studio', 'Pipeline', 'New organization']);
         expect(labels(defaults(items))).toEqual(['Program Studio']);
     });
 
-    it('staff with no membership still get Program Studio, state NoMembership', () => {
+    it('staff with no membership still get Program Studio (default) and Pipeline, state NoMembership', () => {
         const s = standing([CredentialingRole.Staff], []);
-        expect(labels(AreaNav.ItemsFor(s))).toEqual(['Program Studio']);
+        expect(labels(AreaNav.ItemsFor(s))).toEqual(['Program Studio', 'Pipeline']);
         expect(AreaNav.StaffState(s)).toBe('NoMembership');
     });
 
@@ -69,10 +75,20 @@ describe('AreaNav', () => {
         expect(labels(AreaNav.ItemsFor(standing([CredentialingRole.Reviewer, CredentialingRole.Committee])))).toEqual(['Assignments']);
     });
 
-    it('an applicant gets only My Applications', () => {
-        const s = standing([CredentialingRole.Applicant], [], null);
+    it('an applicant with no subject gets only My Applications', () => {
+        const s = standing([CredentialingRole.Applicant], [], null, 0);
         expect(AreaNav.ItemsFor(s)).toEqual([
             { Area: 'Applicant', Label: 'My Applications', Icon: expect.any(String), DriverClass: 'CredentialingApplicantHomeResource', IsDefault: true },
+        ]);
+        expect(AreaNav.AreasFor(s)).toEqual(['Applicant']);
+    });
+
+    it.each([1, 2])('an applicant with %i subject(s) gets My Applications (default), Standards, and Documents', (subjectCount) => {
+        const s = standing([CredentialingRole.Applicant], [], null, subjectCount);
+        expect(AreaNav.ItemsFor(s)).toEqual([
+            { Area: 'Applicant', Label: 'My Applications', Icon: expect.any(String), DriverClass: 'CredentialingApplicantHomeResource', IsDefault: true },
+            { Area: 'Applicant', Label: 'Standards', Icon: expect.any(String), DriverClass: 'CredentialingApplicantStandardsResource', IsDefault: false },
+            { Area: 'Applicant', Label: 'Documents', Icon: expect.any(String), DriverClass: 'CredentialingApplicantDocumentsResource', IsDefault: false },
         ]);
         expect(AreaNav.AreasFor(s)).toEqual(['Applicant']);
     });
@@ -94,7 +110,7 @@ describe('AreaNav', () => {
     it('first-run setup outranks Program Studio as the default for an admin who is also staff', () => {
         const s = standing([CredentialingRole.Staff, CredentialingRole.Admin], [], 0);
         const items = AreaNav.ItemsFor(s);
-        expect(labels(items)).toEqual(['Program Studio', 'Set up organization']);
+        expect(labels(items)).toEqual(['Program Studio', 'Pipeline', 'Set up organization']);
         expect(labels(defaults(items))).toEqual(['Set up organization']);
         expect(AreaNav.StaffState(s)).toBe('FirstRunSetup');
     });
@@ -113,17 +129,27 @@ describe('AreaNav', () => {
 
 describe('AreaNav.CanOpen', () => {
     const R = CredentialingResource;
-    const allResources = [R.ProgramStudio, R.OrganizationSetup, R.ReviewHome, R.ApplicantHome];
+    const allResources = [R.ProgramStudio, R.Pipeline, R.OrganizationSetup, R.ReviewHome, R.ApplicantHome, R.ApplicantStandards, R.ApplicantDocuments];
 
     /** Which resources each single role may open, with the standing that role loads. */
     const cases: { Name: string; Standing: Standing; Opens: string[] }[] = [
-        { Name: 'Staff with a membership', Standing: standing([CredentialingRole.Staff], [ORG_A]), Opens: [R.ProgramStudio] },
-        { Name: 'Staff without a membership', Standing: standing([CredentialingRole.Staff], []), Opens: [R.ProgramStudio] },
+        { Name: 'Staff with a membership', Standing: standing([CredentialingRole.Staff], [ORG_A]), Opens: [R.ProgramStudio, R.Pipeline] },
+        { Name: 'Staff without a membership', Standing: standing([CredentialingRole.Staff], []), Opens: [R.ProgramStudio, R.Pipeline] },
         { Name: 'Admin, first run', Standing: standing([CredentialingRole.Admin], [], 0), Opens: [R.OrganizationSetup] },
         { Name: 'Admin with organizations', Standing: standing([CredentialingRole.Admin], [], 5), Opens: [R.OrganizationSetup] },
         { Name: 'Reviewer', Standing: standing([CredentialingRole.Reviewer]), Opens: [R.ReviewHome] },
         { Name: 'Committee', Standing: standing([CredentialingRole.Committee]), Opens: [R.ReviewHome] },
-        { Name: 'Applicant', Standing: standing([CredentialingRole.Applicant]), Opens: [R.ApplicantHome] },
+        { Name: 'Applicant with 0 subjects', Standing: standing([CredentialingRole.Applicant], [], null, 0), Opens: [R.ApplicantHome] },
+        {
+            Name: 'Applicant with 1 subject',
+            Standing: standing([CredentialingRole.Applicant], [], null, 1),
+            Opens: [R.ApplicantHome, R.ApplicantStandards, R.ApplicantDocuments],
+        },
+        {
+            Name: 'Applicant with 2 subjects',
+            Standing: standing([CredentialingRole.Applicant], [], null, 2),
+            Opens: [R.ApplicantHome, R.ApplicantStandards, R.ApplicantDocuments],
+        },
         { Name: 'no credentialing role', Standing: standing(['UI', 'Developer']), Opens: [] },
     ];
 
@@ -138,7 +164,7 @@ describe('AreaNav.CanOpen', () => {
 
     it('a user holding several roles can open each of their areas and nothing else', () => {
         const s = standing([CredentialingRole.Staff, CredentialingRole.Applicant], [ORG_A]);
-        expect(allResources.filter((r) => AreaNav.CanOpen(s, r))).toEqual([R.ProgramStudio, R.ApplicantHome]);
+        expect(allResources.filter((r) => AreaNav.CanOpen(s, r))).toEqual([R.ProgramStudio, R.Pipeline, R.ApplicantHome]);
     });
 
     it('an unknown driver class is never openable', () => {

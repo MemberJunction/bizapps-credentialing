@@ -94,22 +94,30 @@ export class StandingService {
         const roleNames = (user?.UserRoles ?? []).map((r) => r.Role);
         const isStaff = StandingService.holds(roleNames, CredentialingRole.Staff);
         const isAdmin = StandingService.holds(roleNames, CredentialingRole.Admin);
-        const params = StandingService.viewsFor(user, isStaff, isAdmin);
+        const isApplicant = StandingService.holds(roleNames, CredentialingRole.Applicant);
+        const params = StandingService.viewsFor(user, isStaff, isAdmin, isApplicant);
         if (params.length === 0) {
-            return { RoleNames: roleNames, StaffOrganizations: [], OrganizationCount: null };
+            return { RoleNames: roleNames, StaffOrganizations: [], OrganizationCount: null, SubjectCount: 0 };
         }
         const results = await this.source.RunViews<StaffOrganization>(params);
         const failed = results.find((r) => !r.Success);
         if (failed) {
             throw new Error(failed.ErrorMessage || 'Your Credentialing standing could not be loaded.');
         }
-        const organizations = isStaff ? results[0].Results.map((r) => ({ ID: r.ID, Name: r.Name })) : [];
-        const countResult = isAdmin ? results[isStaff ? 1 : 0] : null;
-        return { RoleNames: roleNames, StaffOrganizations: organizations, OrganizationCount: countResult ? (countResult.TotalRowCount ?? 0) : null };
+        let cursor = 0;
+        const organizations = isStaff && user ? results[cursor++].Results.map((r) => ({ ID: r.ID, Name: r.Name })) : [];
+        const countResult = isAdmin ? results[cursor++] : null;
+        const subjectResult = isApplicant && user ? results[cursor++] : null;
+        return {
+            RoleNames: roleNames,
+            StaffOrganizations: organizations,
+            OrganizationCount: countResult ? (countResult.TotalRowCount ?? 0) : null,
+            SubjectCount: subjectResult ? (subjectResult.TotalRowCount ?? 0) : 0,
+        };
     }
 
-    /** The views the roles call for: the staff member's organizations first, then the admin's count. */
-    private static viewsFor(user: StandingUser | null, isStaff: boolean, isAdmin: boolean): RunViewParams[] {
+    /** The views the roles call for: staff organizations, admin organization count, and applicant subject count. */
+    private static viewsFor(user: StandingUser | null, isStaff: boolean, isAdmin: boolean, isApplicant: boolean): RunViewParams[] {
         const params: RunViewParams[] = [];
         if (isStaff && user) {
             params.push({
@@ -124,6 +132,13 @@ export class StandingService {
         }
         if (isAdmin) {
             params.push({ EntityName: CredentialingEntity.AccreditingOrganization, ResultType: 'count_only' });
+        }
+        if (isApplicant && user) {
+            params.push({
+                EntityName: CredentialingEntity.SubjectContact,
+                ExtraFilter: `UserID = '${EscapeSQLString(user.ID)}'`,
+                ResultType: 'count_only',
+            });
         }
         return params;
     }

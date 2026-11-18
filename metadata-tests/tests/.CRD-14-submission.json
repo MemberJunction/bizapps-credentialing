@@ -1,0 +1,24 @@
+{
+  "fields": {
+    "TypeID": "@lookup:MJ: Test Types.Name=Integration Test",
+    "Name": "CRD-14 - Submission",
+    "Description": "Verify review and submit: gate evaluation, attestation validation, concurrent double-submit exclusion, post-submit freeze of responses/evidence/attestations/prefills/late-reading, applicant-only authorization, staff notifications (best effort), and durable ApplicationEvents dispatch/redispatch.",
+    "InputDefinition": {},
+    "ExpectedOutcomes": {
+      "summary": "All fifteen cred-submission checks pass."
+    },
+    "Configuration": {
+      "tier": "deterministic",
+      "transport": "server",
+      "checks": [
+        {
+          "type": "cred-submission"
+        }
+      ]
+    },
+    "Status": "Active"
+  },
+  "primaryKey": {
+    "ID": "A8B0F03F-63CA-4B54-BB52-C8EB69C0F2EE"
+  }
+}

@@ -1,0 +1,43 @@
+<div
+    class="cred-dropzone"
+    [class.cred-dropzone--dragging]="IsDragging"
+    [class.cred-dropzone--disabled]="Disabled || IsUploading"
+    (dragover)="OnDragOver($event)"
+    (dragleave)="OnDragLeave($event)"
+    (drop)="OnDrop($event)">
+    <input
+        #fileInput
+        type="file"
+        class="cred-dropzone__input"
+        [attr.accept]="AcceptedTypes"
+        [disabled]="Disabled || IsUploading"
+        (change)="OnFileSelected($event)" />
+
+    <div class="cred-dropzone__content">
+        <div class="cred-dropzone__text">
+            <span class="cred-dropzone__prompt">{{ Label }}</span>
+            <span class="cred-dropzone__note">{{ DoesNotSubmitSentence }}</span>
+        </div>
+        <button
+            mjButton
+            Variant="outline"
+            type="button"
+            class="cred-dropzone__btn"
+            [disabled]="Disabled || IsUploading"
+            (click)="OpenPicker()">
+            @if (IsUploading) {
+                <i class="fa-solid fa-spinner fa-spin" aria-hidden="true"></i>
+                Uploading {{ SelectedFileName }}...
+            } @else {
+                <i class="fa-solid fa-upload" aria-hidden="true"></i>
+                Choose file
+            }
+        </button>
+    </div>
+
+    @if (ErrorMessage) {
+        <div class="cred-dropzone__error" role="alert">
+            <mj-alert Variant="error" [Message]="ErrorMessage" [Dismissible]="true" (Dismissed)="ErrorMessage = ''"></mj-alert>
+        </div>
+    }
+</div>

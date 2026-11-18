@@ -22,11 +22,13 @@
   "dependencies": {
     "@mj-biz-apps/credentialing-core": "0.0.0",
     "@mj-biz-apps/credentialing-core-entities-server": "0.0.0",
-    "@mj-biz-apps/credentialing-entities": "0.0.0"
+    "@mj-biz-apps/credentialing-entities": "0.0.0",
+    "@mj-biz-apps/credentialing-server": "0.0.0"
   },
   "peerDependencies": {
     "@memberjunction/core": "^6.2.1",
     "@memberjunction/core-entities": "^6.2.1",
+    "@memberjunction/generic-database-provider": "^6.2.1",
     "@memberjunction/global": "^6.2.1",
     "@memberjunction/graphql-dataprovider": "^6.2.1",
     "@memberjunction/testing-integration": "^6.2.1",
@@ -36,6 +38,7 @@
   "devDependencies": {
     "@memberjunction/core": "6.2.2",
     "@memberjunction/core-entities": "6.2.2",
+    "@memberjunction/generic-database-provider": "6.2.2",
     "@memberjunction/global": "6.2.2",
     "@memberjunction/graphql-dataprovider": "6.2.2",
     "@memberjunction/testing-integration": "6.2.2",

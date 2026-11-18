@@ -31,7 +31,7 @@ export class CredentialingApplication extends BaseApplication {
         } catch (e) {
             LogError(`Credentialing navigation could not load the user's standing: ${e instanceof Error ? e.message : String(e)}`);
             const roleNames = (this.Provider.CurrentUser?.UserRoles ?? []).map((r) => r.Role);
-            return { RoleNames: roleNames, StaffOrganizations: [], OrganizationCount: null };
+            return { RoleNames: roleNames, StaffOrganizations: [], OrganizationCount: null, SubjectCount: 0 };
         }
     }
 

@@ -18,7 +18,8 @@ export class mjBizAppsCredentialingAccreditingOrganizationFormComponent extends 
         this.initSections([
             { sectionKey: 'details', sectionName: 'Details', isExpanded: true },
             { sectionKey: 'mJBizAppsCredentialingOrganizationMemberships', sectionName: 'Organization Memberships', isExpanded: false },
-            { sectionKey: 'mJBizAppsCredentialingPrograms', sectionName: 'Programs', isExpanded: false }
+            { sectionKey: 'mJBizAppsCredentialingPrograms', sectionName: 'Programs', isExpanded: false },
+            { sectionKey: 'mJBizAppsCredentialingSubjects', sectionName: 'Subjects', isExpanded: false }
         ]);
     }
 }

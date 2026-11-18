@@ -14,8 +14,10 @@ import { FormsModule } from '@angular/forms';
 import { BaseAngularComponent } from '@memberjunction/ng-base-types';
 import { SharedGenericModule } from '@memberjunction/ng-shared-generic';
 import { MJButtonDirective, MJDropdownComponent, MJSwitchComponent } from '@memberjunction/ng-ui-components';
-import { CredentialingEntity, NOT_FOUND_REASON, StandardAuthoringRules } from '@mj-biz-apps/credentialing-core';
+import { CredentialingEntity, NOT_FOUND_REASON, StandardAuthoringRules, type VersionStatus } from '@mj-biz-apps/credentialing-core';
 import type { mjBizAppsCredentialingStandardEntity } from '@mj-biz-apps/credentialing-entities';
+import { ResponseSourcesComponent } from './response-sources.component';
+import type { RequirementRow } from './studio-data';
 import { StudioTree, type StandardErrorField } from './studio-tree';
 import { StudioMessages } from '../studio-messages';
 
@@ -34,7 +36,7 @@ export interface NewStandardTarget {
 @Component({
     standalone: true,
     selector: 'bizapps-cred-standard-editor',
-    imports: [FormsModule, SharedGenericModule, MJButtonDirective, MJDropdownComponent, MJSwitchComponent],
+    imports: [FormsModule, SharedGenericModule, MJButtonDirective, MJDropdownComponent, MJSwitchComponent, ResponseSourcesComponent],
     templateUrl: './standard-editor.component.html',
     styleUrls: ['./standard-editor.component.scss'],
 })
@@ -46,6 +48,12 @@ export class StandardEditorComponent extends BaseAngularComponent {
 
     /** Sections and standards of this version can be edited. False renders read-only text. */
     @Input() CanAuthor = false;
+
+    /** Version status governing whether sources can be edited or are read-only. */
+    @Input() VersionStatus: VersionStatus = 'Draft';
+
+    /** Document requirements belonging to the selected version. */
+    @Input() Requirements: readonly RequirementRow[] = [];
 
     /** The standard to show; setting it loads the record. */
     @Input()

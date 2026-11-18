@@ -58,8 +58,16 @@ const CREDENTIALING_ROLES: readonly string[] = [...INTERNAL_ROLES, ...EXTERNAL_R
 /** Platform entities whose rows route around row filters (FRD NFR-2.2); no credentialing role may hold any grant on them. */
 const FORBIDDEN_ENTITIES = ['MJ: Record Changes', 'MJ: Queries'] as const;
 
-/** The seven entities of this app's schema. */
-const ALL_ENTITIES: readonly string[] = Object.values(CredentialingEntity);
+/** The seven B1 entities of this app's schema (Task 3 adds applicant-entity isolation checks). */
+const ALL_ENTITIES: readonly string[] = [
+    CredentialingEntity.AccreditingOrganization,
+    CredentialingEntity.OrganizationMembership,
+    CredentialingEntity.Program,
+    CredentialingEntity.ProgramVersion,
+    CredentialingEntity.Section,
+    CredentialingEntity.Standard,
+    CredentialingEntity.DocumentRequirement,
+];
 
 /** The five program-tree entities, which carry an `AccreditingOrganizationID` only through their program. */
 const TREE_ENTITIES = [
@@ -89,7 +97,7 @@ async function readAs<T extends object>(
     fields: string[],
     asUser: UserInfo,
 ): Promise<ReadOutcome<T>> {
-    const res = await View(ctx).RunView<T>({ EntityName: entityName, ExtraFilter: filter, Fields: fields, ResultType: 'simple' }, asUser);
+    const res = await View(ctx).RunView<T>({ EntityName: entityName, ExtraFilter: filter, Fields: fields, ResultType: 'simple', IgnoreMaxRows: true, SkipTotalRowCount: true }, asUser);
     return res.Success ? { Rows: res.Results ?? [], Refusal: null } : { Rows: [], Refusal: res.ErrorMessage ?? 'unknown' };
 }
 
@@ -538,10 +546,11 @@ const checks: NamedCheck[] = [
             const world = await GetOrLoadWorld(ctx);
             const byStaffA = lower((await FindRows<{ ID: string }>(ctx, COMMITTEES_ENTITY, '', ['ID'], world.StaffA)).map((r) => r.ID));
             Assert(byStaffA.has(world.CommitteeA.ID.toLowerCase()), 'StaffA reads CommitteeA');
-            for (const [label, user] of [['StaffB', world.StaffB], ['StaffNoMembership', world.StaffNoMembership]] as const) {
-                const rows = await FindRows<{ ID: string }>(ctx, COMMITTEES_ENTITY, '', ['ID'], user);
-                AssertEqual(rows.length, 0, `committees ${label} reads`);
-            }
+            Assert(!byStaffA.has(world.CommitteeB.ID.toLowerCase()), 'StaffA does not read CommitteeB');
+            const byStaffB = (await FindRows<{ ID: string }>(ctx, COMMITTEES_ENTITY, '', ['ID'], world.StaffB)).map((r) => r.ID.toLowerCase());
+            AssertEqual(byStaffB.join(', '), world.CommitteeB.ID.toLowerCase(), 'committees StaffB reads (exactly CommitteeB, never CommitteeA)');
+            const byNone = await FindRows<{ ID: string }>(ctx, COMMITTEES_ENTITY, '', ['ID'], world.StaffNoMembership);
+            AssertEqual(byNone.length, 0, 'committees StaffNoMembership reads');
         },
     },
 ];

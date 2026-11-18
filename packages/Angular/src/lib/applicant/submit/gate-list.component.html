@@ -1,0 +1,40 @@
+<ul class="cred-gate" aria-label="Submission readiness checklist">
+    @for (item of Items; track item.Kind + ':' + item.Label + ':' + (item.Target.SectionID ?? '') + ':' + (item.Target.StandardID ?? '') + ':' + (item.Target.RequirementID ?? '')) {
+        <li
+            class="cred-gate__row"
+            [class.cred-gate__row--pass]="item.Passed"
+            [class.cred-gate__row--gap]="!item.Passed">
+            <div class="cred-gate__status">
+                @if (item.Passed) {
+                    <span class="cred-gate__pill cred-gate__pill--pass">
+                        <i class="fa-solid fa-check" aria-hidden="true"></i>
+                        <span>Pass</span>
+                    </span>
+                } @else {
+                    <span class="cred-gate__pill cred-gate__pill--gap">
+                        <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
+                        <span>Needs attention</span>
+                    </span>
+                }
+            </div>
+            <div class="cred-gate__body">
+                <div class="cred-gate__title-line">
+                    <span class="cred-gate__kind">{{ item.Kind }}</span>
+                    <span class="cred-gate__label">{{ item.Label }}</span>
+                </div>
+                <p class="cred-gate__detail">{{ item.Detail }}</p>
+            </div>
+            @if (CanNavigate(item)) {
+                <div class="cred-gate__action">
+                    <button
+                        mjButton
+                        Variant="outline"
+                        type="button"
+                        (click)="OnOpenGap(item)">
+                        {{ ActionLabel(item) }}
+                    </button>
+                </div>
+            }
+        </li>
+    }
+</ul>

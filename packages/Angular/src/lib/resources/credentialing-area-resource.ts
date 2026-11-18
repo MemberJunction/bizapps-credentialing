@@ -30,6 +30,15 @@ export abstract class CredentialingAreaResource extends BaseResourceComponent im
     public ErrorMessage = '';
     public readonly NotAvailableMessage = AREA_NOT_AVAILABLE_MESSAGE;
 
+    /**
+     * Increases each time Explorer shows this resource's cached tab again. Explorer keeps a resource
+     * component alive while its tab is hidden and runs no init when it comes back
+     * (`NavigationService.ResourceReattached$`), so a page bound to this reloads its data then:
+     * otherwise an answer the reader drafted, or a document uploaded on another screen, would not show
+     * until the browser reloaded.
+     */
+    public RefreshKey = 0;
+
     /** The registration name of the subclass, as `AreaNav` knows it. */
     protected abstract get DriverClass(): string;
 
@@ -40,7 +49,22 @@ export abstract class CredentialingAreaResource extends BaseResourceComponent im
 
     override ngOnInit(): void {
         super.ngOnInit();
-        void this.guardAndOpen();
+        const reattached = this.navigationService.ResourceReattached$.subscribe((resource) => {
+            if (resource === this) {
+                this.OnReattached();
+            }
+        });
+        this.destroy$.subscribe(() => reattached.unsubscribe());
+        void this.GuardAndOpen();
+    }
+
+    /** Explorer showed this cached resource again: pages bound to {@link RefreshKey} reload. */
+    protected OnReattached(): void {
+        if (this.State !== 'Open') {
+            return;
+        }
+        this.RefreshKey++;
+        this.cdr.markForCheck();
     }
 
     /** The standing service reading through this component's provider. */
@@ -48,7 +72,12 @@ export abstract class CredentialingAreaResource extends BaseResourceComponent im
         return StandingService.ForProvider(this.ProviderToUse);
     }
 
-    private async guardAndOpen(): Promise<void> {
+    /**
+     * Opens the resource when the user's standing serves its area. `OnOpen` may itself decide what the
+     * resource shows (a subject in the URL the user holds no contact on is `NotAvailable`); that decision
+     * stands, and only a resource still `Loading` becomes `Open`.
+     */
+    protected async GuardAndOpen(): Promise<void> {
         try {
             const standing = await this.StandingLoader().Load();
             if (!AreaNav.CanOpen(standing, this.DriverClass)) {
@@ -56,7 +85,9 @@ export abstract class CredentialingAreaResource extends BaseResourceComponent im
                 return;
             }
             await this.OnOpen(standing);
-            this.State = 'Open';
+            if (this.State === 'Loading') {
+                this.State = 'Open';
+            }
         } catch (e) {
             this.ErrorMessage = StudioMessages.FromError(e, 'load');
             this.State = 'Error';

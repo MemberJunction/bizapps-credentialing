@@ -24,6 +24,7 @@ import {
   ImportCredentialing,
   ImportMJ,
   LoadPersonas,
+  MJAPI_BASE_URL,
   OpenDevLoginSession,
   OpenPersonaSession,
   RouteConsoleToStderr,
@@ -34,24 +35,91 @@ RouteConsoleToStderr();
 const { CompositeKey, RunView } = await ImportMJ();
 const {
   CredentialingEntity,
+  CredentialingOperation,
   CreateProgramOperation,
   CloneVersionToDraftOperation,
   ReorderVersionTreeOperation,
   CreateOrganizationOperation,
   CreateCommitteeOperation,
+  InviteApplicantOperation,
+  ReissueInvitationOperation,
+  GetMySubjectsOperation,
+  GetApplicationWorkspaceOperation,
+  SaveResponseOperation,
+  ConfirmResponseOperation,
+  ReopenResponseOperation,
+  WithdrawApplicationOperation,
+  AttestInLieuOperation,
+  ConfirmDocumentCurrentOperation,
+  GetDocumentLibraryOperation,
+  RequeueReadingOperation,
+  SaveResponseSourcesOperation,
+  RefreshPrefillsOperation,
+  GetSubmissionGateOperation,
+  SubmitApplicationOperation,
 } = await ImportCredentialing();
 
 /** The world's program of accrediting body A (packages/IntegrationTests/src/world/load-world.ts). */
 const SAMPLE_PROGRAM_NAME = 'Sample Certified Practitioner';
 /** The world's program of accrediting body B, owned by staff-b. */
 const PROGRAM_B_NAME = 'Sample Program B';
+/** The world's Active program of accrediting body A, used by applicant-a and applicant-b. */
+const SAMPLE_APPLICANT_PROGRAM = 'Sample Applicant Program';
+const SAMPLE_APPLICANT_ONE = 'Sample Applicant One';
+const SAMPLE_APPLICANT_TWO = 'Sample Applicant Two';
+const SAMPLE_APPLICANT_ORG_B = 'Sample Applicant Org B';
 /** The local dev Owner that issues the links; also the control reader of P6, P7 and P10. */
 const CONTROL_EMAIL = LoadPersonas().issuer.email;
 const NOT_FOUND = 'Record not found.';
+const OPERATION_ONLY_REASON = "This record is changed only through the application's own actions.";
 const READ_REFUSAL = /does not have read permissions? on/i;
 
-const SEVEN_ENTITIES = Object.values(CredentialingEntity);
+/** Every credentialing entity (B1's seven and B2's ten). */
+const ALL_CREDENTIALING_ENTITIES = Object.values(CredentialingEntity);
+/**
+ * The entities an applicant never reads: B1's seven and Response Sources. Since B2 Task 3 applicant-a
+ * is a contact of the world subject `Sample Applicant One`, so it reads that subject's rows of the nine
+ * applicant-data entities by design (proved on the probe as P11).
+ */
+const AUTHORING_ENTITIES = [
+  CredentialingEntity.AccreditingOrganization,
+  CredentialingEntity.OrganizationMembership,
+  CredentialingEntity.Program,
+  CredentialingEntity.ProgramVersion,
+  CredentialingEntity.Section,
+  CredentialingEntity.Standard,
+  CredentialingEntity.DocumentRequirement,
+  CredentialingEntity.ResponseSource,
+];
+/** The nine applicant-data entities, each carrying its subject ID. */
+const APPLICANT_DATA_ENTITIES = [
+  { Name: CredentialingEntity.Subject, SubjectColumn: 'ID' },
+  { Name: CredentialingEntity.SubjectContact, SubjectColumn: 'SubjectID' },
+  { Name: CredentialingEntity.Application, SubjectColumn: 'SubjectID' },
+  { Name: CredentialingEntity.StandardResponse, SubjectColumn: 'SubjectID' },
+  { Name: CredentialingEntity.ResponseCitation, SubjectColumn: 'SubjectID' },
+  { Name: CredentialingEntity.EvidenceDocument, SubjectColumn: 'SubjectID' },
+  { Name: CredentialingEntity.DocumentAttestation, SubjectColumn: 'SubjectID' },
+  { Name: CredentialingEntity.ApplicationDocument, SubjectColumn: 'SubjectID' },
+  { Name: CredentialingEntity.Extraction, SubjectColumn: 'SubjectID' },
+];
 const PLATFORM_ENTITIES = ['MJ: Users', 'MJ: Entities', 'MJ_BizApps_Common: People', 'MJ_BizApps_Common: Organizations'];
+/** P16: authoring entities plus core/common/AI entities an applicant must read zero rows or refusal from. */
+const P16_ENTITIES = [
+  CredentialingEntity.Program,
+  CredentialingEntity.ProgramVersion,
+  CredentialingEntity.Section,
+  CredentialingEntity.Standard,
+  CredentialingEntity.DocumentRequirement,
+  CredentialingEntity.ResponseSource,
+  'MJ: Files',
+  'MJ: File Storage Accounts',
+  'MJ: Users',
+  'MJ_BizApps_Common: People',
+  'MJ_BizApps_Common: Organizations',
+  'MJ: Record Changes',
+  'MJ: AI Prompt Runs',
+];
 
 /** @typedef {import('@memberjunction/graphql-dataprovider').GraphQLDataProvider} Session */
 /** @typedef {{ Name: string; Email: string; Provider: Session }} PersonaSession */
@@ -272,9 +340,12 @@ function reversedStandards(target) {
 
 // ── cases ────────────────────────────────────────────────────────────────────────────────────────
 
-/** P1 / P3: an external role reads nothing from the seven credentialing entities. */
-async function caseSevenEntities(id, persona) {
-  await probeCase(id, persona.Name, () => readsNothingFromAll(persona.Provider, SEVEN_ENTITIES));
+/**
+ * P1 / P3: an external role reads nothing from `entities` — every credentialing entity for a reviewer
+ * or committee member (P3), the authoring entities for a subject contact (P1).
+ */
+async function caseSevenEntities(id, persona, entities = ALL_CREDENTIALING_ENTITIES) {
+  await probeCase(id, persona.Name, () => readsNothingFromAll(persona.Provider, entities));
 }
 
 /** P4: staff-b loads the sample program by its ID over GraphQL. */
@@ -494,13 +565,13 @@ async function caseInviteRows(persona, controlInvites) {
 }
 
 /**
- * P11: an actor deletes accrediting body A (the sample program's organization) over GraphQL. Only
+ * P10b (B1): an actor deletes accrediting body A (the sample program's organization) over GraphQL. Only
  * `Credentialing Admin` may delete an accrediting organization, so the attempt must be refused for
  * want of permission (or as not found, for a caller who cannot read the organization), and body A
  * must still exist, as the admin reads it.
  */
 async function caseDeleteOrganization(persona, admin, target) {
-  await probeCase('P11', persona.Name, async () => {
+  await probeCase('P10b', persona.Name, async () => {
     const organizationID = String(target.Program.AccreditingOrganizationID);
     const refusal = await gqlRefusal(
       persona.Provider,
@@ -520,7 +591,7 @@ async function caseDeleteOrganization(persona, admin, target) {
 }
 
 /**
- * P12: an actor calls `Credentialing.CreateCommittee` for the sample program of accrediting body A.
+ * P10c (B1): an actor calls `Credentialing.CreateCommittee` for the sample program of accrediting body A.
  * The operation writes the committee as the system user, so its own checks are all that stand between
  * a caller and another organization's committee list. staff-b (staff of body B) must be told
  * `Record not found.`, exactly as for a random program ID; applicant-a must be refused outright
@@ -534,7 +605,7 @@ async function caseDeleteOrganization(persona, admin, target) {
  * @param {'not-found' | 'forbidden'} expected
  */
 async function caseCreateCommittee(persona, control, target, committeeTypeID, expected) {
-  await probeCase('P12', persona.Name, async () => {
+  await probeCase('P10c', persona.Name, async () => {
     const name = `Probe Committee ${randomUUID().replace(/-/g, '').slice(0, 8)}`;
     /** @param {string} programID */
     const attempt = (programID) => new CreateCommitteeOperation().Execute({ ProgramID: programID, Name: name, CommitteeTypeID: committeeTypeID }, { provider: persona.Provider });
@@ -552,6 +623,654 @@ async function caseCreateCommittee(persona, control, target, committeeTypeID, ex
     return {
       passed: problems.length === 0,
       detail: problems.length ? problems.join('; ') : `CreateCommittee for the sample program: ${describe(real)}, like a random program ID; no committee created`,
+    };
+  });
+}
+
+// ── B2 applicant-data cases (P11–P20) ────────────────────────────────────────────────────────────
+
+/**
+ * Loads one world subject's IDs and its uploaded sample document + file storage details as `control`.
+ * @param {Session} control
+ * @param {string} displayName
+ * @param {string} versionID
+ */
+async function loadWorldSubject(control, displayName, versionID) {
+  const subjects = await requireRows(control, CredentialingEntity.Subject, `DisplayName = '${quote(displayName)}'`, ['ID', 'DisplayName', 'AccreditingOrganizationID']);
+  if (subjects.length !== 1) throw new Error(`expected 1 subject named ${displayName}, found ${subjects.length}`);
+  const subjectID = String(subjects[0].ID);
+  const [contacts, apps, docs] = await Promise.all([
+    requireRows(control, CredentialingEntity.SubjectContact, `SubjectID = '${quote(subjectID)}'`, ['ID', 'UserID']),
+    requireRows(control, CredentialingEntity.Application, `SubjectID = '${quote(subjectID)}' AND ProgramVersionID = '${quote(versionID)}' AND Status = 'Draft'`, ['ID']),
+    requireRows(control, CredentialingEntity.EvidenceDocument, `SubjectID = '${quote(subjectID)}' AND Status <> 'Superseded'`, ['ID', 'FileID', 'FileName', 'ExtractedText']),
+  ]);
+  if (apps.length === 0) throw new Error(`${displayName} has no Draft application on version ${versionID}`);
+  const appID = String(apps[0].ID);
+  const responses = await requireRows(control, CredentialingEntity.StandardResponse, `ApplicationID = '${quote(appID)}'`, ['ID', 'StandardID', 'Status', 'ResponseText']);
+  if (responses.length === 0) throw new Error(`${displayName} application ${appID} has no responses`);
+  let doc = null;
+  if (docs.length > 0) {
+    const first = docs[0];
+    const files = await requireRows(control, 'MJ: Files', `ID = '${quote(String(first.FileID))}'`, ['ID', 'Name', 'ProviderID', 'ProviderKey']);
+    doc = {
+      ID: String(first.ID),
+      FileID: String(first.FileID),
+      FileName: String(first.FileName),
+      ExtractedText: first.ExtractedText == null ? '' : String(first.ExtractedText),
+      ObjectKey: String(files[0]?.ProviderKey ?? files[0]?.Name ?? ''),
+    };
+  }
+  return {
+    ID: subjectID,
+    DisplayName: String(subjects[0].DisplayName),
+    AccreditingOrganizationID: String(subjects[0].AccreditingOrganizationID),
+    ContactIDs: contacts.map((c) => String(c.ID)),
+    ApplicationID: appID,
+    ResponseIDs: responses.map((r) => String(r.ID)),
+    StandardID: String(responses[0].StandardID),
+    Document: doc,
+  };
+}
+
+/**
+ * Loads the B2 probe targets as `control` and `staffA`.
+ * @param {Session} control
+ * @param {Session} staffA
+ */
+async function readApplicantTargets(control, staffA) {
+  const programs = await requireRows(staffA, CredentialingEntity.Program, `Name = '${quote(SAMPLE_APPLICANT_PROGRAM)}'`, ['ID']);
+  if (programs.length !== 1) throw new Error(`expected 1 program named ${SAMPLE_APPLICANT_PROGRAM}, found ${programs.length}`);
+  const versions = await requireRows(staffA, CredentialingEntity.ProgramVersion, `ProgramID = '${quote(String(programs[0].ID))}' AND Status = 'Active'`, ['ID']);
+  if (versions.length !== 1) throw new Error(`expected 1 Active version of ${SAMPLE_APPLICANT_PROGRAM}, found ${versions.length}`);
+  const versionID = String(versions[0].ID);
+  const [standards, requirements, accounts, orgBPrograms] = await Promise.all([
+    requireRows(staffA, CredentialingEntity.Standard, `ProgramVersionID = '${quote(versionID)}'`, ['ID']),
+    requireRows(staffA, CredentialingEntity.DocumentRequirement, `ProgramVersionID = '${quote(versionID)}'`, ['ID', 'Name']),
+    requireRows(control, 'MJ: File Storage Accounts', `Name = 'Credentialing Evidence (Local Disk)'`, ['ID']),
+    requireRows(control, CredentialingEntity.Program, `Name = 'Sample Program B Applicants'`, ['ID']),
+  ]);
+  if (standards.length === 0 || requirements.length === 0) throw new Error(`${SAMPLE_APPLICANT_PROGRAM} lacks standards or requirements`);
+  if (accounts.length === 0) throw new Error(`storage account 'Credentialing Evidence (Local Disk)' missing (run pnpm run dev:storage)`);
+  if (orgBPrograms.length === 0) throw new Error(`Sample Program B Applicants missing`);
+  const orgBVersions = await requireRows(control, CredentialingEntity.ProgramVersion, `ProgramID = '${quote(String(orgBPrograms[0].ID))}' AND Status = 'Active'`, ['ID']);
+  if (orgBVersions.length === 0) throw new Error(`Sample Program B Applicants has no Active version`);
+
+  const [subjectOne, subjectTwo, subjectOrgB] = await Promise.all([
+    loadWorldSubject(control, SAMPLE_APPLICANT_ONE, versionID),
+    loadWorldSubject(control, SAMPLE_APPLICANT_TWO, versionID),
+    loadWorldSubject(control, SAMPLE_APPLICANT_ORG_B, String(orgBVersions[0].ID)),
+  ]);
+  if (subjectTwo.Document == null) {
+    throw new Error(`${SAMPLE_APPLICANT_TWO} has no uploaded sample document yet; run pnpm run seed:dev first`);
+  }
+  if (subjectOne.Document == null) {
+    throw new Error(`${SAMPLE_APPLICANT_ONE} has no uploaded sample document yet; run pnpm run seed:dev first`);
+  }
+  return {
+    ApplicantProgramVersionID: versionID,
+    ApplicantStandardID: String(standards[0].ID),
+    ApplicantRequirementID: String(requirements[0].ID),
+    StorageAccountID: String(accounts[0].ID),
+    SubjectOne: subjectOne,
+    SubjectTwo: subjectTwo,
+    SubjectOrgB: subjectOrgB,
+  };
+}
+
+/**
+ * P11 / P17-P11: RunView on all nine applicant-data entities returns only rows belonging to `allowedSubjectIDs`.
+ * @param {string} id
+ * @param {PersonaSession} persona
+ * @param {Set<string>} allowedSubjectIDs
+ * @param {string[]} requiredPresentSubjectIDs
+ * @param {string[]} forbiddenSubjectIDs
+ */
+async function caseApplicantDataRunViews(id, persona, allowedSubjectIDs, requiredPresentSubjectIDs, forbiddenSubjectIDs) {
+  await probeCase(id, persona.Name, async () => {
+    const problems = [];
+    const seenCounts = [];
+    for (const entity of APPLICANT_DATA_ENTITIES) {
+      const fields = entity.SubjectColumn === 'ID' ? ['ID'] : ['ID', entity.SubjectColumn];
+      const res = await readRows(persona.Provider, entity.Name, '', fields);
+      if (!res.Success) {
+        problems.push(`${entity.Name} read failed: ${res.ErrorMessage}`);
+        continue;
+      }
+      const subjects = res.Rows.map((r) => String(r[entity.SubjectColumn] ?? '').toLowerCase());
+      const foreign = subjects.filter((s) => !allowedSubjectIDs.has(s));
+      const explicitForbidden = subjects.filter((s) => forbiddenSubjectIDs.includes(s));
+      if (foreign.length > 0 || explicitForbidden.length > 0) {
+        problems.push(`${entity.Name} returned ${foreign.length} out-of-scope row(s) (${[...new Set(foreign)].slice(0, 3).join(', ')})`);
+      }
+      seenCounts.push(`${entity.Name.replace('MJ_BizApps_Credentialing: ', '')}:${res.Rows.length}`);
+    }
+    const subjectView = await readRows(persona.Provider, CredentialingEntity.Subject, '', ['ID']);
+    const visibleSubjects = new Set((subjectView.Rows ?? []).map((r) => String(r.ID).toLowerCase()));
+    for (const expectedID of requiredPresentSubjectIDs) {
+      if (!visibleSubjects.has(expectedID.toLowerCase())) {
+        problems.push(`expected own subject ${expectedID} missing from Subject RunView`);
+      }
+    }
+    return {
+      passed: problems.length === 0,
+      detail: problems.length ? `LEAK ${problems.join('; ')}` : `all 9 applicant-data entities scoped (${seenCounts.join(', ')})`,
+    };
+  });
+}
+
+/**
+ * P12 / P17-P12: single-record load (InnerLoad, GraphQL single-record query, GetEntityRecordName) for a foreign subject's records.
+ * @param {string} id
+ * @param {PersonaSession} persona
+ * @param {Awaited<ReturnType<typeof loadWorldSubject>>} foreign
+ */
+async function caseForeignSingleRecordLoad(id, persona, foreign) {
+  await probeCase(id, persona.Name, async () => {
+    const session = persona.Provider;
+    const targets = [
+      {
+        label: 'application',
+        entity: CredentialingEntity.Application,
+        realID: foreign.ApplicationID,
+        gql: 'query ($id: String!) { mjBizAppsCredentialingApplication(ID: $id) { ID } }',
+        field: 'mjBizAppsCredentialingApplication',
+      },
+      {
+        label: 'response',
+        entity: CredentialingEntity.StandardResponse,
+        realID: foreign.ResponseIDs[0],
+        gql: 'query ($id: String!) { mjBizAppsCredentialingStandardResponse(ID: $id) { ID } }',
+        field: 'mjBizAppsCredentialingStandardResponse',
+      },
+      {
+        label: 'document',
+        entity: CredentialingEntity.EvidenceDocument,
+        realID: foreign.Document.ID,
+        gql: 'query ($id: String!) { mjBizAppsCredentialingEvidenceDocument(ID: $id) { ID } }',
+        field: 'mjBizAppsCredentialingEvidenceDocument',
+      },
+    ];
+    const problems = [];
+    for (const t of targets) {
+      const randID = randomUUID().toUpperCase();
+      const ent = await session.GetEntityObject(t.entity, session.CurrentUser);
+      const loaded = await ent.InnerLoad(CompositeKey.FromID(t.realID));
+      if (loaded) problems.push(`InnerLoad(${t.label}) RETURNED THE RECORD`);
+
+      const realGql = await session.ExecuteGQL(t.gql, { id: t.realID });
+      const randGql = await session.ExecuteGQL(t.gql, { id: randID });
+      if (realGql?.[t.field] != null) problems.push(`GraphQL(${t.label}) RETURNED ${JSON.stringify(realGql[t.field])}`);
+      if (JSON.stringify(realGql?.[t.field] ?? null) !== JSON.stringify(randGql?.[t.field] ?? null)) {
+        problems.push(`GraphQL(${t.label}) differed from random ID`);
+      }
+
+      const name = await session.GetEntityRecordName(t.entity, CompositeKey.FromID(t.realID));
+      if (name) problems.push(`GetEntityRecordName(${t.label}) RETURNED "${name}"`);
+    }
+    return {
+      passed: problems.length === 0,
+      detail: problems.length ? `LEAK ${problems.join('; ')}` : 'application, response and document InnerLoad/GraphQL/recordName all not found (identical to random ID)',
+    };
+  });
+}
+
+/**
+ * P13 / P17-P13: every Tasks 4–11 remote operation called with a foreign subject's IDs vs random UUIDs.
+ * @param {string} id
+ * @param {PersonaSession} persona
+ * @param {'applicant' | 'staff'} actorKind
+ * @param {Awaited<ReturnType<typeof readApplicantTargets>>} appTargets
+ * @param {Target} sampleTarget
+ */
+async function caseB2Operations(id, persona, actorKind, appTargets, sampleTarget) {
+  await probeCase(id, persona.Name, async () => {
+    const provider = persona.Provider;
+    const foreign = appTargets.SubjectTwo;
+    const own = appTargets.SubjectOne;
+    const problems = [];
+    const testedKeys = new Set();
+
+    // 1. GetMySubjects (no ID input)
+    testedKeys.add(CredentialingOperation.GetMySubjects);
+    const mySubjects = await new GetMySubjectsOperation().Execute({}, { provider });
+    if (actorKind === 'applicant') {
+      if (!mySubjects.Success || mySubjects.Output == null) {
+        problems.push(`GetMySubjects failed for applicant: ${describe(mySubjects)}`);
+      } else {
+        const returnedIDs = mySubjects.Output.Subjects.map((s) => s.SubjectID.toLowerCase());
+        if (returnedIDs.some((sid) => sid !== own.ID.toLowerCase())) {
+          problems.push(`GetMySubjects returned foreign subject(s): ${returnedIDs.join(', ')}`);
+        }
+      }
+    } else {
+      if (mySubjects.Success || mySubjects.ResultCode !== 'FORBIDDEN') {
+        problems.push(`GetMySubjects for staff expected FORBIDDEN, got ${describe(mySubjects)}`);
+      }
+    }
+
+    /** @type {{ key: string; expected: 'not-found' | 'forbidden'; call: (foreignIDs: boolean) => Promise<{ Success: boolean; ResultCode?: string; ErrorMessage?: string }> }[]} */
+    const idOps = [
+      {
+        key: CredentialingOperation.GetApplicationWorkspace,
+        expected: 'not-found',
+        call: (f) => new GetApplicationWorkspaceOperation().Execute({ ApplicationID: f ? foreign.ApplicationID : randomUUID().toUpperCase() }, { provider }),
+      },
+      {
+        key: CredentialingOperation.SaveResponse,
+        expected: 'not-found',
+        call: (f) => new SaveResponseOperation().Execute({
+          ResponseID: f ? foreign.ResponseIDs[0] : randomUUID().toUpperCase(),
+          ResponseText: 'Probe text',
+          SelfAssessment: 'Met',
+          ExpectedUpdatedAt: new Date().toISOString(),
+        }, { provider }),
+      },
+      {
+        key: CredentialingOperation.ConfirmResponse,
+        expected: 'not-found',
+        call: (f) => new ConfirmResponseOperation().Execute({
+          ResponseID: f ? foreign.ResponseIDs[0] : randomUUID().toUpperCase(),
+          ExpectedUpdatedAt: new Date().toISOString(),
+        }, { provider }),
+      },
+      {
+        key: CredentialingOperation.WithdrawApplication,
+        expected: 'not-found',
+        call: (f) => new WithdrawApplicationOperation().Execute({
+          ApplicationID: f ? foreign.ApplicationID : randomUUID().toUpperCase(),
+          Reason: 'Probe withdrawal',
+        }, { provider }),
+      },
+      {
+        key: CredentialingOperation.AttestInLieu,
+        expected: actorKind === 'applicant' ? 'not-found' : 'forbidden',
+        call: (f) => new AttestInLieuOperation().Execute({
+          SubjectID: f ? foreign.ID : randomUUID().toUpperCase(),
+          DocumentRequirementID: f ? appTargets.ApplicantRequirementID : randomUUID().toUpperCase(),
+          Statement: 'Probe attestation',
+        }, { provider }),
+      },
+      {
+        key: CredentialingOperation.ConfirmDocumentCurrent,
+        expected: actorKind === 'applicant' ? 'not-found' : 'forbidden',
+        call: (f) => new ConfirmDocumentCurrentOperation().Execute({
+          EvidenceDocumentID: f ? foreign.Document.ID : randomUUID().toUpperCase(),
+        }, { provider }),
+      },
+      {
+        key: CredentialingOperation.GetDocumentLibrary,
+        expected: 'not-found',
+        call: (f) => new GetDocumentLibraryOperation().Execute({
+          SubjectID: f ? foreign.ID : randomUUID().toUpperCase(),
+        }, { provider }),
+      },
+      {
+        key: CredentialingOperation.RequeueReading,
+        expected: 'not-found',
+        call: (f) => new RequeueReadingOperation().Execute({
+          EvidenceDocumentID: f ? foreign.Document.ID : randomUUID().toUpperCase(),
+        }, { provider }),
+      },
+      {
+        key: CredentialingOperation.RefreshPrefills,
+        expected: 'not-found',
+        call: (f) => new RefreshPrefillsOperation().Execute({
+          ApplicationID: f ? foreign.ApplicationID : randomUUID().toUpperCase(),
+        }, { provider }),
+      },
+      {
+        key: CredentialingOperation.GetSubmissionGate,
+        expected: 'not-found',
+        call: (f) => new GetSubmissionGateOperation().Execute({
+          ApplicationID: f ? foreign.ApplicationID : randomUUID().toUpperCase(),
+        }, { provider }),
+      },
+      {
+        key: CredentialingOperation.SubmitApplication,
+        expected: 'not-found',
+        call: (f) => new SubmitApplicationOperation().Execute({
+          ApplicationID: f ? foreign.ApplicationID : randomUUID().toUpperCase(),
+          Attestation: null,
+        }, { provider }),
+      },
+      {
+        key: CredentialingOperation.ReopenResponse,
+        expected: actorKind === 'staff' ? 'not-found' : 'forbidden',
+        call: (f) => new ReopenResponseOperation().Execute({
+          ResponseID: f ? foreign.ResponseIDs[0] : randomUUID().toUpperCase(),
+          Reason: 'Probe reopen',
+        }, { provider }),
+      },
+      {
+        key: CredentialingOperation.SaveResponseSources,
+        expected: actorKind === 'staff' ? 'not-found' : 'forbidden',
+        call: (f) => new SaveResponseSourcesOperation().Execute({
+          StandardID: f ? String(sampleTarget.Standards[0].ID) : randomUUID().toUpperCase(),
+          Sources: [],
+        }, { provider }),
+      },
+      {
+        key: CredentialingOperation.InviteApplicant,
+        expected: actorKind === 'staff' ? 'not-found' : 'forbidden',
+        call: (f) => new InviteApplicantOperation().Execute({
+          ProgramVersionID: f ? appTargets.ApplicantProgramVersionID : randomUUID().toUpperCase(),
+          Subject: { ExistingSubjectID: f ? foreign.ID : randomUUID().toUpperCase() },
+          Contact: { FirstName: 'Probe', LastName: 'Invite', Email: `probe.${randomUUID().slice(0, 8)}@example.test`, ContactRole: 'Primary' },
+        }, { provider }),
+      },
+      {
+        key: CredentialingOperation.ReissueInvitation,
+        expected: actorKind === 'staff' ? 'not-found' : 'forbidden',
+        call: (f) => new ReissueInvitationOperation().Execute({
+          SubjectContactID: f ? foreign.ContactIDs[0] : randomUUID().toUpperCase(),
+        }, { provider }),
+      },
+    ];
+
+    for (const op of idOps) {
+      testedKeys.add(op.key);
+      const real = await op.call(true);
+      const rand = await op.call(false);
+      if (real.Success) {
+        problems.push(`${op.key} SUCCEEDED`);
+        continue;
+      }
+      if (op.expected === 'not-found' && (real.ResultCode !== 'REFUSED' || real.ErrorMessage !== NOT_FOUND)) {
+        problems.push(`${op.key} expected REFUSED/${NOT_FOUND}, got ${describe(real)}`);
+      }
+      if (op.expected === 'forbidden' && real.ResultCode !== 'FORBIDDEN') {
+        problems.push(`${op.key} expected FORBIDDEN, got ${describe(real)}`);
+      }
+      const realPayload = JSON.stringify({ Success: real.Success, ResultCode: real.ResultCode, ErrorMessage: real.ErrorMessage });
+      const randPayload = JSON.stringify({ Success: rand.Success, ResultCode: rand.ResultCode, ErrorMessage: rand.ErrorMessage });
+      if (realPayload !== randPayload) {
+        problems.push(`${op.key} differs from random-UUID answer: ${realPayload} vs ${randPayload}`);
+      }
+    }
+
+    // Completeness check against OperationKeys.ts (B1's 5 ops are covered in P8 + P10c; Tasks 4–11's 16 ops are here).
+    const b1Keys = new Set([
+      CredentialingOperation.CreateProgram,
+      CredentialingOperation.CloneVersionToDraft,
+      CredentialingOperation.ReorderVersionTree,
+      CredentialingOperation.CreateOrganization,
+      CredentialingOperation.CreateCommittee,
+    ]);
+    const missing = Object.values(CredentialingOperation).filter((k) => !b1Keys.has(k) && !testedKeys.has(k));
+    if (missing.length > 0) {
+      problems.push(`OperationKeys missing from probe: ${missing.join(', ')}`);
+    }
+
+    return {
+      passed: problems.length === 0,
+      detail: problems.length
+        ? problems.join('; ')
+        : `all ${testedKeys.size} Tasks 4–11 operations refused (${actorKind === 'applicant' ? '11 Record not found. + 4 FORBIDDEN + GetMySubjects own-only' : '13 Record not found. + 3 FORBIDDEN'}), byte-equal to random UUID`,
+    };
+  });
+}
+
+/**
+ * P14 / P17-P14: `GET /credentialing/evidence/<applicant-b's document>/content` vs random UUID.
+ * Signed-in non-authorized callers get 404 byte-equal to random UUID; unauthenticated gets MJAPI's 401 byte-equal to random UUID.
+ * @param {string} id
+ * @param {string} actorName
+ * @param {string | null} bearerToken
+ * @param {string} documentID
+ * @param {number} expectedStatus
+ */
+async function caseEvidenceDownload(id, actorName, bearerToken, documentID, expectedStatus) {
+  await probeCase(id, actorName, async () => {
+    /** @param {string} docID */
+    const get = async (docID) => {
+      /** @type {Record<string, string>} */
+      const headers = {};
+      if (bearerToken != null) headers.Authorization = `Bearer ${bearerToken}`;
+      const res = await fetch(`${MJAPI_BASE_URL}/credentialing/evidence/${encodeURIComponent(docID)}/content`, { headers });
+      return { status: res.status, body: Buffer.from(await res.arrayBuffer()) };
+    };
+    const real = await get(documentID);
+    const rand = await get(randomUUID().toUpperCase());
+    const problems = [];
+    if (real.status !== expectedStatus) problems.push(`expected status ${expectedStatus}, got ${real.status} (${real.body.toString('utf8')})`);
+    if (rand.status !== expectedStatus) problems.push(`random UUID expected status ${expectedStatus}, got ${rand.status}`);
+    if (!real.body.equals(rand.body)) {
+      problems.push(`body differs from random UUID: "${real.body.toString('utf8')}" vs "${rand.body.toString('utf8')}"`);
+    }
+    return {
+      passed: problems.length === 0,
+      detail: problems.length ? problems.join('; ') : `HTTP ${real.status}, body byte-identical to random UUID (${real.body.toString('utf8')})`,
+    };
+  });
+}
+
+/**
+ * P15: applicant-a calls generated Create/Update/Delete mutations on its OWN response, application and document.
+ * @param {PersonaSession} applicant
+ * @param {Session} control
+ * @param {Awaited<ReturnType<typeof readApplicantTargets>>} appTargets
+ */
+async function caseOwnGeneratedMutations(applicant, control, appTargets) {
+  await probeCase('P15', applicant.Name, async () => {
+    const own = appTargets.SubjectOne;
+    const session = applicant.Provider;
+    const deleteOptions = { SkipEntityAIActions: false, SkipEntityActions: false, ReplayOnly: false, IsParentEntityDelete: false };
+    const beforeResponses = await requireRows(control, CredentialingEntity.StandardResponse, `SubjectID = '${quote(own.ID)}'`, ['ID', 'Status', 'ResponseText']);
+    const beforeApps = await requireRows(control, CredentialingEntity.Application, `SubjectID = '${quote(own.ID)}'`, ['ID', 'Status']);
+    const beforeDocs = await requireRows(control, CredentialingEntity.EvidenceDocument, `SubjectID = '${quote(own.ID)}'`, ['ID', 'FileName']);
+
+    const attempts = [
+      {
+        label: 'Create StandardResponse',
+        kind: 'operation-only',
+        gql: 'mutation ($input: CreatemjBizAppsCredentialingStandardResponseInput!) { CreatemjBizAppsCredentialingStandardResponse(input: $input) { ID } }',
+        vars: { input: { ApplicationID: own.ApplicationID, StandardID: own.StandardID, SubjectID: own.ID, ResponseText: 'Direct create', SelfAssessment: null, Status: 'Empty', AuthorType: 'Human', LastEditedByUserID: null, ConfirmedByUserID: null, ConfirmedAt: null, SourceType: null, SourceLabel: null, SourceReference: null, SourceRetrievedAt: null, SourceRawValue: null, IsStale: false, ReopenReason: null } },
+      },
+      {
+        label: 'Update StandardResponse',
+        kind: 'operation-only',
+        gql: 'mutation ($input: UpdatemjBizAppsCredentialingStandardResponseInput!) { UpdatemjBizAppsCredentialingStandardResponse(input: $input) { ID } }',
+        vars: { input: { ID: own.ResponseIDs[0], Status: 'Confirmed', ResponseText: 'Direct bypass' } },
+      },
+      {
+        label: 'Delete StandardResponse',
+        kind: 'refused',
+        gql: 'mutation ($id: String!, $options: DeleteOptionsInput!) { DeletemjBizAppsCredentialingStandardResponse(ID: $id, options___: $options) { ID } }',
+        vars: { id: own.ResponseIDs[0], options: deleteOptions },
+      },
+      {
+        label: 'Create Application',
+        kind: 'operation-only',
+        gql: 'mutation ($input: CreatemjBizAppsCredentialingApplicationInput!) { CreatemjBizAppsCredentialingApplication(input: $input) { ID } }',
+        vars: { input: { SubjectID: own.ID, ProgramVersionID: appTargets.ApplicantProgramVersionID, Status: 'Draft', IsHistorical: false, SubmittedAt: null, SubmittedByUserID: null, SubmissionDispatchedAt: null, SubmissionDispatchClaimID: null, SubmissionDispatchClaimedAt: null, SubmissionDispatchAttempts: 0, SubmissionDispatchNote: null, SubjectSnapshot: null, AttestationOfficerName: null, AttestationOfficerRole: null, AttestationApprovalDate: null, AttestationStatement: null, AttestedByUserID: null, AttestedAt: null, WithdrawnAt: null, WithdrawnByUserID: null, WithdrawalReason: null } },
+      },
+      {
+        label: 'Update Application',
+        kind: 'operation-only',
+        gql: 'mutation ($input: UpdatemjBizAppsCredentialingApplicationInput!) { UpdatemjBizAppsCredentialingApplication(input: $input) { ID } }',
+        vars: { input: { ID: own.ApplicationID, Status: 'Submitted' } },
+      },
+      {
+        label: 'Delete Application',
+        kind: 'refused',
+        gql: 'mutation ($id: String!, $options: DeleteOptionsInput!) { DeletemjBizAppsCredentialingApplication(ID: $id, options___: $options) { ID } }',
+        vars: { id: own.ApplicationID, options: deleteOptions },
+      },
+      {
+        label: 'Create EvidenceDocument',
+        kind: 'operation-only',
+        gql: 'mutation ($input: CreatemjBizAppsCredentialingEvidenceDocumentInput!) { CreatemjBizAppsCredentialingEvidenceDocument(input: $input) { ID } }',
+        vars: { input: { SubjectID: own.ID, DocumentRequirementID: null, FileID: own.Document.FileID, FileName: 'direct.pdf', ContentType: 'application/pdf', SizeBytes: 100, ContentHash: 'a'.repeat(64), ExtractedText: null, TextStatus: 'Extracted', TextNote: null, PageCount: 1, ReadingStatus: 'Pending', ReadingNote: null, ReadingClaimID: null, ReadingClaimedAt: null, ReadingAttempts: 0, Status: 'Current', SupersedesDocumentID: null, ConfirmedCurrentAt: null, UploadedByUserID: session.CurrentUser.ID, UploadedAt: new Date().toISOString() } },
+      },
+      {
+        label: 'Update EvidenceDocument',
+        kind: 'operation-only',
+        gql: 'mutation ($input: UpdatemjBizAppsCredentialingEvidenceDocumentInput!) { UpdatemjBizAppsCredentialingEvidenceDocument(input: $input) { ID } }',
+        vars: { input: { ID: own.Document.ID, FileName: 'direct-rename.pdf' } },
+      },
+      {
+        label: 'Delete EvidenceDocument',
+        kind: 'refused',
+        gql: 'mutation ($id: String!, $options: DeleteOptionsInput!) { DeletemjBizAppsCredentialingEvidenceDocument(ID: $id, options___: $options) { ID } }',
+        vars: { id: own.Document.ID, options: deleteOptions },
+      },
+    ];
+
+    const problems = [];
+    for (const attempt of attempts) {
+      const refusal = await gqlRefusal(session, attempt.gql, attempt.vars);
+      if (refusal == null) {
+        problems.push(`${attempt.label}: SUCCEEDED`);
+      } else if (attempt.kind === 'operation-only' && !refusal.includes(OPERATION_ONLY_REASON)) {
+        problems.push(`${attempt.label}: expected "${OPERATION_ONLY_REASON}", got "${refusal}"`);
+      }
+    }
+
+    const [afterResponses, afterApps, afterDocs] = await Promise.all([
+      requireRows(control, CredentialingEntity.StandardResponse, `SubjectID = '${quote(own.ID)}'`, ['ID', 'Status', 'ResponseText']),
+      requireRows(control, CredentialingEntity.Application, `SubjectID = '${quote(own.ID)}'`, ['ID', 'Status']),
+      requireRows(control, CredentialingEntity.EvidenceDocument, `SubjectID = '${quote(own.ID)}'`, ['ID', 'FileName']),
+    ]);
+    if (JSON.stringify(beforeResponses) !== JSON.stringify(afterResponses)) problems.push('StandardResponse rows changed');
+    if (JSON.stringify(beforeApps) !== JSON.stringify(afterApps)) problems.push('Application rows changed');
+    if (JSON.stringify(beforeDocs) !== JSON.stringify(afterDocs)) problems.push('EvidenceDocument rows changed');
+
+    return {
+      passed: problems.length === 0,
+      detail: problems.length ? problems.join('; ') : 'all 9 generated Create/Update/Delete mutations on own response, application and document refused; rows unchanged',
+    };
+  });
+}
+
+/**
+ * P16: applicant-a RunView on authoring + file/user/common/audit/AI entities returns 0 rows or permission refusal.
+ * @param {PersonaSession} applicant
+ * @param {Session} control
+ */
+async function caseP16NonReadableEntities(applicant, control) {
+  await probeCase('P16', applicant.Name, async () => {
+    const res = await readsNothingFromAll(applicant.Provider, P16_ENTITIES);
+    // Confirm control actually sees rows in the platform/common tables so the refusal is non-vacuous.
+    const controlFiles = await requireRows(control, 'MJ: Files', '', ['ID']);
+    const controlAccounts = await requireRows(control, 'MJ: File Storage Accounts', '', ['ID']);
+    if (controlFiles.length === 0 || controlAccounts.length === 0) {
+      return { passed: false, detail: `control sees ${controlFiles.length} MJ: Files and ${controlAccounts.length} storage accounts` };
+    }
+    return res;
+  });
+}
+
+/**
+ * P19: applicant-a calls CreateMediaAccessToken, GetFileContents, CreatePreAuthDownloadUrl for applicant-b's and its own FileID.
+ * @param {PersonaSession} applicant
+ * @param {Awaited<ReturnType<typeof readApplicantTargets>>} appTargets
+ */
+async function caseFileResolvers(applicant, appTargets) {
+  await probeCase('P19', applicant.Name, async () => {
+    const session = applicant.Provider;
+    const files = [
+      { label: "applicant-b's FileID", fileID: appTargets.SubjectTwo.Document.FileID, objectKey: appTargets.SubjectTwo.Document.ObjectKey },
+      { label: 'own FileID', fileID: appTargets.SubjectOne.Document.FileID, objectKey: appTargets.SubjectOne.Document.ObjectKey },
+    ];
+    const problems = [];
+    const seen = [];
+    for (const f of files) {
+      // 1. CreateMediaAccessToken
+      try {
+        const res = await session.ExecuteGQL(
+          'mutation ($fileId: String!) { CreateMediaAccessToken(fileId: $fileId) { Success Url ErrorMessage } }',
+          { fileId: f.fileID },
+        );
+        const payload = res?.CreateMediaAccessToken;
+        if (payload?.Success || payload?.Url) {
+          problems.push(`CreateMediaAccessToken(${f.label}) SUCCEEDED: ${JSON.stringify(payload)}`);
+        } else {
+          seen.push(`CreateMediaAccessToken(${f.label}): "${payload?.ErrorMessage ?? 'refused'}"`);
+        }
+      } catch (e) {
+        seen.push(`CreateMediaAccessToken(${f.label}): gql error`);
+      }
+
+      // 2. GetFileContents
+      try {
+        const res = await session.ExecuteGQL(
+          'query ($fileId: String!) { GetFileContents(fileId: $fileId) { Success Base64 ErrorMessage } }',
+          { fileId: f.fileID },
+        );
+        const payload = res?.GetFileContents;
+        if (payload?.Success || payload?.Base64) {
+          problems.push(`GetFileContents(${f.label}) SUCCEEDED`);
+        } else {
+          seen.push(`GetFileContents(${f.label}): "${payload?.ErrorMessage ?? 'refused'}"`);
+        }
+      } catch (e) {
+        seen.push(`GetFileContents(${f.label}): gql error`);
+      }
+
+      // 3. CreatePreAuthDownloadUrl
+      const preAuthRefusal = await gqlRefusal(
+        session,
+        'query ($input: CreatePreAuthDownloadUrlInput!) { CreatePreAuthDownloadUrl(input: $input) }',
+        { input: { AccountID: appTargets.StorageAccountID, ObjectName: f.objectKey || 'credentialing-evidence/probe' } },
+      );
+      if (preAuthRefusal == null) {
+        problems.push(`CreatePreAuthDownloadUrl(${f.label}) SUCCEEDED`);
+      } else {
+        seen.push(`CreatePreAuthDownloadUrl(${f.label}): "${preAuthRefusal}"`);
+      }
+    }
+    return {
+      passed: problems.length === 0,
+      detail: problems.length ? `LEAK ${problems.join('; ')}` : `all 6 MJ file resolver calls refused (${seen.length} checked)`,
+    };
+  });
+}
+
+/**
+ * P20: applicant-a calls SearchEntities for applicant-b's display name and a phrase from applicant-b's document text.
+ * @param {PersonaSession} applicant
+ * @param {Session} control
+ * @param {Awaited<ReturnType<typeof readApplicantTargets>>} appTargets
+ */
+async function caseGlobalSearch(applicant, control, appTargets) {
+  await probeCase('P20', applicant.Name, async () => {
+    const foreign = appTargets.SubjectTwo;
+    const textLines = foreign.Document.ExtractedText.split(/\r?\n/).map((l) => l.trim()).filter((l) => l.length >= 20);
+    const phrase = textLines.find((l) => !appTargets.SubjectOne.Document.ExtractedText.includes(l)) ?? textLines[0];
+    if (!phrase) {
+      return { passed: false, detail: "applicant-b's document has no searchable extracted text phrase" };
+    }
+    // Control sanity check: SearchEntities actually finds Sample Applicant Two on Subject when authorized.
+    const controlMatches = await control.SearchEntities([
+      { entityName: CredentialingEntity.Subject, searchText: foreign.DisplayName, options: { mode: 'hybrid' } },
+    ]);
+    if (!controlMatches[0]?.some((r) => r.recordId.toLowerCase() === foreign.ID.toLowerCase())) {
+      return { passed: false, detail: `control SearchEntities did not match ${foreign.DisplayName} (non-vacuous check failed)` };
+    }
+
+    // SearchEntitiesResolver caps batches at MAX_SEARCH_ENTITIES_BATCH_SIZE = 20.
+    const searchTargets = [...ALL_CREDENTIALING_ENTITIES, 'MJ: Files', 'MJ: AI Prompt Runs', 'MJ: Users'];
+    const queries = [
+      { label: 'display name', text: foreign.DisplayName },
+      { label: 'document phrase', text: phrase },
+    ];
+    const problems = [];
+    for (const q of queries) {
+      for (const mode of ['hybrid', 'lexical']) {
+        const params = searchTargets.map((entityName) => ({ entityName, searchText: q.text, options: { mode } }));
+        const groups = await applicant.Provider.SearchEntities(params);
+        groups.forEach((resultsForEntity, i) => {
+          if (resultsForEntity.length > 0) {
+            problems.push(`SearchEntities(${q.label}, ${mode}, ${searchTargets[i]}) returned ${resultsForEntity.length} result(s): ${resultsForEntity.map((r) => r.recordId).join(', ')}`);
+          }
+        });
+      }
+    }
+    return {
+      passed: problems.length === 0,
+      detail: problems.length
+        ? `LEAK ${problems.join('; ')}`
+        : `SearchEntities across ${searchTargets.length} entities (hybrid + lexical) returned 0 results for "${foreign.DisplayName}" and "${phrase.slice(0, 40)}…"`,
     };
   });
 }
@@ -581,7 +1300,7 @@ async function main() {
     const controlChanges = await requireRows(control.Provider, 'MJ: Record Changes', `RecordID LIKE '%${target.Program.ID}%'`, ['ID']);
     const queryIDs = await credentialingQueryIDs(control.Provider);
 
-    await caseSevenEntities('P1', applicant);
+    await caseSevenEntities('P1', applicant, AUTHORING_ENTITIES);
     await probeCase('P2', applicant.Name, () => readsNothingFromAll(applicant.Provider, PLATFORM_ENTITIES));
     await caseSevenEntities('P3', reviewer);
     await caseSevenEntities('P3', committee);
@@ -602,6 +1321,40 @@ async function main() {
     if (committeeTypes.length === 0) throw new Error('the control reader sees no committee type, so CreateCommittee would be refused for its type');
     await caseCreateCommittee(staffB, control.Provider, target, String(committeeTypes[0].ID), 'not-found');
     await caseCreateCommittee(applicant, control.Provider, target, String(committeeTypes[0].ID), 'forbidden');
+
+    // B2 applicant-data cases (P11–P20)
+    const appTargets = await readApplicantTargets(control.Provider, staffA.Provider);
+    const orgBSubjects = await requireRows(control.Provider, CredentialingEntity.Subject, `AccreditingOrganizationID = '${quote(appTargets.SubjectOrgB.AccreditingOrganizationID)}'`, ['ID']);
+    const orgBAllowed = new Set(orgBSubjects.map((r) => String(r.ID).toLowerCase()));
+
+    await caseApplicantDataRunViews(
+      'P11',
+      applicant,
+      new Set([appTargets.SubjectOne.ID.toLowerCase()]),
+      [appTargets.SubjectOne.ID],
+      [appTargets.SubjectTwo.ID.toLowerCase(), appTargets.SubjectOrgB.ID.toLowerCase()],
+    );
+    await caseForeignSingleRecordLoad('P12', applicant, appTargets.SubjectTwo);
+    await caseB2Operations('P13', applicant, 'applicant', appTargets, target);
+    await caseEvidenceDownload('P14', applicant.Name, applicant.Token, appTargets.SubjectTwo.Document.ID, 404);
+    await caseEvidenceDownload('P14', staffB.Name, staffB.Token, appTargets.SubjectTwo.Document.ID, 404);
+    await caseEvidenceDownload('P14', 'no-token', null, appTargets.SubjectTwo.Document.ID, 401);
+    await caseOwnGeneratedMutations(applicant, control.Provider, appTargets);
+    await caseP16NonReadableEntities(applicant, control.Provider);
+    await caseApplicantDataRunViews(
+      'P17-P11',
+      staffB,
+      orgBAllowed,
+      [appTargets.SubjectOrgB.ID],
+      [appTargets.SubjectOne.ID.toLowerCase(), appTargets.SubjectTwo.ID.toLowerCase()],
+    );
+    await caseForeignSingleRecordLoad('P17-P12', staffB, appTargets.SubjectTwo);
+    await caseB2Operations('P17-P13', staffB, 'staff', appTargets, target);
+    await caseEvidenceDownload('P17-P14', staffB.Name, staffB.Token, appTargets.SubjectTwo.Document.ID, 404);
+    await probeCase('P18', reviewer.Name, () => readsNothingFromAll(reviewer.Provider, APPLICANT_DATA_ENTITIES.map((e) => e.Name)));
+    await probeCase('P18', committee.Name, () => readsNothingFromAll(committee.Provider, APPLICANT_DATA_ENTITIES.map((e) => e.Name)));
+    await caseFileResolvers(applicant, appTargets);
+    await caseGlobalSearch(applicant, control.Provider, appTargets);
   } catch (e) {
     report('SETUP', '-', false, e instanceof Error ? e.message : String(e));
   } finally {
