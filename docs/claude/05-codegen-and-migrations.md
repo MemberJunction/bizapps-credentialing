@@ -35,8 +35,11 @@ in the per-release seed, what to fold vs what CodeGen re-applies everywhere):
   name. `${mjSchema}` for MJ core objects, never a literal `__mj`.
 - **Hardcoded UUIDs** for metadata rows — never `NEWID()` (breaks
   reproducibility across installs).
-- **Never include what CodeGen owns**: no `__mj_CreatedAt`/`__mj_UpdatedAt`
-  columns, no FK indexes.
+- **Never declare what CodeGen owns in hand-written DDL**: no
+  `__mj_CreatedAt`/`__mj_UpdatedAt` columns and no FK indexes up front.
+  They belong only in the CodeGen output folded below the separator (along with
+  the base views, CRUD stored procedures, and triggers; leave out only the
+  recurring refresh procedure calls).
 - **One `ALTER TABLE` per table** — multiple `ADD` clauses comma-separated,
   not repeated statements.
 - **`sp_addextendedproperty` (`MS_Description`) for every new column** (except

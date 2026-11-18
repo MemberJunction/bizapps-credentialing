@@ -1,0 +1,46 @@
+<form class="cred-committee" aria-labelledby="cred-committee-heading" (ngSubmit)="Submit()" novalidate>
+    <h3 id="cred-committee-heading" class="cred-committee__heading">New committee</h3>
+    <p class="cred-committee__intro">The committee is created for this program's organization.</p>
+    <div class="cred-committee__field">
+        <label for="cred-committee-name">Committee name</label>
+        <input id="cred-committee-name" name="Name" type="text" class="mj-input" autocomplete="off" maxlength="255" [(ngModel)]="Name" [readonly]="IsSubmitting"
+            [attr.aria-invalid]="ErrorFor('Name') ? 'true' : null" [attr.aria-describedby]="ErrorFor('Name') ? 'cred-committee-name-error' : null" />
+        @if (ErrorFor('Name')) {
+            <p id="cred-committee-name-error" class="cred-committee__error" role="alert">{{ ErrorFor('Name') }}</p>
+        }
+    </div>
+    <div class="cred-committee__field">
+        <span id="cred-committee-type-label" class="cred-committee__label">Committee type</span>
+        <mj-dropdown
+            name="CommitteeTypeID"
+            AriaLabelledBy="cred-committee-type-label"
+            [Data]="TypeChoices"
+            TextField="Name"
+            ValueField="ID"
+            [ValuePrimitive]="true"
+            Placeholder="Choose a type"
+            [Disabled]="IsSubmitting"
+            [attr.aria-invalid]="ErrorFor('CommitteeTypeID') ? 'true' : null"
+            [AriaDescribedBy]="ErrorFor('CommitteeTypeID') ? 'cred-committee-type-error' : ''"
+            [(ngModel)]="CommitteeTypeID">
+        </mj-dropdown>
+        @if (ErrorFor('CommitteeTypeID')) {
+            <p id="cred-committee-type-error" class="cred-committee__error" role="alert">{{ ErrorFor('CommitteeTypeID') }}</p>
+        }
+    </div>
+    <div class="cred-committee__actions">
+        <button mjButton Variant="primary" type="submit" [disabled]="IsSubmitting" [attr.aria-busy]="IsSubmitting ? 'true' : null"
+            [attr.aria-describedby]="ErrorFor('Form') ? 'cred-committee-form-error' : null">
+            @if (IsSubmitting) {
+                <i class="fa-solid fa-spinner fa-spin" aria-hidden="true"></i>
+            }
+            Create committee
+        </button>
+        <button mjButton Variant="outline" type="button" [disabled]="IsSubmitting" (click)="Cancel()">Cancel</button>
+    </div>
+    <div aria-live="polite">
+        @if (ErrorFor('Form')) {
+            <p id="cred-committee-form-error" class="cred-committee__error" role="alert">{{ ErrorFor('Form') }}</p>
+        }
+    </div>
+</form>

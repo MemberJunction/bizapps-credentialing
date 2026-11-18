@@ -1,0 +1,102 @@
+:host {
+    display: block;
+}
+
+.cred-docs {
+    display: flex;
+    flex-direction: column;
+    gap: var(--mj-space-3, 0.75rem);
+    color: var(--mj-text-primary);
+}
+
+.cred-docs__heading {
+    margin: 0;
+    font-size: var(--mj-text-lg, 1.125rem);
+    font-weight: var(--mj-font-semibold, 600);
+}
+
+.cred-docs__empty {
+    margin: 0;
+    color: var(--mj-text-secondary);
+}
+
+.cred-docs__list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--mj-space-2, 0.5rem);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.cred-docs__item {
+    padding: var(--mj-space-2, 0.5rem) var(--mj-space-3, 0.75rem);
+    border: 1px solid var(--mj-border-default);
+    border-radius: var(--mj-radius-sm, 4px);
+    background: var(--mj-bg-surface);
+}
+
+.cred-docs__row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--mj-space-3, 0.75rem);
+}
+
+.cred-docs__name {
+    font-weight: var(--mj-font-medium, 500);
+}
+
+.cred-docs__meta {
+    flex: 1;
+    font-size: var(--mj-text-sm, 0.875rem);
+    color: var(--mj-text-secondary);
+}
+
+.cred-docs__buttons {
+    display: flex;
+    gap: var(--mj-space-2, 0.5rem);
+}
+
+.cred-docs__form {
+    display: flex;
+    flex-direction: column;
+    gap: var(--mj-space-2, 0.5rem);
+    padding: var(--mj-space-3, 0.75rem);
+    border: 1px solid var(--mj-border-default);
+    border-radius: var(--mj-radius-sm, 4px);
+    background: var(--mj-bg-surface);
+}
+
+.cred-docs__field {
+    display: flex;
+    flex-direction: column;
+    gap: var(--mj-space-1, 0.25rem);
+
+    label {
+        font-size: var(--mj-text-sm, 0.875rem);
+        font-weight: var(--mj-font-medium, 500);
+    }
+
+    [aria-invalid='true'] {
+        border-color: var(--mj-status-error);
+    }
+}
+
+.cred-docs__label {
+    font-size: var(--mj-text-sm, 0.875rem);
+    font-weight: var(--mj-font-medium, 500);
+}
+
+.cred-docs__inline {
+    display: flex;
+    align-items: center;
+    gap: var(--mj-space-2, 0.5rem);
+    font-size: var(--mj-text-sm, 0.875rem);
+}
+
+.cred-docs__error {
+    margin: var(--mj-space-1, 0.25rem) 0 0;
+    font-size: var(--mj-text-sm, 0.875rem);
+    color: var(--mj-status-error);
+}

@@ -1,0 +1,50 @@
+{
+  "name": "@mj-biz-apps/credentialing-integration-tests",
+  "type": "module",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Integration check bundles for BizApps Credentialing, dispatched by `mj test` or standalone runner.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js",
+    "./checks/*": "./dist/checks/*.js"
+  },
+  "scripts": {
+    "build": "tsc && tsc-alias -f",
+    "test": "vitest run"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/MemberJunction/bizapps-credentialing"
+  },
+  "license": "BUSL-1.1",
+  "dependencies": {
+    "@mj-biz-apps/credentialing-core": "0.0.0",
+    "@mj-biz-apps/credentialing-core-entities-server": "0.0.0",
+    "@mj-biz-apps/credentialing-entities": "0.0.0"
+  },
+  "peerDependencies": {
+    "@memberjunction/core": "^6.2.1",
+    "@memberjunction/core-entities": "^6.2.1",
+    "@memberjunction/global": "^6.2.1",
+    "@memberjunction/graphql-dataprovider": "^6.2.1",
+    "@memberjunction/testing-integration": "^6.2.1",
+    "@mj-biz-apps/committees-entities": "^1.5.0",
+    "@mj-biz-apps/common-entities": "^5.62.0"
+  },
+  "devDependencies": {
+    "@memberjunction/core": "6.2.2",
+    "@memberjunction/core-entities": "6.2.2",
+    "@memberjunction/global": "6.2.2",
+    "@memberjunction/graphql-dataprovider": "6.2.2",
+    "@memberjunction/testing-integration": "6.2.2",
+    "@mj-biz-apps/committees-entities": "1.5.0",
+    "@mj-biz-apps/common-entities": "5.66.0",
+    "@types/node": "^22.10.0",
+    "tsc-alias": "^1.8.16",
+    "typescript": "^5.9.3",
+    "vite": "^7.1.5",
+    "vitest": "^4.0.18"
+  }
+}

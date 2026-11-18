@@ -1,0 +1,92 @@
+[
+  {
+    "fields": {
+      "Name": "Credentialing: Staff Organizations",
+      "Description": "Accrediting organizations the user is a member of (Organization Membership). Attached to Accrediting Organizations for Credentialing Staff.",
+      "FilterText": "(ID IN (SELECT m.AccreditingOrganizationID FROM [__mj_BizAppsCredentialing].[vwOrganizationMemberships] m WHERE m.UserID = TRY_CAST('{{UserID}}' AS UNIQUEIDENTIFIER)))"
+    },
+    "primaryKey": {
+      "ID": "C6663F9D-B736-42C2-93B3-6FA776DE43BB"
+    }
+  },
+  {
+    "fields": {
+      "Name": "Credentialing: Staff Rows By Organization",
+      "Description": "Rows whose AccreditingOrganizationID is an organization the user is a member of. Attached to Programs and Organization Memberships for Credentialing Staff.",
+      "FilterText": "(AccreditingOrganizationID IN (SELECT m.AccreditingOrganizationID FROM [__mj_BizAppsCredentialing].[vwOrganizationMemberships] m WHERE m.UserID = TRY_CAST('{{UserID}}' AS UNIQUEIDENTIFIER)))"
+    },
+    "primaryKey": {
+      "ID": "9A41F7E0-DD7D-442B-8D95-C518CF5A5F8B"
+    }
+  },
+  {
+    "fields": {
+      "Name": "Credentialing: Staff Rows By Program",
+      "Description": "Program versions of programs owned by an organization the user is a member of. Attached to Program Versions for Credentialing Staff.",
+      "FilterText": "(ProgramID IN (SELECT p.ID FROM [__mj_BizAppsCredentialing].[vwPrograms] p WHERE p.AccreditingOrganizationID IN (SELECT m.AccreditingOrganizationID FROM [__mj_BizAppsCredentialing].[vwOrganizationMemberships] m WHERE m.UserID = TRY_CAST('{{UserID}}' AS UNIQUEIDENTIFIER))))"
+    },
+    "primaryKey": {
+      "ID": "434FABDB-E098-4960-B524-EFF22A2B46E0"
+    }
+  },
+  {
+    "fields": {
+      "Name": "Credentialing: Staff Rows By Version",
+      "Description": "Rows of a program version whose program is owned by an organization the user is a member of. Attached to Sections, Standards and Document Requirements for Credentialing Staff.",
+      "FilterText": "(ProgramVersionID IN (SELECT v.ID FROM [__mj_BizAppsCredentialing].[vwProgramVersions] v INNER JOIN [__mj_BizAppsCredentialing].[vwPrograms] p ON p.ID = v.ProgramID WHERE p.AccreditingOrganizationID IN (SELECT m.AccreditingOrganizationID FROM [__mj_BizAppsCredentialing].[vwOrganizationMemberships] m WHERE m.UserID = TRY_CAST('{{UserID}}' AS UNIQUEIDENTIFIER))))"
+    },
+    "primaryKey": {
+      "ID": "C64EEE67-7047-4661-9572-228D57D4C420"
+    }
+  },
+  {
+    "fields": {
+      "Name": "Credentialing: Staff Committees",
+      "Description": "BizApps Committees committees owned by the BizApps Common organization behind an accrediting organization the user is a member of. Attached to Committees: Committees for Credentialing Staff (the deciding-committee picker).",
+      "FilterText": "(OrganizationID IN (SELECT ao.OrganizationID FROM [__mj_BizAppsCredentialing].[vwAccreditingOrganizations] ao INNER JOIN [__mj_BizAppsCredentialing].[vwOrganizationMemberships] m ON m.AccreditingOrganizationID = ao.ID WHERE m.UserID = TRY_CAST('{{UserID}}' AS UNIQUEIDENTIFIER)))"
+    },
+    "primaryKey": {
+      "ID": "9700AED8-AB5A-47C9-9D43-61AE67338A97"
+    }
+  },
+  {
+    "fields": {
+      "Name": "Credentialing: Own Workspace Items",
+      "Description": "Workspace items of the user's own workspaces. Part of the Explorer shell baseline of the credentialing roles; Workspace Items has no UserID column of its own.",
+      "FilterText": "(WorkspaceID IN (SELECT w.ID FROM [__mj].[vwWorkspaces] w WHERE w.UserID = TRY_CAST('{{UserID}}' AS UNIQUEIDENTIFIER)))"
+    },
+    "primaryKey": {
+      "ID": "F2965EC6-C9F1-4FB6-B31D-6EC303B52BBA"
+    }
+  },
+  {
+    "fields": {
+      "Name": "Credentialing: Shell Empty",
+      "Description": "Present and empty: lets a credentialing role's Explorer shell load an engine that reads this entity without exposing any of its rows. Every credentialing permission row outside this app's schema carries a filter; this is the filter for shell entities the role must not read.",
+      "FilterText": "(1 = 0)"
+    },
+    "primaryKey": {
+      "ID": "A7D11D98-6E4B-42AD-96D2-4736A830C9AB"
+    }
+  },
+  {
+    "fields": {
+      "Name": "Credentialing: Resource Type Catalog",
+      "Description": "The resource-type catalog. MJ's Explorer shell reads it at startup (the tab container needs the Custom type's ID to open an application's landing page). It names types, not records. The filter is present so a credentialing role holds no unfiltered grant outside this app's schema.",
+      "FilterText": "(1 = 1)"
+    },
+    "primaryKey": {
+      "ID": "D01A58F9-A156-41B6-B1DA-803C020B5D2E"
+    }
+  },
+  {
+    "fields": {
+      "Name": "Credentialing: Committee Type Catalog",
+      "Description": "The BizApps Committees committee-type catalog. Program Studio lists it in the New committee form. It names kinds of committee, not any organization's records. The filter is present so a credentialing role holds no unfiltered grant outside this app's schema. Attached to Committees: Types for Credentialing Staff.",
+      "FilterText": "(1 = 1)"
+    },
+    "primaryKey": {
+      "ID": "9215F286-22DE-462B-AF4D-F4D3D9B225B1"
+    }
+  }
+]

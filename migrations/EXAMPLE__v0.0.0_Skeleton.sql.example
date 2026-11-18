@@ -31,11 +31,13 @@
 -- GO
 
 -- REMEMBER (docs/template-docs/codegen-and-metadata-migrations.md):
---   * no __mj_CreatedAt/__mj_UpdatedAt columns, and no FK indexes — CodeGen adds
---     both after entity registration; declaring them here collides with it
+--   * never declare __mj_CreatedAt/__mj_UpdatedAt columns or FK indexes in hand-written DDL —
+--     CodeGen adds both after entity registration; declaring them up front collides with it
 --   * hardcoded UUIDs for any metadata rows (never NEWID()) — a clean install has
 --     to reproduce the same IDs everywhere
 --   * after this migration: run CodeGen, then commit the regenerated code AND the
---     CodeGen-emitted SQL folded into this (or a follow-up) migration
+--     CodeGen-emitted SQL folded below a separator into this (or a follow-up) migration;
+--     keep the generated system columns, FK indexes, views, procedures, and triggers,
+--     and leave out only the recurring refresh procedure calls
 --   * add a changeset: `pnpm exec changeset` (>= minor whenever a migration is added)
 --   * never edit this file once it has been applied anywhere — add a new migration

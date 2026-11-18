@@ -17,12 +17,16 @@
   "mjVersionRange": ">=6.1.0-edge.5 <7.0.0",
   "dependencies": {
     "mj-bizapps-common": {
-      "version": ">=5.40.0 <6.0.0",
+      "version": ">=5.62.0 <6.0.0",
       "repository": "https://github.com/MemberJunction/bizapps-common"
     },
     "mj-bizapps-tasks": {
-      "version": ">=1.4.3 <2.0.0",
+      "version": ">=1.13.0 <2.0.0",
       "repository": "https://github.com/MemberJunction/bizapps-tasks"
+    },
+    "mj-committees": {
+      "version": ">=1.5.0 <2.0.0",
+      "repository": "https://github.com/MemberJunction/bizapps-committees"
     }
   },
   "schema": {

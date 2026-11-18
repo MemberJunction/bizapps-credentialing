@@ -2,19 +2,67 @@
   {
     "fields": {
       "ApplicationID": "@lookup:MJ: Applications.Name=Credentialing",
-      "RoleID": "@lookup:MJ: Roles.Name=UI",
-      "CanAccess": true,
-      "CanAdmin": false
-    },
-    "primaryKey": { "ID": "218A07B7-A885-4BD3-B5A1-63CBB4FAD5E1" }
-  },
-  {
-    "fields": {
-      "ApplicationID": "@lookup:MJ: Applications.Name=Credentialing",
       "RoleID": "@lookup:MJ: Roles.Name=Developer",
       "CanAccess": true,
       "CanAdmin": true
     },
-    "primaryKey": { "ID": "CC3C38A6-3C74-4C77-8CD6-E6FDD74FB417" }
+    "primaryKey": {
+      "ID": "CC3C38A6-3C74-4C77-8CD6-E6FDD74FB417"
+    }
+  },
+  {
+    "fields": {
+      "ApplicationID": "@lookup:MJ: Applications.Name=Credentialing",
+      "RoleID": "@lookup:MJ: Roles.Name=Credentialing Admin",
+      "CanAccess": true,
+      "CanAdmin": false
+    },
+    "primaryKey": {
+      "ID": "9A8BA96A-6AFE-4C53-999B-DA9C3C25BF69"
+    }
+  },
+  {
+    "fields": {
+      "ApplicationID": "@lookup:MJ: Applications.Name=Credentialing",
+      "RoleID": "@lookup:MJ: Roles.Name=Credentialing Staff",
+      "CanAccess": true,
+      "CanAdmin": false
+    },
+    "primaryKey": {
+      "ID": "CE9F47FE-EC05-40C4-82CA-BCE1F9EA867B"
+    }
+  },
+  {
+    "fields": {
+      "ApplicationID": "@lookup:MJ: Applications.Name=Credentialing",
+      "RoleID": "@lookup:MJ: Roles.Name=Credentialing Committee",
+      "CanAccess": true,
+      "CanAdmin": false
+    },
+    "primaryKey": {
+      "ID": "D1C1B9B0-33D2-4DB2-BB8E-A2A8CD014E2E"
+    }
+  },
+  {
+    "fields": {
+      "ApplicationID": "@lookup:MJ: Applications.Name=Credentialing",
+      "RoleID": "@lookup:MJ: Roles.Name=Credentialing Reviewer",
+      "CanAccess": true,
+      "CanAdmin": false
+    },
+    "primaryKey": {
+      "ID": "30502249-8CCD-43EC-996E-355458AF8019"
+    }
+  },
+  {
+    "fields": {
+      "ApplicationID": "@lookup:MJ: Applications.Name=Credentialing",
+      "RoleID": "@lookup:MJ: Roles.Name=Credentialing Applicant",
+      "CanAccess": true,
+      "CanAdmin": false
+    },
+    "primaryKey": {
+      "ID": "C0778F68-0E59-4A08-9F3C-BE82185CB8FA"
+    }
   }
 ]

@@ -1,0 +1,72 @@
+<section class="cred-docs" aria-labelledby="cred-docs-heading">
+    <h3 id="cred-docs-heading" class="cred-docs__heading">Document requirements</h3>
+
+    @if (Rows.length === 0 && !IsAdding) {
+        <p class="cred-docs__empty">This version asks for no documents.</p>
+    }
+
+    <ul class="cred-docs__list">
+        @for (row of Rows; track row.ID) {
+            <li class="cred-docs__item">
+                    <div class="cred-docs__row">
+                        <span class="cred-docs__name">{{ row.Name }}</span>
+                        <span class="cred-docs__meta">{{ row.IsRequired ? 'Required' : 'Optional' }} · {{ row.SensitivityPolicy }}</span>
+                        @if (CanAuthor) {
+                            <span class="cred-docs__buttons">
+                                <button mjButton Variant="flat" Size="sm" type="button" [disabled]="IsBusy" (click)="StartEdit(row)" [attr.aria-label]="'Edit ' + row.Name">Edit</button>
+                                <button mjButton Variant="flat" Size="sm" type="button" [disabled]="IsBusy" (click)="Delete(row)" [attr.aria-label]="'Delete ' + row.Name">Delete</button>
+                            </span>
+                        }
+                    </div>
+                    @if (ErrorFor(row.ID) && !IsEditingRow(row.ID)) {
+                        <p class="cred-docs__error" role="alert">{{ ErrorFor(row.ID) }}</p>
+                    }
+            </li>
+        }
+    </ul>
+
+    @if (CanAuthor) {
+        @if (Editing) {
+            @let target = EditTarget;
+            <form class="cred-docs__form" (ngSubmit)="SaveEditing()" novalidate [attr.aria-label]="target === 'new' ? 'New document requirement' : 'Edit ' + Editing.Name">
+                <div class="cred-docs__field">
+                    <label [for]="'cred-doc-name-' + target">Name</label>
+                    <input [id]="'cred-doc-name-' + target" name="name" type="text" class="mj-input" autocomplete="off" [(ngModel)]="Editing.Name"
+                        [attr.aria-invalid]="FieldErrorFor(target, 'Name') ? 'true' : null"
+                        [attr.aria-describedby]="FieldErrorFor(target, 'Name') ? 'cred-doc-name-error-' + target : (FieldErrorFor(target, 'Form') ? 'cred-doc-error-' + target : null)" />
+                    @if (FieldErrorFor(target, 'Name')) {
+                        <p [id]="'cred-doc-name-error-' + target" class="cred-docs__error" role="alert">{{ FieldErrorFor(target, 'Name') }}</p>
+                    }
+                </div>
+                <div class="cred-docs__field">
+                    <label [for]="'cred-doc-description-' + target">Description</label>
+                    <textarea [id]="'cred-doc-description-' + target" name="description" rows="2" class="mj-input" [(ngModel)]="Editing.Description"></textarea>
+                </div>
+                <div class="cred-docs__inline">
+                    <mj-switch name="required" [InputId]="'cred-doc-required-' + target" [(ngModel)]="Editing.IsRequired"></mj-switch>
+                    <label [for]="'cred-doc-required-' + target">Required</label>
+                </div>
+                <div class="cred-docs__field">
+                    <span class="cred-docs__label" [id]="'cred-doc-policy-label-' + target">Sensitivity policy</span>
+                    <mj-dropdown name="policy" [AriaLabelledBy]="'cred-doc-policy-label-' + target" [Data]="SensitivityPolicies" [(ngModel)]="Editing.SensitivityPolicy"></mj-dropdown>
+                </div>
+                <div class="cred-docs__buttons">
+                    <button mjButton Variant="primary" Size="sm" type="submit" [disabled]="IsBusy">{{ target === 'new' ? 'Add' : 'Save' }}</button>
+                    <button mjButton Variant="outline" Size="sm" type="button" [disabled]="IsBusy" (click)="CancelEdit()">Cancel</button>
+                </div>
+                <div aria-live="polite">
+                    @if (FieldErrorFor(target, 'Form')) {
+                        <p [id]="'cred-doc-error-' + target" class="cred-docs__error" role="alert">{{ FieldErrorFor(target, 'Form') }}</p>
+                    }
+                </div>
+            </form>
+        } @else {
+            <button mjButton Variant="outline" Size="sm" type="button" [disabled]="IsBusy || Editing !== null" (click)="StartAdd()">
+                <i class="fa-solid fa-plus" aria-hidden="true"></i> Add document requirement
+            </button>
+        }
+    }
+    @if (!Editing && ErrorFor('new')) {
+        <p class="cred-docs__error" role="alert">{{ ErrorFor('new') }}</p>
+    }
+</section>

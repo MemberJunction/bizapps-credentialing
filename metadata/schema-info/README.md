@@ -1,14 +1,18 @@
 # schema-info
 
-Registers this app's schema in `__mj.SchemaInfo` — the record that gives the
-app's entities their name prefix and reserved ID range.
+Registers this app's schema reserved ID range and description in
+`__mj.SchemaInfo`.
 
 `.schema-info.json` is **already activated** for `__mj_BizAppsCredentialing`
-(prefix `MJ_BizApps_Credentialing: `, IDs `10000001`–`10099999`). The
-`primaryKey.ID` was generated once and must **never change** — it is what makes
-the row deterministic across every database this app is installed into. The
-`sync` block is written back by `mj sync push` on first push; commit it.
+(IDs `10000001`–`10099999`). Because `mj migrate --schema` runs
+`spUpdateSchemaInfoFromDatabase` and inserts the `__mj.SchemaInfo` row with an
+auto-generated ID first, `primaryKey.ID` uses the natural-key lookup
+`@lookup:MJ: Schema Info.SchemaName=__mj_BizAppsCredentialing`. Do not commit any
+`sync` block written back by `mj sync push`.
 
-`EntityNamePrefix` here must always agree with `mj.config.cjs`
-`newEntityDefaults.NameRulesBySchema`. Full guide:
+The entity name prefix (`MJ_BizApps_Credentialing: `) lives in `mj.config.cjs`
+`newEntityDefaults.NameRulesBySchema` only and is intentionally omitted from
+`.schema-info.json`: `__mj.SchemaInfo.EntityNamePrefix` holds at most 25
+characters, while `MJ_BizApps_Credentialing: ` is 26 characters, and CodeGen
+reads `NameRulesBySchema` first. Full guide:
 [`docs/template-docs/metadata.md`](../../docs/template-docs/metadata.md) § Schema registration.

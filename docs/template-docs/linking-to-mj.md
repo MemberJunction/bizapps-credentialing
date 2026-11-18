@@ -123,17 +123,24 @@ in the **MJ** repo, and both are local dev wiring you never commit to MJ (§5).
    carry — the template starts at `0.0.0`).
 
 2. **Client (MJExplorer)** — only if you ship UI packages. Add
-   `"@mj-biz-apps/credentialing-ng": "0.0.0"` to `packages/MJExplorer/package.json`, and a
-   static import to
-   `packages/MJExplorer/src/app/generated/open-app-bootstrap.generated.ts`:
-   ```ts
-   import '@mj-biz-apps/credentialing-ng';
+   `"@mj-biz-apps/credentialing-ng": "0.0.0"` (plus its workspace deps added by
+   manifest generation) to `packages/MJExplorer/package.json`, and add a
+   `dynamicPackages.client` entry in `mj/mj.config.cjs`:
+   ```js
+   {
+     PackageName: '@mj-biz-apps/credentialing-ng',
+     Enabled: true,
+   }
    ```
-   (When an app is *installed* via `mj app install`, the CLI maintains that
-   file for you; in a linked dev setup you add the line yourself.)
+   Then run `mj codegen manifest --exclude-packages @memberjunction --output ./src/app/generated/class-registrations-manifest.ts --open-app-client-bootstrap`
+   in `mj/packages/MJExplorer` (the `mj:manifest:explorer` script; `prestart`
+   also runs it). That writes `OPEN_APP_CLIENT_MODULES` directly into
+   `packages/MJExplorer/src/app/generated/class-registrations-manifest.ts`.
 
-Re-run `pnpm install` **at the workspace parent** after either package.json
-edit.
+Re-run `pnpm install` **at the workspace parent** after either `package.json`
+edit (and again if `mj:manifest:api` or `mj:manifest:explorer` adds missing
+transitive workspace dependencies to `MJAPI/package.json` or
+`MJExplorer/package.json`).
 
 ## 3. Database — when do you actually need one?
 
@@ -146,20 +153,36 @@ depends on which manifest blocks you kept:
 | A `schema` + `migrations` block | **Yes** — create/migrate the schema *before first boot* (below) |
 | A `metadata/` directory | Yes at dev time — `mj sync push` writes into the DB |
 
-For a schema-backed app, from **this repo's** root:
+For a schema-backed app, from **this repo's** root (with `.env` at this repo's
+root):
 
 ```sh
 pnpm run mj:migrate      # mj migrate --schema __mj_BizAppsCredentialing --dir ./migrations
 ```
 
-That creates the schema (if missing) and applies your app's migrations to the
-same database MJAPI uses (connection settings come from your `.env`). Re-run it
-whenever you add a migration. After schema changes run CodeGen —
-[codegen-and-metadata-migrations.md](codegen-and-metadata-migrations.md):
+That creates the schema (if missing), applies your app's migrations to the
+same database MJAPI uses (connection settings come from `.env`), and runs
+`spUpdateSchemaInfoFromDatabase` to register the schema in `__mj.SchemaInfo`.
+Re-run it whenever you add a migration. After schema changes run CodeGen from
+**this repo's** root — [codegen-and-metadata-migrations.md](codegen-and-metadata-migrations.md):
 
 ```sh
 pnpm run mj:codegen
 ```
+
+And to push `metadata/` from **this repo's** root:
+
+```sh
+pnpm exec mj sync push --dir=metadata --ci
+```
+
+### Dependency apps in a linked dev database
+
+When this app depends on sibling BizApps apps (Common, Tasks, Committees) inside a linked workspace:
+
+1. **Migrate leaf-first** from each sibling repo's own root (with `.env` placed at that sibling repo's root): run `pnpm run mj:migrate` in `bizapps-common`, then `bizapps-tasks`, then `bizapps-committees`. Their shipped `Metadata_Sync` migrations plus `mj migrate`'s per-schema metadata refresh create their schemas, tables, `__mj.Entity` rows, and `__mj.Application` rows (`Common`, `Tasks`, `Committee Management`) without needing `mj app install` or separate `mj sync push` runs.
+2. **Register each dependency app locally in `mj/`** alongside this app: add each app's `dynamicPackages.server` and `dynamicPackages.client` entries to `mj/mj.config.cjs`, add their `-server` / `-ng` packages at exact sibling versions to `mj/packages/MJAPI/package.json` and `mj/packages/MJExplorer/package.json`, run manifest generation (`mj:manifest:api` and `mj:manifest:explorer`), run `pnpm install` at the workspace parent, and build (`pnpm run build` at parent).
+3. **`mj/packages/MJAPI/.env`**: `MJAPI`'s `start` script runs `-r dotenv/config` inside `mj/packages/MJAPI/`, so symlink or place `.env` there as well as at `mj/.env`.
 
 ## 4. Build and run
 

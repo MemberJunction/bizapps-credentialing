@@ -62,3 +62,6 @@ jobs:
 
       - name: Build all packages
         run: pnpm run build:packages
+
+      - name: Run unit tests
+        run: pnpm test

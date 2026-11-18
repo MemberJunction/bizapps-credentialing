@@ -5,7 +5,10 @@
   },
   "directoryOrder": [
     "schema-info",
+    "roles",
     "applications",
-    "application-roles"
+    "application-roles",
+    "row-level-security-filters",
+    "entity-permissions"
   ]
 }

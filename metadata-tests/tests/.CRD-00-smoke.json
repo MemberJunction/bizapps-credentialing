@@ -1,0 +1,24 @@
+{
+  "fields": {
+    "TypeID": "@lookup:MJ: Test Types.Name=Integration Test",
+    "Name": "CRD-00 - Smoke",
+    "Description": "Verify BizApps Credentialing schema registration and integration test wiring.",
+    "InputDefinition": {},
+    "ExpectedOutcomes": {
+      "summary": "SchemaInfo row exists for __mj_BizAppsCredentialing."
+    },
+    "Configuration": {
+      "tier": "deterministic",
+      "transport": "server",
+      "checks": [
+        {
+          "type": "cred-smoke"
+        }
+      ]
+    },
+    "Status": "Active"
+  },
+  "primaryKey": {
+    "ID": "E4B59947-ABC1-425B-92DA-B3567028F2EB"
+  }
+}

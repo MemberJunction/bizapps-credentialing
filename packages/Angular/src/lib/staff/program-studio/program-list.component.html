@@ -1,0 +1,33 @@
+<nav class="cred-list" aria-labelledby="cred-list-heading">
+    <div class="cred-list__header">
+        <h2 id="cred-list-heading" class="cred-list__heading">Programs</h2>
+        <button mjButton Variant="primary" Size="sm" type="button" (click)="RequestNew()">
+            <i class="fa-solid fa-plus" aria-hidden="true"></i> New program
+        </button>
+    </div>
+    <label class="cred-list__filter-label" for="cred-list-filter">Find a program</label>
+    <input id="cred-list-filter" type="search" class="mj-input" autocomplete="off" placeholder="Name or prefix" [(ngModel)]="Filter" />
+
+    @if (IsLoading) {
+        <mj-loading Text="Loading programs..."></mj-loading>
+    } @else if (ErrorMessage) {
+        <p class="cred-list__error" role="alert">{{ ErrorMessage }}</p>
+    } @else {
+        @if (Programs.length === 0) {
+            <p class="cred-list__empty" role="status">No programs yet. Create the first one with New program.</p>
+        } @else if (Visible.length === 0) {
+            <p class="cred-list__empty" role="status">No program matches.</p>
+        }
+        <ul class="cred-list__items">
+            @for (program of Visible; track program.ID) {
+                <li>
+                    <button type="button" class="cred-list__item" [class.cred-list__item--selected]="IsSelected(program.ID)"
+                        [attr.aria-current]="IsSelected(program.ID) ? 'page' : null" (click)="Select(program)">
+                        <span class="cred-list__name">{{ program.Name }}</span>
+                        <span class="cred-list__meta">{{ program.CredentialPrefix }} · {{ program.ProgramType }} · {{ program.AccreditingOrganization }}</span>
+                    </button>
+                </li>
+            }
+        </ul>
+    }
+</nav>
