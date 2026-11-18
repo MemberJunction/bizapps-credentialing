@@ -14,7 +14,7 @@
         <div class="cred-card__status-row">
             <span class="cred-card__state">{{ StateLabel }}</span>
             @if (Standard.Response.IsStale) {
-                <span class="cred-card__badge cred-card__badge--stale">Needs review (source changed)</span>
+                <span class="cred-card__badge cred-card__badge--stale">{{ StaleSourceSentence }}</span>
             }
         </div>
     </header>
@@ -36,7 +36,9 @@
         </div>
     }
 
-    @if (Standard.Response.SourceLabel) {
+    @if (Standard.Response.Status === 'Located') {
+        <p class="cred-card__provenance">{{ LocatedPassagesSentence }}</p>
+    } @else if (Standard.Response.SourceLabel) {
         <p class="cred-card__provenance">
             Drafted from {{ Standard.Response.SourceLabel }}
             @if (Standard.Response.SourceRetrievedAt) {
@@ -55,10 +57,7 @@
                             type="button"
                             class="cred-card__citation-chip"
                             (click)="OpenCitation(citation)">
-                            {{ citation.SourceLabel }}
-                            @if (citation.PageReference) {
-                                ({{ citation.PageReference }})
-                            }
+                            {{ FormatChip(citation) }}
                         </button>
                     </li>
                 }
@@ -101,9 +100,9 @@
         </div>
     }
 
-    @if (Standard.Response.Explanation; as explanation) {
+    @if (Standard.Response.Status !== 'Located' && Standard.Response.Explanation; as explanation) {
         <details class="cred-card__explanation">
-            <summary class="cred-card__guidance-toggle">How the assistant drafted this</summary>
+            <summary class="cred-card__guidance-toggle">How this was drafted</summary>
             <dl class="cred-card__explanation-dl">
                 <dt>What</dt>
                 <dd>{{ explanation.What }}</dd>

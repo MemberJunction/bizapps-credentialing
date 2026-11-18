@@ -164,6 +164,18 @@
     gap: var(--mj-space-3, 0.75rem);
 }
 
+.cred-runner__prefill-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--mj-space-2, 0.5rem);
+}
+
+.cred-runner__prefill-summary {
+    font-size: var(--mj-text-sm, 0.875rem);
+    color: var(--mj-text-secondary);
+}
+
 .cred-runner__dialog {
     max-width: 30rem;
     width: calc(100% - 2rem);

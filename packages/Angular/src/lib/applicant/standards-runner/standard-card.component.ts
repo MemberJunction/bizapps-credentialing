@@ -34,9 +34,12 @@ import type { UploadResult } from '../documents/evidence-client';
 import { UploadDropzoneComponent } from '../documents/upload-dropzone.component';
 import { ApplicantMessages } from '../shared/applicant-messages';
 import {
+    FormatCitationChip,
     IntakeSentence,
+    LOCATED_PASSAGES_SENTENCE,
     ResolveCardActions,
     ResponseStateLabel,
+    STALE_SOURCE_SENTENCE,
     type CardActions,
 } from './runner-model';
 
@@ -90,6 +93,8 @@ export class StandardCardComponent extends BaseAngularComponent {
     @Output() public readonly ResponseUpdated = new EventEmitter<WorkspaceStandardResponse>();
 
     public readonly SelfAssessmentOptions = SELF_ASSESSMENT_OPTIONS;
+    public readonly StaleSourceSentence = STALE_SOURCE_SENTENCE;
+    public readonly LocatedPassagesSentence = LOCATED_PASSAGES_SENTENCE;
     public IsEditing = false;
     public DraftText = '';
     public DraftSelfAssessment: SelfAssessment | null = null;
@@ -137,6 +142,10 @@ export class StandardCardComponent extends BaseAngularComponent {
         if (!iso) return '';
         const parsed = new Date(iso);
         return Number.isNaN(parsed.getTime()) ? iso : DATE_FORMAT.format(parsed);
+    }
+
+    public FormatChip(citation: WorkspaceCitation): string {
+        return FormatCitationChip(citation);
     }
 
     public ToggleEvidenceUpload(): void {

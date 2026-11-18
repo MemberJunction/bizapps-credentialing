@@ -24,6 +24,8 @@ export const CredentialingOperation = {
     ConfirmDocumentCurrent: 'Credentialing.ConfirmDocumentCurrent',
     GetDocumentLibrary: 'Credentialing.GetDocumentLibrary',
     RequeueReading: 'Credentialing.RequeueReading',
+    SaveResponseSources: 'Credentialing.SaveResponseSources',
+    RefreshPrefills: 'Credentialing.RefreshPrefills',
 } as const;
 
 /** One of the {@link CredentialingOperation} keys. */

@@ -20,7 +20,13 @@ import { UserCache } from '@memberjunction/generic-database-provider';
  *   permission on `MJ: Files` or the storage account: the app's evidence route is the only door to
  *   the bytes (plan Decision 5);
  * - the reading queue (`reading/DatabaseReadingData.ts`) claims, reads and commits documents, and the
- *   recognizer and reader run their prompts, as the system user, because background work has no caller.
+ *   recognizer and reader run their prompts, as the system user, because background work has no caller;
+ * - prefill resolution (`prefill/PrefillRunner.ts`, `RunForSubject` and agent-authored writes under
+ *   `DatabasePrefillData`): `RunForSubject` runs background resolution on each Draft application as the
+ *   system user; interactive `RefreshPrefills` and `RunForApplication` authorize the caller first on
+ *   `Application`, `StandardResponse` and evidence rows inside the lock before writing as the system
+ *   user, because external roles hold no delete permission on `ResponseCitation` and bulk saves run
+ *   without per-row RLS round-trips.
  *
  * Any new use must be added to that list.
  */

@@ -30,6 +30,7 @@ import {
 import {
     ApplicationLifecycleRules,
     GetApplicationWorkspaceOperation,
+    RefreshPrefillsOperation,
     ResponseRules,
     WithdrawApplicationOperation,
     type ApplicationWorkspace,
@@ -44,9 +45,11 @@ import {
     ApplicationCounts,
     ApplyResponseUpdate,
     CANNOT_PREFILL_BANNER,
+    FormatRefreshSummary,
     ParseRunnerFilter,
     RUNNER_FILTER_OPTIONS,
     ResolveRunnerSelection,
+    ShowRefreshPrefills,
     type RunnerFilter,
 } from './runner-model';
 import { SectionRailComponent } from './section-rail.component';
@@ -141,6 +144,10 @@ export class StandardsRunnerPage extends BaseAngularComponent {
     public ErrorMessage = '';
     public NotAvailable = false;
 
+    public IsRefreshingPrefills = false;
+    public RefreshSummary = '';
+    public RefreshError = '';
+
     public WithdrawReason = '';
     public WithdrawError = '';
     public IsWithdrawing = false;
@@ -185,12 +192,49 @@ export class StandardsRunnerPage extends BaseAngularComponent {
         return ApplicationLifecycleRules.CanWithdraw(this.Workspace.Application.Status, 'Applicant', 'reason').Allowed;
     }
 
+    public get CanRefreshPrefills(): boolean {
+        if (!this.Workspace) return false;
+        return ShowRefreshPrefills(this.Workspace.Application);
+    }
+
+    public async RefreshPrefills(): Promise<void> {
+        const ws = this.Workspace;
+        if (!ws || !this.CanRefreshPrefills || this.IsRefreshingPrefills) return;
+        this.IsRefreshingPrefills = true;
+        this.RefreshSummary = '';
+        this.RefreshError = '';
+        this.cdr.markForCheck();
+        try {
+            const res = await new RefreshPrefillsOperation().Execute(
+                { ApplicationID: ws.Application.ApplicationID },
+                { provider: this.ProviderToUse },
+            );
+            if (!res.Success || res.Output == null) {
+                this.RefreshError = ApplicantMessages.ForUser(
+                    res.ErrorMessage || 'Could not refresh prefills.',
+                    'save',
+                );
+                return;
+            }
+            const summary = FormatRefreshSummary(res.Output);
+            await this.loadWorkspace(ws.Application.ApplicationID);
+            this.RefreshSummary = summary;
+        } catch (e) {
+            this.RefreshError = ApplicantMessages.FromError(e, 'save');
+        } finally {
+            this.IsRefreshingPrefills = false;
+            this.cdr.markForCheck();
+        }
+    }
+
     public OnSelectApplication(applicationID: string): void {
         if (!applicationID || (this._applicationID && UUIDsEqual(this._applicationID, applicationID))) {
             return;
         }
         this._applicationID = applicationID;
         this._sectionID = null;
+        this.RefreshSummary = '';
+        this.RefreshError = '';
         void this.ensureWorkspaceLoaded();
     }
 

@@ -83,6 +83,15 @@
                     }
                 </div>
             </form>
+            <bizapps-cred-response-sources
+                [Provider]="ProviderToUse"
+                [StandardID]="Standard.ID"
+                [IsNew]="IsNew"
+                [IntakeMode]="Standard.IntakeMode"
+                [VersionStatus]="VersionStatus"
+                [Requirements]="Requirements"
+                (ReloadRequested)="ReloadRequested.emit()">
+            </bizapps-cred-response-sources>
         } @else {
             <div aria-live="polite">
                 @if (ErrorMessage) {
@@ -102,6 +111,15 @@
                 <dt>Evidence hint</dt><dd data-field="EvidenceHint">{{ Standard.EvidenceHint || 'None' }}</dd>
                 <dt>Evaluation mode</dt><dd data-field="EvaluationMode">{{ Standard.EvaluationMode }} <span class="cred-std__note">{{ EvaluationModeNote }}</span></dd>
             </dl>
+            <bizapps-cred-response-sources
+                [Provider]="ProviderToUse"
+                [StandardID]="Standard.ID"
+                [IsNew]="IsNew"
+                [IntakeMode]="Standard.IntakeMode"
+                [VersionStatus]="VersionStatus"
+                [Requirements]="Requirements"
+                (ReloadRequested)="ReloadRequested.emit()">
+            </bizapps-cred-response-sources>
             }
         }
     }

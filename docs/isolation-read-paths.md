@@ -218,3 +218,18 @@ cannot read or write directly:
   `SubjectAccess.Document` (another subject's or organization's document answers `Record not found.`),
   `ActorFor` must be `Applicant` or `Staff`, and the save is the caller's, inside `OperationWrite`
   (`cred-reader.9`).
+
+### System-user work added by Task 10 (prefill resolution)
+
+- **`PrefillRunner.RunForSubject`** (`packages/CoreEntitiesServer/src/prefill/PrefillRunner.ts`) runs in
+  the background when a document reading commits (`CredentialingServices.OnReadingCommitted`): it reads
+  the subject's Draft applications on an isolated provider and runs `RunForApplication` as `SystemUser.Get`.
+- **`PrefillRunner.RunForApplication` & `Credentialing.RefreshPrefills`:** `RefreshPrefills` authorizes
+  `Applicant` or `Staff` for the subject via `SubjectAccess.Application` + `ActorFor`, and `DatabasePrefillData`
+  re-reads the `Application` and its `StandardResponse` IDs **as the caller** inside the subject+application
+  lock (`AuthoringLock.ForSubject` then `ForApplication`) so row-level security decides access before any
+  write. Only after the caller's read succeeds does `DatabasePrefillData` load the response/citation
+  entity objects and write outcomes (updating `StandardResponse`, replacing `ResponseCitation`s) as
+  `SystemUser.Get` inside `OperationWrite` (an applicant holds no delete permission on `ResponseCitation`
+  and bulk writes run without per-row RLS round-trips). Candidate evaluation (`DocumentExtractionEvaluator`)
+  reads extractions, documents, and requirements as the caller (or system user for background runs).

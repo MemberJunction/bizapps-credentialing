@@ -51,6 +51,7 @@ const SERVER_ONLY_BUNDLES = {
     'cred-invite': 'CRD-09 - Invitations',
     'cred-evidence-rules': 'CRD-11 - Evidence',
     'cred-reader': 'CRD-12 - Reader',
+    'cred-prefill': 'CRD-13 - Prefill',
 };
 
 const args = process.argv.slice(2);

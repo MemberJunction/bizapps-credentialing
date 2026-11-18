@@ -5,6 +5,8 @@ import {
     ApplyResponseUpdate,
     CANNOT_PREFILL_BANNER,
     CONFIRMED_LOCKED_SENTENCE,
+    FormatCitationChip,
+    FormatRefreshSummary,
     IntakeSentence,
     MatchesRunnerFilter,
     NO_CHANGES_TO_SAVE_REASON,
@@ -14,6 +16,7 @@ import {
     ResponseStateLabel,
     SAVE_DRAFT_BEFORE_CONFIRMING_REASON,
     SectionCounts,
+    ShowRefreshPrefills,
 } from '../runner-model';
 
 function makeResponse(overrides: Partial<WorkspaceStandardResponse> = {}): WorkspaceStandardResponse {
@@ -246,5 +249,34 @@ describe('runner-model copy and card actions', () => {
         expect(actions.ApplicationLockedReason).toBe(
             'This application was submitted on Nov 17, 2026. Its answers and documents are locked.',
         );
+    });
+});
+
+describe('runner-model prefill and citation formatting', () => {
+    it('formats citation chips with optional page references', () => {
+        expect(FormatCitationChip({ SourceLabel: 'safety-policy.pdf', PageReference: null })).toBe(
+            'safety-policy.pdf',
+        );
+        expect(FormatCitationChip({ SourceLabel: 'safety-policy.pdf', PageReference: '1' })).toBe(
+            'safety-policy.pdf, p. 1',
+        );
+        expect(FormatCitationChip({ SourceLabel: 'safety-policy.pdf', PageReference: 'p. 3' })).toBe(
+            'safety-policy.pdf, p. 3',
+        );
+    });
+
+    it('hides Refresh prefills when CanPrefill is false or application is not Draft', () => {
+        expect(ShowRefreshPrefills({ CanPrefill: true, Status: 'Draft' })).toBe(true);
+        expect(ShowRefreshPrefills({ CanPrefill: false, Status: 'Draft' })).toBe(false);
+        expect(ShowRefreshPrefills({ CanPrefill: true, Status: 'Submitted' })).toBe(false);
+    });
+
+    it('formats the refresh prefills summary sentence', () => {
+        expect(
+            FormatRefreshSummary({ Prefilled: 1, Located: 0, MarkedStale: 0, Cleared: 0, Unchanged: 2 }),
+        ).toBe('1 answer drafted, 2 unchanged.');
+        expect(
+            FormatRefreshSummary({ Prefilled: 3, Located: 1, MarkedStale: 0, Cleared: 0, Unchanged: 0 }),
+        ).toBe('3 answers drafted, 0 unchanged.');
     });
 });

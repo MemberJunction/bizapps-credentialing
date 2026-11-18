@@ -105,6 +105,27 @@
                     </div>
                 </div>
 
+                @if (CanRefreshPrefills) {
+                    <div class="cred-runner__prefill-bar">
+                        <button
+                            mjButton
+                            Variant="outline"
+                            Size="sm"
+                            type="button"
+                            [disabled]="IsRefreshingPrefills"
+                            [attr.aria-busy]="IsRefreshingPrefills ? 'true' : null"
+                            (click)="RefreshPrefills()">
+                            {{ IsRefreshingPrefills ? 'Refreshing prefills...' : 'Refresh prefills' }}
+                        </button>
+                        @if (RefreshSummary) {
+                            <span class="cred-runner__prefill-summary" role="status">{{ RefreshSummary }}</span>
+                        }
+                        @if (RefreshError) {
+                            <mj-alert Variant="error" [Message]="RefreshError" [Dismissible]="true" (Dismissed)="RefreshError = ''"></mj-alert>
+                        }
+                    </div>
+                }
+
                 @if (selection.VisibleStandards.length === 0) {
                     <mj-empty-state
                         Icon="fa-solid fa-check-double"

@@ -187,7 +187,7 @@ export async function LoadWorkspaceResponseByID(
             },
             {
                 EntityName: CredentialingEntity.Extraction,
-                ExtraFilter: `SubjectID = '${escapedSubjectID}' AND IsSuperseded = 0`,
+                ExtraFilter: `SubjectID = '${escapedSubjectID}' AND (IsSuperseded = 0 OR ID IN (SELECT TRY_CAST(r.SourceReference AS UNIQUEIDENTIFIER) FROM [__mj_BizAppsCredentialing].[vwStandardResponses] r WHERE r.ID = '${escapedID}' AND r.SourceReference IS NOT NULL))`,
                 Fields: EXTRACTION_WORKSPACE_FIELDS,
                 ResultType: 'simple',
                 SkipTotalRowCount: true,

@@ -13,7 +13,7 @@ export const OPERATION_ONLY_REASON = 'This record is changed only through the ap
  * this module can add to it, and nothing a request sends reaches it. A `WeakSet` holds no entity
  * alive after its operation lets go of it.
  */
-const marked = new WeakSet<BaseEntity>();
+const marked = new WeakMap<BaseEntity, Scope>();
 
 /** The two writes an operation makes through {@link OperationWrite.Run}. */
 export interface OperationWriteScope {
@@ -21,14 +21,32 @@ export interface OperationWriteScope {
     Save(entity: BaseEntity): Promise<void>;
     /** Deletes `entity` as an operation write; throws the entity's refusal as a `REFUSED` operation error. */
     Delete(entity: BaseEntity): Promise<void>;
+    /**
+     * Records a parent row's `SubjectID` already read inside this locked operation's transaction so
+     * bulk child inserts in the same operation do not re-query the parent row one by one.
+     */
+    CacheParentSubject(parentEntityName: string, parentID: string, subjectID: string): void;
 }
 
 /** The scope one {@link OperationWrite.Run} hands its work; it stops writing once the run has settled. */
 class Scope implements OperationWriteScope {
     private open = true;
+    private readonly parentSubjects = new Map<string, string>();
 
     public Close(): void {
         this.open = false;
+        this.parentSubjects.clear();
+    }
+
+    public CacheParentSubject(parentEntityName: string, parentID: string, subjectID: string): void {
+        if (!this.open) {
+            return;
+        }
+        this.parentSubjects.set(`${parentEntityName}:${parentID.toLowerCase()}`, subjectID);
+    }
+
+    public KnownParentSubject(parentEntityName: string, parentID: string): string | null {
+        return this.parentSubjects.get(`${parentEntityName}:${parentID.toLowerCase()}`) ?? null;
     }
 
     public async Save(entity: BaseEntity): Promise<void> {
@@ -44,7 +62,7 @@ class Scope implements OperationWriteScope {
         if (!this.open) {
             throw new Error('An operation write was attempted after its operation had finished.');
         }
-        marked.add(entity);
+        marked.set(entity, this);
         let succeeded: boolean;
         try {
             succeeded = await run();
@@ -88,5 +106,13 @@ export class OperationWrite {
     /** Whether `entity` is being saved or deleted by an operation's scope at this moment. */
     public static IsAllowed(entity: BaseEntity): boolean {
         return marked.has(entity);
+    }
+
+    /** Returns a parent row's `SubjectID` already verified by the active operation's scope, if present. */
+    public static KnownParentSubject(entity: BaseEntity, parentEntityName: string, parentID: string | null): string | null {
+        if (parentID == null) {
+            return null;
+        }
+        return marked.get(entity)?.KnownParentSubject(parentEntityName, parentID) ?? null;
     }
 }

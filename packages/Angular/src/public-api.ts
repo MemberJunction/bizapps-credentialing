@@ -45,6 +45,20 @@ export { ProgramListComponent } from './lib/staff/program-studio/program-list.co
 export { ProgramWizardComponent, type WizardOrganization, type WizardErrorField } from './lib/staff/program-studio/program-wizard.component';
 export { VersionTreeComponent, type TreeErrorTarget } from './lib/staff/program-studio/version-tree.component';
 export { StandardEditorComponent, EVALUATION_MODE_NOTE, type NewStandardTarget } from './lib/staff/program-studio/standard-editor.component';
+export { ResponseSourcesComponent } from './lib/staff/program-studio/response-sources.component';
+export {
+    SOURCES_DRAFT_ONLY_SENTENCE,
+    MANUAL_STANDARD_NO_SOURCES_SENTENCE,
+    FormatSourceSentence,
+    ResolveSourcesViewState,
+    AvailableRequirements,
+    AddSourceItem,
+    MoveSourceItem,
+    RemoveSourceItem,
+    SourcesListsEqual,
+    type SourceListItem,
+    type SourcesViewState,
+} from './lib/staff/program-studio/response-sources-model';
 export { VersionSettingsComponent, FROZEN_SETTINGS_SENTENCE, ROLLOUT_FLAGS_SENTENCE, FIXED_ON_ACTIVATION_SENTENCE, RETIRED_SETTINGS_SENTENCE, type SettingDescriptor, type SettingsGroup, type SettingsTier } from './lib/staff/program-studio/version-settings.component';
 export { DocumentRequirementsComponent } from './lib/staff/program-studio/document-requirements.component';
 export { PipelinePage } from './lib/staff/pipeline/pipeline.page';
@@ -89,11 +103,16 @@ export {
     ResolveCardActions,
     ResolveRunnerSelection,
     ApplyResponseUpdate,
+    FormatCitationChip,
+    ShowRefreshPrefills,
+    FormatRefreshSummary,
     RUNNER_FILTER_OPTIONS,
     CANNOT_PREFILL_BANNER,
     CONFIRMED_LOCKED_SENTENCE,
     SAVE_DRAFT_BEFORE_CONFIRMING_REASON,
     NO_CHANGES_TO_SAVE_REASON,
+    STALE_SOURCE_SENTENCE,
+    LOCATED_PASSAGES_SENTENCE,
     type RunnerFilter,
     type RunnerFilterOption,
     type SectionProgressSummary,

@@ -26,6 +26,7 @@ import {
 import type {
     mjBizAppsCredentialingDocumentRequirementEntity,
     mjBizAppsCredentialingProgramVersionEntity,
+    mjBizAppsCredentialingResponseSourceEntity,
     mjBizAppsCredentialingSectionEntity,
     mjBizAppsCredentialingStandardEntity,
 } from '@mj-biz-apps/credentialing-entities';
@@ -36,6 +37,7 @@ type VersionEntity = mjBizAppsCredentialingProgramVersionEntity;
 type SectionEntity = mjBizAppsCredentialingSectionEntity;
 type StandardEntity = mjBizAppsCredentialingStandardEntity;
 type DocumentRequirementEntity = mjBizAppsCredentialingDocumentRequirementEntity;
+type ResponseSourceEntity = mjBizAppsCredentialingResponseSourceEntity;
 
 /** The refusal given for a source version that is still a Draft. */
 export const CLONE_SOURCE_STATUS_REASON = 'Only an Active or Retired version can be copied into a new draft.';
@@ -46,6 +48,7 @@ interface SourceTree {
     Sections: SectionEntity[];
     Standards: StandardEntity[];
     DocumentRequirements: DocumentRequirementEntity[];
+    ResponseSources: ResponseSourceEntity[];
 }
 
 @RegisterClass(BaseRemotableOperation, CredentialingOperation.CloneVersionToDraft)
@@ -72,10 +75,14 @@ export class CloneVersionToDraftServerOperation extends CloneVersionToDraftOpera
             }
             // The version guard refuses a second Draft or a duplicate label here, before any child is written.
             const draft = await this.copyVersion(source.Version, input.NewLabel, provider, user);
-            const standardCount = await this.copySections(source, draft.ID, provider, user);
+            const clonedStandardByLineage = new Map<string, string>();
+            const standardCount = await this.copySections(source, draft.ID, clonedStandardByLineage, provider, user);
+            const clonedReqByName = new Map<string, string>();
             for (const requirement of source.DocumentRequirements) {
-                await this.copyDocumentRequirement(requirement, draft.ID, provider, user);
+                const clonedReqID = await this.copyDocumentRequirement(requirement, draft.ID, provider, user);
+                clonedReqByName.set(requirement.Name.trim().toLowerCase(), clonedReqID);
             }
+            await this.copyResponseSources(source, draft.ID, clonedStandardByLineage, clonedReqByName, provider, user);
             return {
                 VersionID: draft.ID,
                 SectionCount: source.Sections.length,
@@ -96,6 +103,7 @@ export class CloneVersionToDraftServerOperation extends CloneVersionToDraftOpera
             { EntityName: CredentialingEntity.Section, ExtraFilter: byVersion, OrderBy: 'Sequence, Number', ResultType: 'entity_object' },
             { EntityName: CredentialingEntity.Standard, ExtraFilter: byVersion, OrderBy: 'Sequence, Code', ResultType: 'entity_object' },
             { EntityName: CredentialingEntity.DocumentRequirement, ExtraFilter: byVersion, OrderBy: 'Sequence, Name', ResultType: 'entity_object' },
+            { EntityName: CredentialingEntity.ResponseSource, ExtraFilter: byVersion, OrderBy: 'StandardID, Rank, Sequence', ResultType: 'entity_object' },
         ];
         const results = await RunView.FromMetadataProvider(provider).RunViews<BaseEntity>(params, user);
         const failed = results.find((r) => !r.Success);
@@ -111,6 +119,7 @@ export class CloneVersionToDraftServerOperation extends CloneVersionToDraftOpera
             Sections: results[1].Results as SectionEntity[],
             Standards: results[2].Results as StandardEntity[],
             DocumentRequirements: results[3].Results as DocumentRequirementEntity[],
+            ResponseSources: results[4].Results as ResponseSourceEntity[],
         };
     }
 
@@ -139,7 +148,13 @@ export class CloneVersionToDraftServerOperation extends CloneVersionToDraftOpera
     }
 
     /** Copies each section in `Sequence` order and, after each, its standards in `Sequence` order. Returns the standards copied. */
-    private async copySections(source: SourceTree, draftID: string, provider: IMetadataProvider, user: UserInfo): Promise<number> {
+    private async copySections(
+        source: SourceTree,
+        draftID: string,
+        clonedStandardByLineage: Map<string, string>,
+        provider: IMetadataProvider,
+        user: UserInfo,
+    ): Promise<number> {
         let standardsSaved = 0;
         for (const section of source.Sections) {
             const copy = await OperationSupport.NewRecord<SectionEntity>(provider, CredentialingEntity.Section, user);
@@ -150,7 +165,8 @@ export class CloneVersionToDraftServerOperation extends CloneVersionToDraftOpera
             copy.Sequence = section.Sequence;
             await OperationSupport.Save(copy);
             for (const standard of source.Standards.filter((s) => UUIDsEqual(s.SectionID, section.ID))) {
-                await this.copyStandard(standard, copy.ID, draftID, provider, user);
+                const clonedID = await this.copyStandard(standard, copy.ID, draftID, provider, user);
+                clonedStandardByLineage.set(standard.LineageKey.toLowerCase(), clonedID);
                 standardsSaved++;
                 const failAfter = CloneVersionToDraftServerOperation.FailAfterStandards;
                 if (failAfter != null && standardsSaved >= failAfter) {
@@ -165,7 +181,7 @@ export class CloneVersionToDraftServerOperation extends CloneVersionToDraftOpera
      * Copies one standard with every authoring column, its lineage and its evaluation mode. The clone
      * mark lets the guard accept the carried-over evaluation mode, after checking it against the source.
      */
-    private async copyStandard(source: StandardEntity, sectionID: string, draftID: string, provider: IMetadataProvider, user: UserInfo): Promise<void> {
+    private async copyStandard(source: StandardEntity, sectionID: string, draftID: string, provider: IMetadataProvider, user: UserInfo): Promise<string> {
         const copy = await OperationSupport.NewRecord<StandardEntityServer>(provider, CredentialingEntity.Standard, user);
         copy.SectionID = sectionID;
         copy.ProgramVersionID = draftID;
@@ -183,6 +199,7 @@ export class CloneVersionToDraftServerOperation extends CloneVersionToDraftOpera
         copy.Sequence = source.Sequence;
         copy.MarkAsVersionClone(source.ID);
         await OperationSupport.Save(copy);
+        return copy.ID;
     }
 
     private async copyDocumentRequirement(
@@ -190,7 +207,7 @@ export class CloneVersionToDraftServerOperation extends CloneVersionToDraftOpera
         draftID: string,
         provider: IMetadataProvider,
         user: UserInfo,
-    ): Promise<void> {
+    ): Promise<string> {
         const copy = await OperationSupport.NewRecord<DocumentRequirementEntity>(provider, CredentialingEntity.DocumentRequirement, user);
         copy.ProgramVersionID = draftID;
         copy.Name = source.Name;
@@ -199,5 +216,45 @@ export class CloneVersionToDraftServerOperation extends CloneVersionToDraftOpera
         copy.SensitivityPolicy = source.SensitivityPolicy;
         copy.Sequence = source.Sequence;
         await OperationSupport.Save(copy);
+        return copy.ID;
+    }
+
+    private async copyResponseSources(
+        source: SourceTree,
+        draftID: string,
+        clonedStandardByLineage: ReadonlyMap<string, string>,
+        clonedReqByName: ReadonlyMap<string, string>,
+        provider: IMetadataProvider,
+        user: UserInfo,
+    ): Promise<void> {
+        if (source.ResponseSources.length === 0) {
+            return;
+        }
+        const lineageByStandardID = new Map(source.Standards.map((s) => [s.ID.toLowerCase(), s.LineageKey.toLowerCase()]));
+        const reqNameByID = new Map(source.DocumentRequirements.map((r) => [r.ID.toLowerCase(), r.Name.trim().toLowerCase()]));
+        for (const src of source.ResponseSources) {
+            const lineage = lineageByStandardID.get(src.StandardID.toLowerCase());
+            const clonedStandardID = lineage != null ? clonedStandardByLineage.get(lineage) : undefined;
+            if (clonedStandardID == null) {
+                throw new Error(`Cloned standard not found for response source ${src.ID}.`);
+            }
+            let clonedRequirementID: string | null = null;
+            if (src.DocumentRequirementID != null) {
+                const reqName = reqNameByID.get(src.DocumentRequirementID.toLowerCase());
+                clonedRequirementID = reqName != null ? (clonedReqByName.get(reqName) ?? null) : null;
+                if (clonedRequirementID == null) {
+                    throw new Error(`Cloned document requirement not found for response source ${src.ID}.`);
+                }
+            }
+            const copy = await OperationSupport.NewRecord<ResponseSourceEntity>(provider, CredentialingEntity.ResponseSource, user);
+            copy.StandardID = clonedStandardID;
+            copy.ProgramVersionID = draftID;
+            copy.SourceType = src.SourceType;
+            copy.DocumentRequirementID = clonedRequirementID;
+            copy.Mode = src.Mode;
+            copy.Rank = src.Rank;
+            copy.Sequence = src.Sequence;
+            await OperationSupport.Save(copy);
+        }
     }
 }

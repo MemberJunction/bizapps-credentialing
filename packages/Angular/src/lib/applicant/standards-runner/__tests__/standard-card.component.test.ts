@@ -199,4 +199,21 @@ describe('StandardCardComponent', () => {
         card.CloseViewer();
         expect(card.ViewerOpen).toBe(false);
     });
+
+    it('exposes Task 10 provenance, stale, located, and citation chip copy helpers', () => {
+        const card = createCard(APP_DRAFT, makeStandard('Prefilled'));
+        expect(card.StaleSourceSentence).toBe('Source changed since this was drafted');
+        expect(card.LocatedPassagesSentence).toBe('The assistant found these passages. Write your answer.');
+        expect(
+            card.FormatChip({
+                CitationID: 'C-1',
+                EvidenceDocumentID: 'D-1',
+                SourceLabel: 'safety-policy.pdf',
+                PageReference: '2',
+                Excerpt: 'Excerpt.',
+                StartOffset: 0,
+                EndOffset: 8,
+            }),
+        ).toBe('safety-policy.pdf, p. 2');
+    });
 });

@@ -48,6 +48,10 @@ import { AttestInLieuServerOperation } from './operations/AttestInLieuServerOper
 import { ConfirmDocumentCurrentServerOperation } from './operations/ConfirmDocumentCurrentServerOperation.js';
 import { GetDocumentLibraryServerOperation } from './operations/GetDocumentLibraryServerOperation.js';
 import { RequeueReadingServerOperation } from './operations/RequeueReadingServerOperation.js';
+import { SaveResponseSourcesServerOperation } from './operations/SaveResponseSourcesServerOperation.js';
+import { RefreshPrefillsServerOperation } from './operations/RefreshPrefillsServerOperation.js';
+import { PrefillRunner } from './prefill/PrefillRunner.js';
+import { CredentialingServices } from './services/CredentialingServices.js';
 
 export {
     AccreditingOrganizationEntityServer,
@@ -133,6 +137,25 @@ export { AttestInLieuServerOperation } from './operations/AttestInLieuServerOper
 export { ConfirmDocumentCurrentServerOperation } from './operations/ConfirmDocumentCurrentServerOperation.js';
 export { GetDocumentLibraryServerOperation } from './operations/GetDocumentLibraryServerOperation.js';
 export { RequeueReadingServerOperation } from './operations/RequeueReadingServerOperation.js';
+export { SaveResponseSourcesServerOperation } from './operations/SaveResponseSourcesServerOperation.js';
+export { RefreshPrefillsServerOperation } from './operations/RefreshPrefillsServerOperation.js';
+export {
+    DocumentExtractionEvaluator,
+    type PrefillContext,
+    type ResponseSourceRow,
+    type SourceEvaluator,
+} from './prefill/SourceEvaluators.js';
+export {
+    PrefillRunner,
+    PrefillWorker,
+    type PrefillApplicationRecord,
+    type PrefillCitationRecord,
+    type PrefillData,
+    type PrefillLoadedState,
+    type PrefillResponseRecord,
+    type PrefillSeams,
+    type PrefillTransactionScope,
+} from './prefill/PrefillRunner.js';
 export { ReadingQueue, ORPHAN_FILE_MINUTES } from './reading/ReadingQueue.js';
 export {
     ReadingWorker,
@@ -221,8 +244,13 @@ export function LoadBizAppsCredentialingEntitiesServer(): void {
         ConfirmDocumentCurrentServerOperation,
         GetDocumentLibraryServerOperation,
         RequeueReadingServerOperation,
+        SaveResponseSourcesServerOperation,
+        RefreshPrefillsServerOperation,
     ];
-    if (anchor.length !== 17 || operations.length !== 17) {
+    if (anchor.length !== 17 || operations.length !== 19) {
         throw new Error('credentialing server entity subclasses or operations missing');
     }
+    CredentialingServices.Register({
+        OnReadingCommitted: (subjectID) => PrefillRunner.RunForSubject(subjectID),
+    });
 }

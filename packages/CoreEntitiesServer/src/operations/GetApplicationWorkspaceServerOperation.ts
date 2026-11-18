@@ -141,7 +141,7 @@ export class GetApplicationWorkspaceServerOperation extends GetApplicationWorksp
                     },
                     {
                         EntityName: CredentialingEntity.Extraction,
-                        ExtraFilter: `SubjectID = '${subjectID}' AND IsSuperseded = 0`,
+                        ExtraFilter: `SubjectID = '${subjectID}' AND (IsSuperseded = 0 OR ID IN (SELECT TRY_CAST(r.SourceReference AS UNIQUEIDENTIFIER) FROM ${STANDARD_RESPONSES_VIEW} r WHERE r.ApplicationID = '${applicationID}' AND r.SourceReference IS NOT NULL))`,
                         Fields: EXTRACTION_WORKSPACE_FIELDS,
                         ResultType: 'simple',
                         SkipTotalRowCount: true,

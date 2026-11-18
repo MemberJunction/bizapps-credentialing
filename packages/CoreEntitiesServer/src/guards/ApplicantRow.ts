@@ -109,6 +109,11 @@ export class ApplicantRow {
         if (entity.IsSaved) {
             return null;
         }
+        const known = OperationWrite.KnownParentSubject(entity, parentEntityName, parentID);
+        if (known != null) {
+            assign(known);
+            return null;
+        }
         const subjectID = await ApplicantRow.SubjectOfParent(entity, user, parentEntityName, parentID);
         if (subjectID == null) {
             return NOT_FOUND_REASON;

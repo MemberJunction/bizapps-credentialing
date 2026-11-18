@@ -44,3 +44,5 @@ export * from './operations/AttestInLieuOperation.js';
 export * from './operations/ConfirmDocumentCurrentOperation.js';
 export * from './operations/GetDocumentLibraryOperation.js';
 export * from './operations/RequeueReadingOperation.js';
+export * from './operations/SaveResponseSourcesOperation.js';
+export * from './operations/RefreshPrefillsOperation.js';

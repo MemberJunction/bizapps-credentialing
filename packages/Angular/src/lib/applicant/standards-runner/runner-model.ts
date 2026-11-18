@@ -9,9 +9,11 @@ import { UUIDsEqual } from '@memberjunction/global';
 import {
     ResponseRules,
     type ApplicationWorkspace,
+    type RefreshPrefillsOutput,
     type ResponseState,
     type ResponseStatus,
     type WorkspaceApplication,
+    type WorkspaceCitation,
     type WorkspaceSection,
     type WorkspaceStandard,
     type WorkspaceStandardResponse,
@@ -35,6 +37,8 @@ export const CANNOT_PREFILL_BANNER = 'This program does not draft answers. Every
 export const CONFIRMED_LOCKED_SENTENCE = "Confirmed answers are locked. Ask the program's staff to reopen one if it must change.";
 export const SAVE_DRAFT_BEFORE_CONFIRMING_REASON = 'Save your draft before confirming.';
 export const NO_CHANGES_TO_SAVE_REASON = 'Make a change before saving.';
+export const STALE_SOURCE_SENTENCE = 'Source changed since this was drafted';
+export const LOCATED_PASSAGES_SENTENCE = 'The assistant found these passages. Write your answer.';
 
 const INTAKE_SENTENCES: Readonly<Record<string, string>> = {
     Manual: 'Nothing is drafted for this standard. Write your own answer.',
@@ -275,4 +279,27 @@ export function ApplyResponseUpdate(
         },
         Sections: sections,
     };
+}
+
+/** Formats a citation chip label as `{SourceLabel}{, p. N}` (FR-4.7). */
+export function FormatCitationChip(
+    citation: Pick<WorkspaceCitation, 'SourceLabel' | 'PageReference'>,
+): string {
+    const page = citation.PageReference?.trim() ?? '';
+    if (!page) return citation.SourceLabel;
+    if (/^(p\.|page\b)/i.test(page)) return `${citation.SourceLabel}, ${page}`;
+    return `${citation.SourceLabel}, p. ${page}`;
+}
+
+/** Whether `Refresh prefills` is shown above the standards list (FR-4.10). */
+export function ShowRefreshPrefills(
+    application: Pick<WorkspaceApplication, 'CanPrefill' | 'Status'>,
+): boolean {
+    return application.CanPrefill && application.Status === 'Draft';
+}
+
+/** Plain-language summary reported after `Refresh prefills` completes. */
+export function FormatRefreshSummary(output: RefreshPrefillsOutput): string {
+    const noun = output.Prefilled === 1 ? 'answer' : 'answers';
+    return `${output.Prefilled} ${noun} drafted, ${output.Unchanged} unchanged.`;
 }
