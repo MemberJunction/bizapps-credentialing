@@ -21,7 +21,9 @@
  * the MJ checkout's gitignored `.env` (default `../mj/.env`), replacing only those two lines (or
  * appending them). Nothing of that file is printed. Restart MJAPI afterwards.
  *
- * Usage (the root is required and must be an absolute path outside every repository):
+ * Usage (the root must be an absolute path outside every repository; when neither --root nor
+ * CREDENTIALING_EVIDENCE_STORE_ROOT is given, the root recorded in the MJ .env by an earlier run
+ * is used, so a rebuilt database needs only `pnpm run dev:storage`):
  *   CREDENTIALING_EVIDENCE_STORE_ROOT=/abs/path pnpm run dev:storage
  *   node scripts/dev/ensure-dev-storage.mjs --root /abs/path [--account <name>] [--mj-env <path to MJ .env>]
  */
@@ -57,6 +59,20 @@ if (!process.env.DB_DATABASE && existsSync(ENV_PATH) && typeof process.loadEnvFi
 }
 
 /**
+ * The root this script wrote into the MJ `.env` on an earlier run, so a rebuild of the database
+ * reuses it without the root being given again. Only that one line is read; nothing is printed.
+ * @param {string} mjEnvPath
+ * @returns {string}
+ */
+function rootRecordedIn(mjEnvPath) {
+  if (!existsSync(mjEnvPath)) return '';
+  const line = readFileSync(mjEnvPath, 'utf8')
+    .split(/\r?\n/)
+    .find((l) => l.startsWith(`${ROOT_ENV}=`));
+  return line ? line.slice(ROOT_ENV.length + 1).trim().replace(/^(['"])(.*)\1$/, '$2') : '';
+}
+
+/**
  * @param {readonly string[]} argv
  * @returns {{ root: string; accountName: string; mjEnvPath: string }}
  */
@@ -68,6 +84,9 @@ function parseArgs(argv) {
     if (argv[i] === '--root' && argv[i + 1]) root = argv[++i].trim();
     else if (argv[i] === '--account' && argv[i + 1]) accountName = argv[++i].trim();
     else if (argv[i] === '--mj-env' && argv[i + 1]) mjEnvPath = path.resolve(argv[++i].trim());
+  }
+  if (!root) {
+    root = rootRecordedIn(mjEnvPath);
   }
   if (!root) {
     console.error(`Give the evidence root directory: --root <absolute path> or ${ROOT_ENV}=<absolute path>.`);
