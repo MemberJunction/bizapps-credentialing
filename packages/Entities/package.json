@@ -1,11 +1,15 @@
 {
   "name": "@mj-biz-apps/credentialing-entities",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "type": "module",
   "description": "Generated entity subclasses for the app schema. TODO(template): rename package + description.",
   "main": "dist/index.js",
-  "files": ["/dist"],
-  "publishConfig": { "access": "public" },
+  "files": [
+    "/dist"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
   "types": "dist/index.d.ts",
   "scripts": {
     "build": "tsc && tsc-alias -f",

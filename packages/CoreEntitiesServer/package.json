@@ -1,11 +1,15 @@
 {
   "name": "@mj-biz-apps/credentialing-core-entities-server",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "type": "module",
   "description": "Server-side entity subclass overrides (validation, computed fields, save hooks). TODO(template): rename.",
   "main": "dist/index.js",
-  "files": ["/dist"],
-  "publishConfig": { "access": "public" },
+  "files": [
+    "/dist"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
   "types": "dist/index.d.ts",
   "scripts": {
     "build": "tsc && tsc-alias -f",
@@ -17,8 +21,8 @@
   },
   "license": "BUSL-1.1",
   "dependencies": {
-    "@mj-biz-apps/credentialing-core": "0.0.0",
-    "@mj-biz-apps/credentialing-entities": "0.0.0"
+    "@mj-biz-apps/credentialing-core": "0.1.0",
+    "@mj-biz-apps/credentialing-entities": "0.1.0"
   },
   "peerDependencies": {
     "@memberjunction/core": "^6.2.1",

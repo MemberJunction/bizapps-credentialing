@@ -1,7 +1,7 @@
 {
   "name": "@mj-biz-apps/credentialing-integration-tests",
   "type": "module",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "private": true,
   "description": "Integration check bundles for BizApps Credentialing, dispatched by `mj test` or standalone runner.",
   "main": "dist/index.js",
@@ -20,10 +20,10 @@
   },
   "license": "BUSL-1.1",
   "dependencies": {
-    "@mj-biz-apps/credentialing-core": "0.0.0",
-    "@mj-biz-apps/credentialing-core-entities-server": "0.0.0",
-    "@mj-biz-apps/credentialing-entities": "0.0.0",
-    "@mj-biz-apps/credentialing-server": "0.0.0"
+    "@mj-biz-apps/credentialing-core": "0.1.0",
+    "@mj-biz-apps/credentialing-core-entities-server": "0.1.0",
+    "@mj-biz-apps/credentialing-entities": "0.1.0",
+    "@mj-biz-apps/credentialing-server": "0.1.0"
   },
   "peerDependencies": {
     "@memberjunction/core": "^6.2.1",
