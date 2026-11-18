@@ -67,6 +67,7 @@ import { ApplicantSubjectResource } from './applicant-subject-resource';
                                 [Provider]="Provider"
                                 [Subject]="ActiveSubject"
                                 [ApplicationID]="ApplicationID"
+                                [RefreshKey]="RefreshKey"
                                 (BackToStandards)="OnBackToStandards()"
                                 (NavigateToGap)="OnNavigateToGap($event)"
                                 (Submitted)="OnApplicationSubmitted()">
@@ -79,6 +80,7 @@ import { ApplicantSubjectResource } from './applicant-subject-resource';
                                 [SectionID]="SectionID"
                                 [StandardID]="StandardID"
                                 [Filter]="Filter"
+                                [RefreshKey]="RefreshKey"
                                 (SelectionChanged)="OnRunnerSelectionChanged($event)"
                                 (Withdrawn)="OnApplicationWithdrawn()"
                                 (ReviewAndSubmit)="OnReviewAndSubmit($event)">

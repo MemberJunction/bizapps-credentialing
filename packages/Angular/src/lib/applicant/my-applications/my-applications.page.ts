@@ -46,6 +46,7 @@ export class MyApplicationsPage extends BaseAngularComponent implements OnInit {
     private readonly subjectContext = inject(SubjectContext);
     private _queryParams: Record<string, string> = {};
     private loaded = false;
+    private _refreshKey: number | null = null;
 
     public readonly NoSubjectMessage = NO_SUBJECT_MESSAGE;
     public readonly NoApplicationsMessage = NO_APPLICATIONS_MESSAGE;
@@ -69,6 +70,22 @@ export class MyApplicationsPage extends BaseAngularComponent implements OnInit {
     }
 
     /** Emitted whenever the active subject should be written to or cleared from the URL. */
+    /**
+     * Bumped by the hosting resource each time Explorer shows its cached tab again. A change reloads
+     * the list without a loading state, so counts changed on another screen appear without a reload.
+     */
+    @Input()
+    public get RefreshKey(): number | null {
+        return this._refreshKey;
+    }
+    public set RefreshKey(value: number | null) {
+        const previous = this._refreshKey;
+        this._refreshKey = value;
+        if (previous != null && value !== previous && this.loaded) {
+            void this.Load(true);
+        }
+    }
+
     @Output() public readonly SubjectSelected = new EventEmitter<string | null>();
 
     /** Emitted when the applicant clicks `Continue` or `View` on an application row. */
@@ -78,13 +95,17 @@ export class MyApplicationsPage extends BaseAngularComponent implements OnInit {
         void this.Load();
     }
 
-    public async Load(): Promise<void> {
-        this.IsLoading = true;
-        this.ErrorMessage = '';
-        this.cdr.markForCheck();
+    /** Loads the applicant's subjects. A `silent` load keeps the list on screen and shows no error over it. */
+    public async Load(silent = false): Promise<void> {
+        if (!silent) {
+            this.IsLoading = true;
+            this.ErrorMessage = '';
+            this.cdr.markForCheck();
+        }
         try {
             const result = await new GetMySubjectsOperation().Execute({}, { provider: this.ProviderToUse });
             if (!result.Success || result.Output == null) {
+                if (silent) return;
                 this.ErrorMessage = ApplicantMessages.ForUser(result.ErrorMessage || 'Could not load your applications.', 'load');
                 return;
             }
@@ -92,7 +113,7 @@ export class MyApplicationsPage extends BaseAngularComponent implements OnInit {
             this.loaded = true;
             this.resolveView();
         } catch (e) {
-            this.ErrorMessage = ApplicantMessages.FromError(e, 'load');
+            if (!silent) this.ErrorMessage = ApplicantMessages.FromError(e, 'load');
         } finally {
             this.IsLoading = false;
             this.cdr.markForCheck();

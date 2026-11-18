@@ -62,6 +62,7 @@ export class ReviewSubmitPage extends BaseAngularComponent {
     private _subject: MySubject | null = null;
     private _applicationID: string | null = null;
     private loadCounter = 0;
+    private _refreshKey: number | null = null;
 
     @ViewChild('confirmSubmitDialog')
     public ConfirmSubmitDialogRef?: ElementRef<HTMLDialogElement>;
@@ -92,6 +93,22 @@ export class ReviewSubmitPage extends BaseAngularComponent {
         if (normalized !== this._applicationID) {
             this._applicationID = normalized;
             void this.ensureGateLoaded();
+        }
+    }
+
+    /**
+     * Bumped by the hosting resource each time Explorer shows its cached tab again. A change reloads
+     * what is on screen without a loading state, so work done elsewhere appears without a page reload.
+     */
+    @Input()
+    public get RefreshKey(): number | null {
+        return this._refreshKey;
+    }
+    public set RefreshKey(value: number | null) {
+        const previous = this._refreshKey;
+        this._refreshKey = value;
+        if (previous != null && value !== previous && this.Gate != null) {
+            void this.loadGate(this.Gate.Application.ApplicationID, true);
         }
     }
 
@@ -236,12 +253,18 @@ export class ReviewSubmitPage extends BaseAngularComponent {
         return apps[0]?.ApplicationID ?? null;
     }
 
-    private async loadGate(applicationID: string): Promise<void> {
+    /**
+     * Evaluates the gate. A `silent` load keeps the gate on screen while it runs, shows no error over
+     * it, and keeps an attestation the applicant is still filling in.
+     */
+    private async loadGate(applicationID: string, silent = false): Promise<void> {
         const currentLoad = ++this.loadCounter;
-        this.IsLoading = true;
-        this.NotAvailable = false;
-        this.ErrorMessage = '';
-        this.cdr.markForCheck();
+        if (!silent) {
+            this.IsLoading = true;
+            this.NotAvailable = false;
+            this.ErrorMessage = '';
+            this.cdr.markForCheck();
+        }
         try {
             const res = await new GetSubmissionGateOperation().Execute(
                 { ApplicationID: applicationID },
@@ -251,6 +274,9 @@ export class ReviewSubmitPage extends BaseAngularComponent {
                 return;
             }
             if (!res.Success || res.Output == null) {
+                if (silent) {
+                    return;
+                }
                 this.Gate = null;
                 this.ErrorMessage = ApplicantMessages.ForUser(
                     res.ErrorMessage || 'Could not check submission readiness.',
@@ -259,14 +285,14 @@ export class ReviewSubmitPage extends BaseAngularComponent {
                 return;
             }
             this.Gate = res.Output;
-            this.Attestation = res.Output.RecordedAttestation ?? {
+            this.Attestation = res.Output.RecordedAttestation ?? (silent ? this.Attestation : {
                 OfficerName: null,
                 OfficerRole: null,
                 ApprovalDate: null,
                 Accepted: false,
-            };
+            });
         } catch (e) {
-            if (currentLoad !== this.loadCounter) {
+            if (currentLoad !== this.loadCounter || silent) {
                 return;
             }
             this.Gate = null;

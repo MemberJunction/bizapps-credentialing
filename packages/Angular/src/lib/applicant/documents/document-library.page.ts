@@ -75,6 +75,7 @@ export class DocumentLibraryPage extends BaseAngularComponent implements OnDestr
     private _requestedDocumentID: string | null = null;
     private _requestedRequirementID: string | null = null;
     private loadCounter = 0;
+    private _refreshKey: number | null = null;
 
     @ViewChild('attestDialog') public AttestDialogRef?: ElementRef<HTMLDialogElement>;
 
@@ -92,6 +93,22 @@ export class DocumentLibraryPage extends BaseAngularComponent implements OnDestr
             this.ActionSuccessMessage = '';
             this.ActiveUploadRequirementID = null;
             void this.loadLibrary();
+        }
+    }
+
+    /**
+     * Bumped by the hosting resource each time Explorer shows its cached tab again. A change reloads
+     * what is on screen without a loading state, so work done elsewhere appears without a page reload.
+     */
+    @Input()
+    public get RefreshKey(): number | null {
+        return this._refreshKey;
+    }
+    public set RefreshKey(value: number | null) {
+        const previous = this._refreshKey;
+        this._refreshKey = value;
+        if (previous != null && value !== previous && this._subject != null) {
+            void this.loadLibrary(true);
         }
     }
 

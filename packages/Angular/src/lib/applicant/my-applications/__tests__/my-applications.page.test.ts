@@ -62,6 +62,24 @@ describe('MyApplicationsPage', () => {
         expect(emitted).toEqual([S1.SubjectID]);
     });
 
+    it('reloads the list without a loading state when RefreshKey changes', async () => {
+        const updated: MySubject = { ...S1, Applications: [{ ...S1.Applications[0], ConfirmedCount: 3 }] };
+        const spy = vi
+            .spyOn(GetMySubjectsOperation.prototype, 'Execute')
+            .mockResolvedValueOnce({ Success: true, ResultCode: 'SUCCESS', Output: { Subjects: [S1] } })
+            .mockResolvedValueOnce({ Success: true, ResultCode: 'SUCCESS', Output: { Subjects: [updated] } });
+        const { page } = createPage();
+        page.RefreshKey = 0;
+        await page.Load();
+
+        page.RefreshKey = 1;
+        expect(page.IsLoading).toBe(false);
+        await Promise.resolve();
+        await Promise.resolve();
+        expect(spy).toHaveBeenCalledTimes(2);
+        expect(page.Subjects[0].Applications[0].ConfirmedCount).toBe(3);
+    });
+
     it('lands on the picker when multiple subjects exist without URL or context selection', async () => {
         vi.spyOn(GetMySubjectsOperation.prototype, 'Execute').mockResolvedValue({
             Success: true,

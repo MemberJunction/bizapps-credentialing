@@ -188,4 +188,36 @@ describe('StandardsRunnerPage', () => {
         await page.ConfirmWithdraw();
         expect(withdrawSpy).toHaveBeenCalledWith({ ApplicationID: APP_ID, Reason: 'Deferring' }, expect.any(Object));
     });
+
+    it('reloads the workspace silently when RefreshKey changes, keeping the cards on screen', async () => {
+        const first = makeWorkspace();
+        const second = makeWorkspace();
+        second.Sections[0].Standards[0].Response.Status = 'Prefilled';
+        second.Sections[0].Standards[0].Response.ResponseText = 'Drafted from a document.';
+        const spy = vi
+            .spyOn(GetApplicationWorkspaceOperation.prototype, 'Execute')
+            .mockResolvedValueOnce({ Success: true, ResultCode: 'SUCCESS', Output: first })
+            .mockResolvedValueOnce({ Success: true, ResultCode: 'SUCCESS', Output: second });
+
+        const page = createPage();
+        page.RefreshKey = 0;
+        page.Subject = SUBJECT;
+        await Promise.resolve();
+        await Promise.resolve();
+        expect(spy).toHaveBeenCalledTimes(1);
+
+        const loadingStates: boolean[] = [];
+        page.RefreshKey = 1;
+        loadingStates.push(page.IsLoading);
+        await Promise.resolve();
+        await Promise.resolve();
+
+        expect(spy).toHaveBeenCalledTimes(2);
+        expect(loadingStates).toEqual([false]);
+        expect(page.Workspace?.Sections[0].Standards[0].Response.Status).toBe('Prefilled');
+
+        page.RefreshKey = 1;
+        await Promise.resolve();
+        expect(spy).toHaveBeenCalledTimes(2);
+    });
 });

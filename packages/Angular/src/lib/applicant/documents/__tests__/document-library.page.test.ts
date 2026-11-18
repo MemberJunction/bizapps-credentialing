@@ -161,6 +161,29 @@ describe('DocumentLibraryPage and DocumentViewerComponent', () => {
         page.ngOnDestroy();
     });
 
+    it('reloads the library silently when RefreshKey changes', async () => {
+        const settled: DocumentLibrary = { ...LIBRARY, Ledgers: [] };
+        const libSpy = vi
+            .spyOn(GetDocumentLibraryOperation.prototype, 'Execute')
+            .mockResolvedValueOnce({ Success: true, ResultCode: 'SUCCESS', Output: settled })
+            .mockResolvedValueOnce({ Success: true, ResultCode: 'SUCCESS', Output: LIBRARY });
+
+        const page = createLibraryPage();
+        page.RefreshKey = 0;
+        page.Subject = SUBJECT;
+        await Promise.resolve();
+        await Promise.resolve();
+        expect(libSpy).toHaveBeenCalledTimes(1);
+
+        page.RefreshKey = 1;
+        expect(page.IsLoading).toBe(false);
+        await Promise.resolve();
+        await Promise.resolve();
+        expect(libSpy).toHaveBeenCalledTimes(2);
+        expect(page.Library?.Ledgers).toHaveLength(1);
+        page.ngOnDestroy();
+    });
+
     it('reloads every 5 seconds while a document is being read, stops when none is, and Read again requeues and reloads', async () => {
         vi.useFakeTimers();
         try {

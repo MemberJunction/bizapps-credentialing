@@ -37,6 +37,7 @@ import { CredentialingAreaResource } from './credentialing-area-resource';
                     <bizapps-cred-my-applications
                         [Provider]="Provider"
                         [QueryParams]="QueryParams"
+                        [RefreshKey]="RefreshKey"
                         (SubjectSelected)="OnSubjectSelected($event)"
                         (OpenApplication)="OnOpenApplication($event)">
                     </bizapps-cred-my-applications>

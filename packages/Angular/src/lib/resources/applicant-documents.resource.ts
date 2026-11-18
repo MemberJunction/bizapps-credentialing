@@ -52,6 +52,7 @@ import { ApplicantSubjectResource } from './applicant-subject-resource';
                             [Subject]="ActiveSubject"
                             [RequestedDocumentID]="RequestedDocumentID"
                             [RequestedRequirementID]="RequestedRequirementID"
+                            [RefreshKey]="RefreshKey"
                             (DocumentViewed)="OnDocumentViewed($event)">
                         </bizapps-cred-document-library>
                     }

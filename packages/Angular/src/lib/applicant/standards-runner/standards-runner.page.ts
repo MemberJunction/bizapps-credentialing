@@ -86,6 +86,7 @@ export class StandardsRunnerPage extends BaseAngularComponent {
     private _standardID: string | null = null;
     private _filter: RunnerFilter = 'needs-review';
     private loadCounter = 0;
+    private _refreshKey: number | null = null;
 
     @ViewChild('withdrawDialog') public WithdrawDialogRef?: ElementRef<HTMLDialogElement>;
 
@@ -147,6 +148,23 @@ export class StandardsRunnerPage extends BaseAngularComponent {
     public set Filter(value: RunnerFilter | string | null | undefined) {
         this._filter = ParseRunnerFilter(value);
         this.cdr.markForCheck();
+    }
+
+    /**
+     * Bumped by the hosting resource each time Explorer shows its cached tab again. A change reloads
+     * what is on screen without a loading state, so work done elsewhere (a document read, a prefill,
+     * a confirmation on another screen) appears without the applicant reloading the page.
+     */
+    @Input()
+    public get RefreshKey(): number | null {
+        return this._refreshKey;
+    }
+    public set RefreshKey(value: number | null) {
+        const previous = this._refreshKey;
+        this._refreshKey = value;
+        if (previous != null && value !== previous && this.Workspace) {
+            void this.loadWorkspace(this.Workspace.Application.ApplicationID, true);
+        }
     }
 
     @Output() public readonly SelectionChanged = new EventEmitter<RunnerNavigationState>();
@@ -381,12 +399,15 @@ export class StandardsRunnerPage extends BaseAngularComponent {
         return preferred.ApplicationID;
     }
 
-    private async loadWorkspace(applicationID: string): Promise<void> {
+    /** Loads the workspace. A `silent` load keeps the cards on screen while it runs and shows no error over them. */
+    private async loadWorkspace(applicationID: string, silent = false): Promise<void> {
         const token = ++this.loadCounter;
-        this.IsLoading = true;
-        this.ErrorMessage = '';
-        this.NotAvailable = false;
-        this.cdr.markForCheck();
+        if (!silent) {
+            this.IsLoading = true;
+            this.ErrorMessage = '';
+            this.NotAvailable = false;
+            this.cdr.markForCheck();
+        }
         try {
             const res = await new GetApplicationWorkspaceOperation().Execute(
                 { ApplicationID: applicationID },
@@ -394,6 +415,7 @@ export class StandardsRunnerPage extends BaseAngularComponent {
             );
             if (token !== this.loadCounter) return;
             if (!res.Success || res.Output == null) {
+                if (silent) return;
                 this.ErrorMessage = ApplicantMessages.ForUser(
                     res.ErrorMessage || 'Could not load standards for this application.',
                     'load',
@@ -414,11 +436,11 @@ export class StandardsRunnerPage extends BaseAngularComponent {
             this._sectionID = resolved.SectionID;
             this._filter = resolved.Filter;
             this.emitSelection();
-            if (this._standardID) {
+            if (this._standardID && !silent) {
                 this.scrollToRequestedStandard(this._standardID);
             }
         } catch (e) {
-            if (token !== this.loadCounter) return;
+            if (token !== this.loadCounter || silent) return;
             this.ErrorMessage = ApplicantMessages.FromError(e, 'load');
         } finally {
             if (token === this.loadCounter) {
