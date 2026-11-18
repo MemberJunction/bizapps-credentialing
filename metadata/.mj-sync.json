@@ -10,6 +10,7 @@
     "application-roles",
     "row-level-security-filters",
     "entity-permissions",
-    "prompts"
+    "prompts",
+    "user-notification-types"
   ]
 }

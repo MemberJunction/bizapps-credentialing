@@ -50,6 +50,9 @@ import { GetDocumentLibraryServerOperation } from './operations/GetDocumentLibra
 import { RequeueReadingServerOperation } from './operations/RequeueReadingServerOperation.js';
 import { SaveResponseSourcesServerOperation } from './operations/SaveResponseSourcesServerOperation.js';
 import { RefreshPrefillsServerOperation } from './operations/RefreshPrefillsServerOperation.js';
+import { GetSubmissionGateServerOperation } from './operations/GetSubmissionGateServerOperation.js';
+import { SubmitApplicationServerOperation } from './operations/SubmitApplicationServerOperation.js';
+import { ApplicationEvents } from './events/ApplicationEvents.js';
 import { PrefillRunner } from './prefill/PrefillRunner.js';
 import { CredentialingServices } from './services/CredentialingServices.js';
 
@@ -139,6 +142,15 @@ export { GetDocumentLibraryServerOperation } from './operations/GetDocumentLibra
 export { RequeueReadingServerOperation } from './operations/RequeueReadingServerOperation.js';
 export { SaveResponseSourcesServerOperation } from './operations/SaveResponseSourcesServerOperation.js';
 export { RefreshPrefillsServerOperation } from './operations/RefreshPrefillsServerOperation.js';
+export { GetSubmissionGateServerOperation } from './operations/GetSubmissionGateServerOperation.js';
+export { SubmitApplicationServerOperation } from './operations/SubmitApplicationServerOperation.js';
+export {
+    ApplicationEvents,
+    type ApplicationEventsSeams,
+    type ApplicationSubmittedEvent,
+    type ApplicationSubmittedHandler,
+    type DispatchResult,
+} from './events/ApplicationEvents.js';
 export {
     DocumentExtractionEvaluator,
     type PrefillContext,
@@ -246,11 +258,20 @@ export function LoadBizAppsCredentialingEntitiesServer(): void {
         RequeueReadingServerOperation,
         SaveResponseSourcesServerOperation,
         RefreshPrefillsServerOperation,
+        GetSubmissionGateServerOperation,
+        SubmitApplicationServerOperation,
     ];
-    if (anchor.length !== 17 || operations.length !== 19) {
+    if (anchor.length !== 17 || operations.length !== 21) {
         throw new Error('credentialing server entity subclasses or operations missing');
     }
     CredentialingServices.Register({
         OnReadingCommitted: (subjectID) => PrefillRunner.RunForSubject(subjectID),
+    });
+    CredentialingServices.AddSweepStep({
+        Name: 'ApplicationEvents.Redispatch',
+        Phase: 'BeforeQueue',
+        Run: async () => {
+            await ApplicationEvents.Redispatch();
+        },
     });
 }

@@ -73,6 +73,7 @@ export class DocumentLibraryPage extends BaseAngularComponent implements OnDestr
     private destroyed = false;
     private _subject: MySubject | null = null;
     private _requestedDocumentID: string | null = null;
+    private _requestedRequirementID: string | null = null;
     private loadCounter = 0;
 
     @ViewChild('attestDialog') public AttestDialogRef?: ElementRef<HTMLDialogElement>;
@@ -104,6 +105,20 @@ export class DocumentLibraryPage extends BaseAngularComponent implements OnDestr
             this._requestedDocumentID = normalized;
             if (normalized && this.Library) {
                 this.openRequestedDocument(normalized);
+            }
+        }
+    }
+
+    @Input()
+    public get RequestedRequirementID(): string | null {
+        return this._requestedRequirementID;
+    }
+    public set RequestedRequirementID(value: string | null) {
+        const normalized = value?.trim() || null;
+        if (normalized !== this._requestedRequirementID) {
+            this._requestedRequirementID = normalized;
+            if (normalized && this.Library) {
+                this.openRequestedRequirement(normalized);
             }
         }
     }
@@ -378,6 +393,8 @@ export class DocumentLibraryPage extends BaseAngularComponent implements OnDestr
             this.Library = res.Output;
             if (this._requestedDocumentID && !silent) {
                 this.openRequestedDocument(this._requestedDocumentID);
+            } else if (this._requestedRequirementID && !silent) {
+                this.openRequestedRequirement(this._requestedRequirementID);
             }
         } catch (err) {
             if (token !== this.loadCounter) return;
@@ -429,5 +446,17 @@ export class DocumentLibraryPage extends BaseAngularComponent implements OnDestr
         this.ViewerFileName = '';
         this.ViewerContentType = '';
         this.ViewerOpen = true;
+    }
+
+    private openRequestedRequirement(requirementID: string): void {
+        if (!this.Library) return;
+        for (const ledger of this.Library.Ledgers) {
+            const match = ledger.Rows.find((r) => UUIDsEqual(r.RequirementID, requirementID));
+            if (match && ledger.ApplicationStatus === 'Draft') {
+                this.ActiveUploadRequirementID = match.RequirementID;
+                this.cdr.markForCheck();
+                return;
+            }
+        }
     }
 }

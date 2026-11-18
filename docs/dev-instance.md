@@ -1320,3 +1320,46 @@ subject `Sample Reading Applicant` has the contact `applicant.reading@example.te
   We keep `TrackRecordChanges` active on every credentialing entity (including `ResponseCitation`) to
   preserve NFR-3.1's complete audit trail; any future plan needing sub-second 150-standard bulk
   prefills would need platform-level batched record-change writing.
+
+## Notifications without `UI` (B2 Task 11 Step 3 discovery)
+
+Verified from MJ v6.2.2 (`mj/packages/Communication/notifications/src/NotificationEngine.ts:118-300`,
+`mj/packages/MJCoreEntities/src/engines/UserInfoEngine.ts:170-257, 297-382, 1434-1436`,
+`mj/packages/Angular/Explorer/explorer-core/src/lib/user-notifications/user-notifications.component.ts:451-524, 655-813`,
+and `metadata/entity-permissions/.core-entity-permissions.json`):
+
+- **How `NotificationEngine` is configured and which user writes:** `NotificationEngine.Instance`
+  (package `@memberjunction/notifications`) is a `BaseEngine` singleton. Calling
+  `NotificationEngine.Instance.Config(false, systemUser, Metadata.Provider)` configures
+  `UserInfoEngine.Instance` (loading `MJ: User Notification Types`, `MJ: User Notification
+  Preferences`, etc. without a per-user filter on the server `Database` provider) and loads `MJ: Scoped
+  Notification Configs`. Passing `Metadata.Provider` (never a short-lived isolated provider from
+  `CreateIsolatedProvider()`, because `BaseEngine` caches `_provider` as `ProviderToUse` across
+  calls) ensures the engine's provider stays alive across requests. `createInAppNotification`
+  (`NotificationEngine.ts:276`) calls `md.GetEntityObject('MJ: User Notifications', contextUser)` and
+  saves as `contextUser` (`SystemUser`). An applicant holds `CanCreate: false` on `MJ: User
+  Notifications`, so running as `SystemUser` after the submission transaction commits is required.
+- **How staff without `UI` read and open the notification:**
+  - `Credentialing Staff` already holds `CanRead: true, CanUpdate: true` on `MJ: User Notifications`
+    with row filter `Magic Link: Own Rows by UserID` (`UserID = '{{UserID}}'`) and `CanRead: true` on
+    `MJ: Resource Types` (`Credentialing: Resource Type Catalog`, `1 = 1`). No new entity permission
+    was needed.
+  - `Credentialing Staff` holds `CanRead: true` on `MJ: User Notification Types` with
+    `Credentialing: Shell Empty` (`1 = 0`). `UserInfoEngine.NotificationTypes` returns `[]` without
+    throwing, and `UserNotificationsComponent` falls back to `'Notification'` / `'fa-bell'` while still
+    rendering every notification's `Title`, `Message`, and clickable link.
+  - `UserNotificationsComponent.navigateToResource` (`user-notifications.component.ts:783-813`)
+    routes only `Records` (`OpenEntityRecord`), `User Views`, `Dashboards`, and built-in chat/meeting
+    configs; it has no `Custom` nav-item target. Therefore `EngineStaffNotifier` targets `ResourceTypeID`
+    = `Records` (`DAAFCCEC-6A37-EF11-86D4-000D3A4E707E`), `ResourceRecordID` = `ApplicationID` (bare UUID;
+    the `MJ: User Notifications.ResourceRecordID` column is `uniqueidentifier`), and
+    `ResourceConfiguration` = `{ Entity: 'MJ_BizApps_Credentialing: Applications' }`. Because MJ 6.2.2
+    `SimpleLoadFromURLSegment` ignores bare UUIDs without `|` and routes to `/record/.../new` (which
+    allocates an unsaved `record.ID`), `packages/Angular` registers
+    `ApplicationRecordRedirectFormComponent` (`@RegisterClass(BaseFormComponent, CredentialingEntity.Application, 100)`)
+    extending `BaseFormComponent` to resolve the target `ApplicationID` (using `record.ID` when
+    `record.IsSaved`, or falling back to `SharedService.UserNotifications`), open `Credentialing`'s
+    `Pipeline` nav item with `applicationId`, and close the temporary Application record tab(s).
+- **Notification type metadata:** `metadata/user-notification-types/.credentialing-notification-types.json`
+  defines `Credentialing: Application Submitted` (`DefaultInApp: true`, `DefaultEmail: false`,
+  `DefaultSMS: false`, `AllowUserPreference: true`), pushed via `mj sync push --dir=metadata`.

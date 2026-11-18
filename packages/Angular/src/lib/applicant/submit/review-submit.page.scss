@@ -1,0 +1,187 @@
+:host {
+    display: block;
+    color: var(--mj-text-primary);
+}
+
+.cred-submit {
+    display: flex;
+    flex-direction: column;
+    gap: var(--mj-space-4, 1rem);
+    max-width: 64rem;
+}
+
+.cred-submit__header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--mj-space-3, 0.75rem);
+}
+
+.cred-submit__title-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: var(--mj-space-2, 0.5rem);
+}
+
+.cred-submit__title {
+    margin: 0;
+    font-size: var(--mj-text-2xl, 1.5rem);
+    font-weight: var(--mj-font-semibold, 600);
+}
+
+.cred-submit__version,
+.cred-submit__subtitle {
+    margin: 0;
+    font-size: var(--mj-text-sm, 0.875rem);
+    color: var(--mj-text-secondary);
+}
+
+.cred-submit__status {
+    padding: 0.15rem 0.55rem;
+    border-radius: 999px;
+    border: 1px solid var(--mj-border-default);
+    background: var(--mj-bg-surface);
+    font-size: var(--mj-text-xs, 0.75rem);
+    font-weight: var(--mj-font-medium, 500);
+}
+
+.cred-submit__header-actions button {
+    min-height: 44px;
+}
+
+.cred-submit__section {
+    display: flex;
+    flex-direction: column;
+    gap: var(--mj-space-2, 0.5rem);
+}
+
+.cred-submit__section-title {
+    margin: 0;
+    font-size: var(--mj-text-lg, 1.125rem);
+    font-weight: var(--mj-font-semibold, 600);
+}
+
+.cred-submit__freeze-note {
+    margin: 0;
+    padding: var(--mj-space-3, 0.75rem);
+    border: 1px solid var(--mj-border-default);
+    border-left: 3px solid var(--mj-brand-primary);
+    border-radius: var(--mj-radius-sm, 4px);
+    background: var(--mj-bg-surface);
+    font-size: var(--mj-text-sm, 0.875rem);
+    color: var(--mj-text-secondary);
+}
+
+.cred-submit__empty-docs {
+    margin: 0;
+    font-size: var(--mj-text-sm, 0.875rem);
+    color: var(--mj-text-secondary);
+}
+
+.cred-submit__doc-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--mj-space-1, 0.25rem);
+}
+
+.cred-submit__doc-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: var(--mj-space-2, 0.5rem);
+    padding: var(--mj-space-2, 0.5rem) var(--mj-space-3, 0.75rem);
+    border: 1px solid var(--mj-border-default);
+    border-radius: var(--mj-radius-sm, 4px);
+    background: var(--mj-bg-surface);
+    font-size: var(--mj-text-sm, 0.875rem);
+}
+
+.cred-submit__doc-kind {
+    font-size: var(--mj-text-xs, 0.75rem);
+    font-weight: var(--mj-font-semibold, 600);
+    text-transform: uppercase;
+    color: var(--mj-text-secondary);
+}
+
+.cred-submit__doc-title {
+    font-weight: var(--mj-font-medium, 500);
+}
+
+.cred-submit__doc-req,
+.cred-submit__doc-detail {
+    color: var(--mj-text-secondary);
+    font-size: var(--mj-text-xs, 0.75rem);
+}
+
+.cred-submit__footer {
+    display: flex;
+    flex-direction: column;
+    gap: var(--mj-space-2, 0.5rem);
+    padding-top: var(--mj-space-2, 0.5rem);
+    border-top: 1px solid var(--mj-border-default);
+}
+
+.cred-submit__submit-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--mj-space-3, 0.75rem);
+}
+
+.cred-submit__submit-bar button {
+    min-height: 44px;
+}
+
+.cred-submit__disabled-reason {
+    margin: 0;
+    font-size: var(--mj-text-sm, 0.875rem);
+    color: var(--mj-text-secondary);
+}
+
+.cred-submit__dialog {
+    max-width: 30rem;
+    width: calc(100% - 2rem);
+    padding: 0;
+    border: 1px solid var(--mj-border-default);
+    border-radius: var(--mj-radius-md, 6px);
+    background: var(--mj-bg-surface);
+    color: var(--mj-text-primary);
+
+    &::backdrop {
+        background: color-mix(in srgb, var(--mj-text-primary) 45%, transparent);
+    }
+}
+
+.cred-submit__dialog-body {
+    display: flex;
+    flex-direction: column;
+    gap: var(--mj-space-3, 0.75rem);
+    padding: var(--mj-space-5, 1.25rem);
+}
+
+.cred-submit__dialog-title {
+    margin: 0;
+    font-size: var(--mj-text-lg, 1.125rem);
+    font-weight: var(--mj-font-semibold, 600);
+}
+
+.cred-submit__dialog-desc {
+    margin: 0;
+    font-size: var(--mj-text-sm, 0.875rem);
+    color: var(--mj-text-secondary);
+}
+
+.cred-submit__dialog-actions {
+    display: flex;
+    gap: var(--mj-space-2, 0.5rem);
+    justify-content: flex-start;
+}
+
+.cred-submit__dialog-actions button {
+    min-height: 44px;
+}

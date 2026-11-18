@@ -3,10 +3,10 @@
  * {@link ApplicantSubjectResource}. Hosts the Standards Runner and synchronizes `subjectId`,
  * `applicationId`, `sectionId`, and `filter` with the URL.
  */
-import { Component } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { ResourceData } from '@memberjunction/core-entities';
-import { RegisterClass } from '@memberjunction/global';
-import { BaseResourceComponent } from '@memberjunction/ng-shared';
+import { RegisterClass, UUIDsEqual } from '@memberjunction/global';
+import { BaseResourceComponent, NavigationService } from '@memberjunction/ng-shared';
 import { SharedGenericModule } from '@memberjunction/ng-shared-generic';
 import { MJAlertComponent, MJEmptyStateComponent } from '@memberjunction/ng-ui-components';
 import type { MySubject } from '@mj-biz-apps/credentialing-core';
@@ -19,6 +19,8 @@ import {
     StandardsRunnerPage,
     type RunnerNavigationState,
 } from '../applicant/standards-runner/standards-runner.page';
+import { ReviewSubmitPage } from '../applicant/submit/review-submit.page';
+import type { SubmitGapLink } from '../applicant/submit/submit-model';
 import { SUBJECT_ID_PARAM } from '../shared/subject-context.service';
 import { ApplicantSubjectResource } from './applicant-subject-resource';
 
@@ -26,7 +28,13 @@ import { ApplicantSubjectResource } from './applicant-subject-resource';
 @Component({
     standalone: true,
     selector: 'bizapps-cred-applicant-standards-resource',
-    imports: [SharedGenericModule, MJAlertComponent, MJEmptyStateComponent, StandardsRunnerPage],
+    imports: [
+        SharedGenericModule,
+        MJAlertComponent,
+        MJEmptyStateComponent,
+        StandardsRunnerPage,
+        ReviewSubmitPage,
+    ],
     template: `
         <div class="cred-resource">
             @switch (State) {
@@ -54,15 +62,28 @@ import { ApplicantSubjectResource } from './applicant-subject-resource';
                             </ul>
                         </section>
                     } @else if (ActiveSubject) {
-                        <bizapps-cred-standards-runner
-                            [Provider]="Provider"
-                            [Subject]="ActiveSubject"
-                            [ApplicationID]="ApplicationID"
-                            [SectionID]="SectionID"
-                            [Filter]="Filter"
-                            (SelectionChanged)="OnRunnerSelectionChanged($event)"
-                            (Withdrawn)="OnApplicationWithdrawn()">
-                        </bizapps-cred-standards-runner>
+                        @if (ViewMode === 'submit') {
+                            <bizapps-cred-review-submit
+                                [Provider]="Provider"
+                                [Subject]="ActiveSubject"
+                                [ApplicationID]="ApplicationID"
+                                (BackToStandards)="OnBackToStandards()"
+                                (NavigateToGap)="OnNavigateToGap($event)"
+                                (Submitted)="OnApplicationSubmitted()">
+                            </bizapps-cred-review-submit>
+                        } @else {
+                            <bizapps-cred-standards-runner
+                                [Provider]="Provider"
+                                [Subject]="ActiveSubject"
+                                [ApplicationID]="ApplicationID"
+                                [SectionID]="SectionID"
+                                [StandardID]="StandardID"
+                                [Filter]="Filter"
+                                (SelectionChanged)="OnRunnerSelectionChanged($event)"
+                                (Withdrawn)="OnApplicationWithdrawn()"
+                                (ReviewAndSubmit)="OnReviewAndSubmit($event)">
+                            </bizapps-cred-standards-runner>
+                        }
                     }
                 }
             }
@@ -77,10 +98,13 @@ import { ApplicantSubjectResource } from './applicant-subject-resource';
     `],
 })
 export class CredentialingApplicantStandardsResource extends ApplicantSubjectResource {
+    private readonly navigation = inject(NavigationService, { optional: true });
     public ActiveSubject: MySubject | null = null;
     public ApplicationID: string | null = null;
     public SectionID: string | null = null;
+    public StandardID: string | null = null;
     public Filter: RunnerFilter = 'needs-review';
+    public ViewMode: 'standards' | 'submit' = 'standards';
 
     protected get DriverClass(): string {
         return CredentialingResource.ApplicantStandards;
@@ -88,9 +112,20 @@ export class CredentialingApplicantStandardsResource extends ApplicantSubjectRes
 
     protected override async OnSubjectResolved(subject: MySubject, params: Record<string, string>): Promise<void> {
         this.ActiveSubject = subject;
-        this.ApplicationID = params['applicationId']?.trim() || null;
-        this.SectionID = params['sectionId']?.trim() || null;
-        this.Filter = ParseRunnerFilter(params['filter']);
+        this.applyRunnerParams(params);
+    }
+
+    protected override OnQueryParamsChanged(params: Record<string, string>, source: 'popstate' | 'deeplink'): void {
+        const incomingSubject = params[SUBJECT_ID_PARAM]?.trim() || null;
+        if (incomingSubject && (!this.ActiveSubject || !UUIDsEqual(incomingSubject, this.ActiveSubject.SubjectID))) {
+            super.OnQueryParamsChanged(params, source);
+            return;
+        }
+        if (!this.ActiveSubject) {
+            return;
+        }
+        this.applyRunnerParams(params);
+        this.cdr.markForCheck();
     }
 
     public OnRunnerSelectionChanged(state: RunnerNavigationState): void {
@@ -102,13 +137,86 @@ export class CredentialingApplicantStandardsResource extends ApplicantSubjectRes
             [SUBJECT_ID_PARAM]: subjectID,
             applicationId: state.ApplicationID,
             sectionId: state.SectionID,
+            standardId: this.StandardID,
             filter: state.Filter,
+            view: this.ViewMode === 'submit' ? 'submit' : null,
         });
+    }
+
+    public OnReviewAndSubmit(applicationID: string): void {
+        this.ApplicationID = applicationID;
+        this.ViewMode = 'submit';
+        this.UpdateQueryParams({
+            [SUBJECT_ID_PARAM]: this.ActiveSubject?.SubjectID ?? null,
+            applicationId: applicationID,
+            view: 'submit',
+            sectionId: null,
+            standardId: null,
+        });
+        this.cdr.markForCheck();
+    }
+
+    public OnBackToStandards(): void {
+        this.ViewMode = 'standards';
+        this.UpdateQueryParams({
+            [SUBJECT_ID_PARAM]: this.ActiveSubject?.SubjectID ?? null,
+            applicationId: this.ApplicationID,
+            sectionId: this.SectionID,
+            standardId: null,
+            filter: this.Filter,
+            view: null,
+        });
+        this.cdr.markForCheck();
+    }
+
+    public OnNavigateToGap(link: SubmitGapLink): void {
+        const subjectID = this.ActiveSubject?.SubjectID ?? null;
+        if (link.Screen === 'Documents') {
+            void this.navigation?.OpenNavItemByName('Documents', undefined, undefined, {
+                queryParams: {
+                    [SUBJECT_ID_PARAM]: subjectID,
+                    requirementId: link.RequirementID ?? null,
+                },
+            });
+            return;
+        }
+        this.ViewMode = 'standards';
+        this.SectionID = link.SectionID;
+        this.StandardID = link.StandardID;
+        this.Filter = link.StandardID ? 'all' : 'needs-review';
+        this.UpdateQueryParams({
+            [SUBJECT_ID_PARAM]: subjectID,
+            applicationId: this.ApplicationID,
+            sectionId: this.SectionID,
+            standardId: this.StandardID,
+            filter: this.Filter,
+            view: null,
+        });
+        this.cdr.markForCheck();
+    }
+
+    public async OnApplicationSubmitted(): Promise<void> {
+        const standing = await this.StandingLoader().Load();
+        await this.OnOpen(standing);
     }
 
     public async OnApplicationWithdrawn(): Promise<void> {
         const standing = await this.StandingLoader().Load();
         await this.OnOpen(standing);
+    }
+
+    private applyRunnerParams(params: Record<string, string>): void {
+        this.ApplicationID = params['applicationId']?.trim() || null;
+        this.SectionID = params['sectionId']?.trim() || null;
+        this.StandardID = params['standardId']?.trim() || null;
+        this.ViewMode = params['view']?.trim() === 'submit' ? 'submit' : 'standards';
+        if (params['filter']) {
+            this.Filter = ParseRunnerFilter(params['filter']);
+        } else if (this.StandardID) {
+            this.Filter = 'all';
+        } else {
+            this.Filter = 'needs-review';
+        }
     }
 
     async GetResourceDisplayName(_data: ResourceData): Promise<string> {

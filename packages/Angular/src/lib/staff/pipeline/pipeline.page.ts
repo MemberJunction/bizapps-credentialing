@@ -3,7 +3,7 @@
  * status and program, pages by 50 rows, hosts the Invite Applicant wizard, and lets staff send a
  * new invitation link to any contact.
  */
-import { ChangeDetectorRef, Component, OnInit, inject } from '@angular/core';
+import { ChangeDetectorRef, Component, ElementRef, Input, OnInit, ViewChild, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { UUIDsEqual } from '@memberjunction/global';
 import { BaseAngularComponent } from '@memberjunction/ng-base-types';
@@ -20,6 +20,7 @@ import {
     ApplicationLifecycleRules,
     GetApplicationWorkspaceOperation,
     GetDocumentLibraryOperation,
+    GetSubmissionGateOperation,
     ReissueInvitationOperation,
     ReopenResponseOperation,
     ResponseRules,
@@ -28,6 +29,7 @@ import {
     type ApplicationWorkspace,
     type DocumentLedger,
     type DocumentLibrary,
+    type GetSubmissionGateOutput,
     type InviteApplicantOutput,
     type LibraryDocument,
     type ResponseStatus,
@@ -104,6 +106,23 @@ export class PipelinePage extends BaseAngularComponent implements OnInit {
     private readonly cdr = inject(ChangeDetectorRef);
     private _statusFilter = 'All';
     private _programFilter = 'All';
+    private _requestedApplicationID: string | null = null;
+
+    @ViewChild('detailSection') public DetailSectionRef?: ElementRef<HTMLElement>;
+
+    @Input()
+    public get SelectedApplicationID(): string | null {
+        return this._requestedApplicationID;
+    }
+    public set SelectedApplicationID(value: string | null) {
+        const normalized = value?.trim() || null;
+        if (normalized !== this._requestedApplicationID) {
+            this._requestedApplicationID = normalized;
+            if (normalized && this.Snapshot.Applications.length > 0) {
+                void this.openRequestedApplication();
+            }
+        }
+    }
 
     public readonly PageSize = PIPELINE_PAGE_SIZE;
     public Snapshot: PipelineSnapshot = { Applications: [], Programs: [], ActiveTargets: [], Subjects: [] };
@@ -120,6 +139,7 @@ export class PipelinePage extends BaseAngularComponent implements OnInit {
 
     public SelectedApplication: PipelineApplicationRow | null = null;
     public DetailWorkspace: ApplicationWorkspace | null = null;
+    public DetailGate: GetSubmissionGateOutput | null = null;
     public DetailLoading = false;
     public DetailError = '';
     public DetailLibrary: DocumentLibrary | null = null;
@@ -201,6 +221,7 @@ export class PipelinePage extends BaseAngularComponent implements OnInit {
         this.cdr.markForCheck();
         try {
             this.Snapshot = await PipelineData.FromProvider(this.ProviderToUse).Load();
+            await this.openRequestedApplication();
         } catch (e) {
             this.ErrorMessage = StudioMessages.FromError(e, 'load');
         } finally {
@@ -287,9 +308,23 @@ export class PipelinePage extends BaseAngularComponent implements OnInit {
     public CloseDetail(): void {
         this.SelectedApplication = null;
         this.DetailWorkspace = null;
+        this.DetailGate = null;
         this.DetailLibrary = null;
         this.DetailError = '';
         this.DetailDocumentsError = '';
+    }
+
+    private async openRequestedApplication(): Promise<void> {
+        const requested = this._requestedApplicationID;
+        if (!requested) return;
+        const match = this.Snapshot.Applications.find((a) => UUIDsEqual(a.ID, requested));
+        if (!match) return;
+        if (!this.SelectedApplication || !UUIDsEqual(this.SelectedApplication.ID, match.ID)) {
+            await this.OpenDetail(match);
+        }
+        setTimeout(() => {
+            this.DetailSectionRef?.nativeElement?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 0);
     }
 
     public get DetailLedger(): DocumentLedger | null {
@@ -488,10 +523,11 @@ export class PipelinePage extends BaseAngularComponent implements OnInit {
         this.DetailError = '';
         this.DetailDocumentsError = '';
         this.DetailWorkspace = null;
+        this.DetailGate = null;
         this.DetailLibrary = null;
         this.cdr.markForCheck();
         try {
-            const [workspaceRes, libraryRes] = await Promise.all([
+            const [workspaceRes, libraryRes, gateRes] = await Promise.all([
                 new GetApplicationWorkspaceOperation().Execute(
                     { ApplicationID: applicationID },
                     { provider: this.ProviderToUse },
@@ -504,12 +540,23 @@ export class PipelinePage extends BaseAngularComponent implements OnInit {
                         ErrorMessage: err instanceof Error ? err.message : String(err),
                         Output: undefined,
                     })),
+                new GetSubmissionGateOperation()
+                    .Execute({ ApplicationID: applicationID }, { provider: this.ProviderToUse })
+                    .catch((err) => ({
+                        Success: false,
+                        ResultCode: 'EXECUTION_ERROR',
+                        ErrorMessage: err instanceof Error ? err.message : String(err),
+                        Output: undefined,
+                    })),
             ]);
             if (!workspaceRes.Success || workspaceRes.Output == null) {
                 this.DetailError = StudioMessages.ForUser(workspaceRes.ErrorMessage || 'Could not load application answers.', 'load');
                 return;
             }
             this.DetailWorkspace = workspaceRes.Output;
+            if (gateRes.Success && gateRes.Output != null) {
+                this.DetailGate = gateRes.Output;
+            }
             if (libraryRes.Success && libraryRes.Output != null) {
                 this.DetailLibrary = libraryRes.Output;
             } else {

@@ -57,6 +57,7 @@ export interface PipelineApplicationRow {
     Status: string;
     IsHistorical: boolean;
     SubmittedAt: string | null;
+    SubmissionDispatchNote: string | null;
     CreatedAt: string;
     Contacts: PipelineContactRow[];
 }
@@ -99,7 +100,7 @@ export interface PipelineSnapshot {
 
 type RawApplicationRow = Pick<
     mjBizAppsCredentialingApplicationEntity,
-    'ID' | 'SubjectID' | 'ProgramVersionID' | 'Status' | 'IsHistorical' | 'SubmittedAt' | '__mj_CreatedAt'
+    'ID' | 'SubjectID' | 'ProgramVersionID' | 'Status' | 'IsHistorical' | 'SubmittedAt' | 'SubmissionDispatchNote' | '__mj_CreatedAt'
 >;
 type RawSubjectRow = Pick<
     mjBizAppsCredentialingSubjectEntity,
@@ -173,7 +174,7 @@ export class PipelineData {
         const results = await this.source.RunViews<Record<string, unknown>>([
             {
                 EntityName: CredentialingEntity.Application,
-                Fields: ['ID', 'SubjectID', 'ProgramVersionID', 'Status', 'IsHistorical', 'SubmittedAt', '__mj_CreatedAt'],
+                Fields: ['ID', 'SubjectID', 'ProgramVersionID', 'Status', 'IsHistorical', 'SubmittedAt', 'SubmissionDispatchNote', '__mj_CreatedAt'],
                 OrderBy: '__mj_CreatedAt DESC',
                 ResultType: 'simple',
             },
@@ -284,6 +285,7 @@ export class PipelineData {
                 Status: app.Status,
                 IsHistorical: Boolean(app.IsHistorical),
                 SubmittedAt: isoStringOrNull(app.SubmittedAt),
+                SubmissionDispatchNote: app.SubmissionDispatchNote ?? null,
                 CreatedAt: isoStringOrNull(app.__mj_CreatedAt) ?? '',
                 Contacts: contactsBySubject.get(app.SubjectID.toLowerCase()) ?? [],
             };

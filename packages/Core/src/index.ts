@@ -46,3 +46,5 @@ export * from './operations/GetDocumentLibraryOperation.js';
 export * from './operations/RequeueReadingOperation.js';
 export * from './operations/SaveResponseSourcesOperation.js';
 export * from './operations/RefreshPrefillsOperation.js';
+export * from './operations/GetSubmissionGateOperation.js';
+export * from './operations/SubmitApplicationOperation.js';

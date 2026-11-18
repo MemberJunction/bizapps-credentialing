@@ -2,6 +2,7 @@ import { DatabaseProviderBase } from '@memberjunction/core';
 import { CredentialingServices } from '@mj-biz-apps/credentialing-core-entities-server';
 import { WorkerTextExtractor } from '../evidence/WorkerTextExtractor.js';
 import { MagicLinkInvitationIssuer } from '../invitations/MagicLinkInvitationIssuer.js';
+import { EngineStaffNotifier } from '../notifications/EngineStaffNotifier.js';
 import { PromptEvidenceReader } from '../reading/PromptEvidenceReader.js';
 import { PromptTextRecognizer } from '../reading/PromptTextRecognizer.js';
 
@@ -29,6 +30,7 @@ export function RegisterCredentialingServices(): void {
         Text: new WorkerTextExtractor(),
         Recognizer: new PromptTextRecognizer(),
         Reader: new PromptEvidenceReader(),
+        Notifier: new EngineStaffNotifier(),
         // The reading queue's nudge (OnEvidenceStored) is registered when the background work starts
         // (reading/background.ts, from the evidence extension once the server has booted).
         // The evidence store is registered by EvidenceRouteExtension when it starts, because the

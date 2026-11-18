@@ -22,7 +22,8 @@
   "dependencies": {
     "@mj-biz-apps/credentialing-core": "0.0.0",
     "@mj-biz-apps/credentialing-core-entities-server": "0.0.0",
-    "@mj-biz-apps/credentialing-entities": "0.0.0"
+    "@mj-biz-apps/credentialing-entities": "0.0.0",
+    "@mj-biz-apps/credentialing-server": "0.0.0"
   },
   "peerDependencies": {
     "@memberjunction/core": "^6.2.1",

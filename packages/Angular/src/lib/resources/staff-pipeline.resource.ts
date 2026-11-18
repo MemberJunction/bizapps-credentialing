@@ -38,7 +38,10 @@ import { CredentialingAreaResource } from './credentialing-area-resource';
                             Message="Your account has the Credentialing Staff role but is not attached to an organization, so there is nothing to show and nothing can be saved. Ask a Credentialing administrator to add you.">
                         </mj-empty-state>
                     } @else {
-                        <bizapps-cred-pipeline [Provider]="Provider"></bizapps-cred-pipeline>
+                        <bizapps-cred-pipeline
+                            [Provider]="Provider"
+                            [SelectedApplicationID]="SelectedApplicationID">
+                        </bizapps-cred-pipeline>
                     }
                 }
             }
@@ -48,6 +51,7 @@ import { CredentialingAreaResource } from './credentialing-area-resource';
 })
 export class CredentialingPipelineResource extends CredentialingAreaResource {
     public Organizations: StaffOrganization[] = [];
+    public SelectedApplicationID: string | null = null;
 
     protected override get DriverClass(): string {
         return CredentialingResource.Pipeline;
@@ -55,6 +59,24 @@ export class CredentialingPipelineResource extends CredentialingAreaResource {
 
     protected override async OnOpen(standing: Standing): Promise<void> {
         this.Organizations = [...standing.StaffOrganizations];
+        this.SelectedApplicationID = this.resolveRequestedApplicationID(this.GetQueryParams());
+    }
+
+    protected override OnQueryParamsChanged(params: Record<string, string>, _source: 'popstate' | 'deeplink'): void {
+        this.SelectedApplicationID = this.resolveRequestedApplicationID(params);
+        this.cdr.markForCheck();
+    }
+
+    private resolveRequestedApplicationID(params: Record<string, string>): string | null {
+        const fromParams = params['applicationId']?.trim();
+        if (fromParams) {
+            return fromParams;
+        }
+        const rawConfig = this.Data?.Configuration?.['applicationId'];
+        if (typeof rawConfig === 'string' && rawConfig.trim().length > 0) {
+            return rawConfig.trim();
+        }
+        return null;
     }
 
     async GetResourceDisplayName(_data: ResourceData): Promise<string> {

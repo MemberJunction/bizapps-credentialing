@@ -79,9 +79,11 @@ export interface RunnerNavigationState {
 })
 export class StandardsRunnerPage extends BaseAngularComponent {
     private readonly cdr = inject(ChangeDetectorRef);
+    private readonly hostRef: ElementRef<HTMLElement> | null = inject(ElementRef, { optional: true });
     private _subject: MySubject | null = null;
     private _applicationID: string | null = null;
     private _sectionID: string | null = null;
+    private _standardID: string | null = null;
     private _filter: RunnerFilter = 'needs-review';
     private loadCounter = 0;
 
@@ -125,6 +127,20 @@ export class StandardsRunnerPage extends BaseAngularComponent {
     }
 
     @Input()
+    public get StandardID(): string | null {
+        return this._standardID;
+    }
+    public set StandardID(value: string | null) {
+        const normalized = value?.trim() || null;
+        if (normalized !== this._standardID) {
+            this._standardID = normalized;
+            if (normalized && this.Workspace) {
+                this.scrollToRequestedStandard(normalized);
+            }
+        }
+    }
+
+    @Input()
     public get Filter(): RunnerFilter {
         return this._filter;
     }
@@ -135,6 +151,7 @@ export class StandardsRunnerPage extends BaseAngularComponent {
 
     @Output() public readonly SelectionChanged = new EventEmitter<RunnerNavigationState>();
     @Output() public readonly Withdrawn = new EventEmitter<void>();
+    @Output() public readonly ReviewAndSubmit = new EventEmitter<string>();
 
     public readonly FilterOptions = RUNNER_FILTER_OPTIONS;
     public readonly CannotPrefillBanner = CANNOT_PREFILL_BANNER;
@@ -254,6 +271,13 @@ export class StandardsRunnerPage extends BaseAngularComponent {
         if (!this.Workspace) return;
         this.Workspace = ApplyResponseUpdate(this.Workspace, updated);
         this.cdr.markForCheck();
+    }
+
+    public OnReviewAndSubmit(): void {
+        const appID = this.Workspace?.Application.ApplicationID ?? this._applicationID;
+        if (appID) {
+            this.ReviewAndSubmit.emit(appID);
+        }
     }
 
     public OpenWithdrawDialog(): void {
@@ -377,10 +401,22 @@ export class StandardsRunnerPage extends BaseAngularComponent {
                 return;
             }
             this.Workspace = res.Output;
+            if (this._standardID) {
+                const matchingSection = res.Output.Sections.find((s) =>
+                    s.Standards.some((st) => UUIDsEqual(st.StandardID, this._standardID!)),
+                );
+                if (matchingSection) {
+                    this._sectionID = matchingSection.SectionID;
+                    this._filter = 'all';
+                }
+            }
             const resolved = ResolveRunnerSelection(res.Output, this._sectionID, this._filter);
             this._sectionID = resolved.SectionID;
             this._filter = resolved.Filter;
             this.emitSelection();
+            if (this._standardID) {
+                this.scrollToRequestedStandard(this._standardID);
+            }
         } catch (e) {
             if (token !== this.loadCounter) return;
             this.ErrorMessage = ApplicantMessages.FromError(e, 'load');
@@ -400,5 +436,30 @@ export class StandardsRunnerPage extends BaseAngularComponent {
             SectionID: this._sectionID,
             Filter: this._filter,
         });
+    }
+
+    private scrollToRequestedStandard(standardID: string): void {
+        if (this.Workspace) {
+            const matchingSection = this.Workspace.Sections.find((s) =>
+                s.Standards.some((st) => UUIDsEqual(st.StandardID, standardID)),
+            );
+            if (matchingSection && !UUIDsEqual(this._sectionID ?? '', matchingSection.SectionID)) {
+                this._sectionID = matchingSection.SectionID;
+                this._filter = 'all';
+            }
+        }
+        this.cdr.markForCheck();
+        setTimeout(() => {
+            const host = this.hostRef?.nativeElement;
+            if (!host) return;
+            const cards = host.querySelectorAll('[data-standard-id]');
+            for (const card of Array.from(cards)) {
+                const attr = card.getAttribute('data-standard-id');
+                if (attr && UUIDsEqual(attr, standardID)) {
+                    card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    break;
+                }
+            }
+        }, 0);
     }
 }

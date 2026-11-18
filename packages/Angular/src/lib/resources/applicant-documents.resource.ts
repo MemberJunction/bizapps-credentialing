@@ -5,7 +5,7 @@
  */
 import { Component } from '@angular/core';
 import { ResourceData } from '@memberjunction/core-entities';
-import { RegisterClass } from '@memberjunction/global';
+import { UUIDsEqual, RegisterClass } from '@memberjunction/global';
 import { BaseResourceComponent } from '@memberjunction/ng-shared';
 import { SharedGenericModule } from '@memberjunction/ng-shared-generic';
 import { MJAlertComponent, MJEmptyStateComponent } from '@memberjunction/ng-ui-components';
@@ -51,6 +51,7 @@ import { ApplicantSubjectResource } from './applicant-subject-resource';
                             [Provider]="Provider"
                             [Subject]="ActiveSubject"
                             [RequestedDocumentID]="RequestedDocumentID"
+                            [RequestedRequirementID]="RequestedRequirementID"
                             (DocumentViewed)="OnDocumentViewed($event)">
                         </bizapps-cred-document-library>
                     }
@@ -69,6 +70,7 @@ import { ApplicantSubjectResource } from './applicant-subject-resource';
 export class CredentialingApplicantDocumentsResource extends ApplicantSubjectResource {
     public ActiveSubject: MySubject | null = null;
     public RequestedDocumentID: string | null = null;
+    public RequestedRequirementID: string | null = null;
 
     protected get DriverClass(): string {
         return CredentialingResource.ApplicantDocuments;
@@ -77,6 +79,21 @@ export class CredentialingApplicantDocumentsResource extends ApplicantSubjectRes
     protected override async OnSubjectResolved(subject: MySubject, params: Record<string, string>): Promise<void> {
         this.ActiveSubject = subject;
         this.RequestedDocumentID = params['documentId']?.trim() || null;
+        this.RequestedRequirementID = params['requirementId']?.trim() || null;
+    }
+
+    protected override OnQueryParamsChanged(params: Record<string, string>, source: 'popstate' | 'deeplink'): void {
+        const incomingSubject = params[SUBJECT_ID_PARAM]?.trim() || null;
+        if (incomingSubject && (!this.ActiveSubject || !UUIDsEqual(incomingSubject, this.ActiveSubject.SubjectID))) {
+            super.OnQueryParamsChanged(params, source);
+            return;
+        }
+        if (!this.ActiveSubject) {
+            return;
+        }
+        this.RequestedDocumentID = params['documentId']?.trim() || null;
+        this.RequestedRequirementID = params['requirementId']?.trim() || null;
+        this.cdr.markForCheck();
     }
 
     public OnDocumentViewed(documentID: string | null): void {

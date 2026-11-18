@@ -52,6 +52,7 @@ const SERVER_ONLY_BUNDLES = {
     'cred-evidence-rules': 'CRD-11 - Evidence',
     'cred-reader': 'CRD-12 - Reader',
     'cred-prefill': 'CRD-13 - Prefill',
+    'cred-submission': 'CRD-14 - Submission',
 };
 
 const args = process.argv.slice(2);

@@ -60,5 +60,6 @@ export * from './checks/cred-responses.checks.js';
 export * from './checks/cred-evidence-rules.checks.js';
 export * from './checks/cred-reader.checks.js';
 export * from './checks/cred-prefill.checks.js';
+export * from './checks/cred-submission.checks.js';
 
 export function LoadCredentialingIntegrationTests(): void {}

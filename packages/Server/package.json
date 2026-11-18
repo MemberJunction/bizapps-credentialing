@@ -4,6 +4,16 @@
   "type": "module",
   "description": "Server bootstrap package - loaded by MJAPI at startup via the manifest's startupExport. TODO(template): rename.",
   "main": "dist/index.js",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./notifications": {
+      "types": "./dist/notifications/EngineStaffNotifier.d.ts",
+      "default": "./dist/notifications/EngineStaffNotifier.js"
+    }
+  },
   "files": [
     "/dist"
   ],
@@ -36,6 +46,7 @@
     "@memberjunction/core-entities": "^6.2.1",
     "@memberjunction/document-parsing": "^6.2.1",
     "@memberjunction/global": "^6.2.1",
+    "@memberjunction/notifications": "^6.2.1",
     "@memberjunction/server": "^6.2.1",
     "@memberjunction/server-extensions-core": "^6.2.1",
     "@memberjunction/sqlserver-dataprovider": "^6.2.1",
@@ -51,6 +62,7 @@
     "@memberjunction/core-entities": "6.2.2",
     "@memberjunction/document-parsing": "6.2.2",
     "@memberjunction/global": "6.2.2",
+    "@memberjunction/notifications": "6.2.2",
     "@memberjunction/server": "6.2.2",
     "@memberjunction/server-extensions-core": "6.2.2",
     "@memberjunction/sqlserver-dataprovider": "6.2.2",

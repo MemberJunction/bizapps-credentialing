@@ -53,6 +53,14 @@
                         Withdraw application
                     </button>
                 }
+                <button
+                    mjButton
+                    Variant="primary"
+                    Size="sm"
+                    type="button"
+                    (click)="OnReviewAndSubmit()">
+                    Review and submit
+                </button>
             </div>
         </header>
 
@@ -140,6 +148,7 @@
                     <div class="cred-runner__cards">
                         @for (standard of selection.VisibleStandards; track standard.StandardID) {
                             <bizapps-cred-standard-card
+                                [attr.data-standard-id]="standard.StandardID"
                                 [Provider]="ProviderToUse"
                                 [Application]="ws.Application"
                                 [Standard]="standard"

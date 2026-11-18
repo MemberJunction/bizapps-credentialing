@@ -34,6 +34,10 @@ export abstract class ApplicantSubjectResource extends CredentialingAreaResource
             throw new Error(res.ErrorMessage || 'Could not load your applicant context.');
         }
         this.Subjects = res.Output.Subjects;
+        const freshParams = this.GetQueryParams();
+        if (Object.keys(freshParams).length > 0) {
+            this.QueryParams = freshParams;
+        }
         await this.applyParams(this.QueryParams);
     }
 
@@ -46,7 +50,9 @@ export abstract class ApplicantSubjectResource extends CredentialingAreaResource
 
     protected override OnQueryParamsChanged(params: Record<string, string>, _source: 'popstate' | 'deeplink'): void {
         this.QueryParams = params;
-        void this.applyParams(params);
+        if (this.State === 'Open' || this.Subjects.length > 0) {
+            void this.applyParams(params);
+        }
     }
 
     private async applyParams(params: Record<string, string>, syncUrl: boolean = true): Promise<void> {

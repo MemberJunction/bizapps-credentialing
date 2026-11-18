@@ -30,6 +30,7 @@ import { LoadCredentialingReviewHomeResource } from './lib/resources/review-home
 import { LoadCredentialingApplicantHomeResource } from './lib/resources/applicant-home.resource';
 import { LoadCredentialingApplicantStandardsResource } from './lib/resources/applicant-standards.resource';
 import { LoadCredentialingApplicantDocumentsResource } from './lib/resources/applicant-documents.resource';
+import { LoadApplicationRecordRedirectForm } from './lib/staff/pipeline/application-record-redirect.form';
 
 export * from './lib/application/area-nav';
 export { CredentialingApplication, LoadCredentialingApplication } from './lib/application/credentialing.application';
@@ -62,6 +63,10 @@ export {
 export { VersionSettingsComponent, FROZEN_SETTINGS_SENTENCE, ROLLOUT_FLAGS_SENTENCE, FIXED_ON_ACTIVATION_SENTENCE, RETIRED_SETTINGS_SENTENCE, type SettingDescriptor, type SettingsGroup, type SettingsTier } from './lib/staff/program-studio/version-settings.component';
 export { DocumentRequirementsComponent } from './lib/staff/program-studio/document-requirements.component';
 export { PipelinePage } from './lib/staff/pipeline/pipeline.page';
+export {
+    ApplicationRecordRedirectFormComponent,
+    LoadApplicationRecordRedirectForm,
+} from './lib/staff/pipeline/application-record-redirect.form';
 export { InviteWizardComponent } from './lib/staff/pipeline/invite-wizard.component';
 export { PipelineData, FilterPipelineApplications, PageSlice, PIPELINE_PAGE_SIZE, type PipelineDataSource, type PagedSlice, type PipelineApplicationRow, type PipelineContactRow, type PipelineActiveTarget, type PipelineSubjectOption, type PipelineFilter, type PipelineSnapshot } from './lib/staff/pipeline/pipeline-data';
 export { InviteWizardModel, FormatInvitationOutcome, EligibleSubjectsForTarget, type InviteWizardStep, type InviteSubjectMode, type FormattedInvitationOutcome } from './lib/staff/pipeline/invite-wizard-model';
@@ -145,6 +150,17 @@ export {
     type PreviewKind,
     type HighlightSplit,
 } from './lib/applicant/documents/document-viewer-model';
+export { ReviewSubmitPage } from './lib/applicant/submit/review-submit.page';
+export { GateListComponent } from './lib/applicant/submit/gate-list.component';
+export { AttestationFormComponent } from './lib/applicant/submit/attestation-form.component';
+export {
+    SUBMIT_FREEZE_NOTE,
+    EvaluateSubmitState,
+    GapLinkForItem,
+    FormatSubmittedBannerDate,
+    type SubmitGapLink,
+    type EvaluatedSubmitState,
+} from './lib/applicant/submit/submit-model';
 
 /**
  * Bootstrap function named by mj-app.json packages.client[0].startupExport.
@@ -160,4 +176,5 @@ export function LoadBizAppsCredentialingClient(): void {
     LoadCredentialingApplicantHomeResource();
     LoadCredentialingApplicantStandardsResource();
     LoadCredentialingApplicantDocumentsResource();
+    LoadApplicationRecordRedirectForm();
 }

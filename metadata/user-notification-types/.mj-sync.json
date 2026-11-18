@@ -1,0 +1,13 @@
+{
+  "entity": "MJ: User Notification Types",
+  "filePattern": "**/.*.json",
+  "pull": {
+    "createNewFileIfNotFound": true,
+    "newFileName": ".credentialing-notification-types.json",
+    "appendRecordsToExistingFile": true,
+    "updateExistingRecords": true,
+    "ignoreNullFields": true,
+    "ignoreVirtualFields": true,
+    "filter": "Name LIKE 'Credentialing:%'"
+  }
+}

@@ -142,7 +142,7 @@
     }
 
     @if (SelectedApplication; as selected) {
-        <section class="cred-pipeline__detail" aria-label="Application details">
+        <section #detailSection class="cred-pipeline__detail" aria-label="Application details">
             <header class="cred-pipeline__detail-header">
                 <div>
                     <h2 class="cred-pipeline__detail-title">
@@ -151,6 +151,9 @@
                     @if (DetailWorkspace; as detail) {
                         <p class="cred-pipeline__subtitle">
                             Status: {{ FormatStatus(detail.Application.Status) }} · {{ detail.Application.ConfirmedCount }} of {{ detail.Application.StandardCount }} confirmed
+                            @if (detail.Application.SubmittedAt) {
+                                · Submitted on {{ FormatSubmittedDate(detail.Application.SubmittedAt) }}
+                            }
                         </p>
                     }
                 </div>
@@ -173,6 +176,46 @@
             } @else if (DetailWorkspace; as detail) {
                 @if (detail.Application.WithdrawalReason) {
                     <mj-alert Variant="warning" [Message]="'Withdrawal reason: ' + detail.Application.WithdrawalReason"></mj-alert>
+                }
+                @if (selected.SubmissionDispatchNote) {
+                    <mj-alert Variant="warning" Title="Post-submission processing note" [Message]="selected.SubmissionDispatchNote"></mj-alert>
+                }
+                @if (DetailGate; as gate) {
+                    @if (gate.Application.Status === 'Submitted') {
+                        <section class="cred-pipeline__frozen-summary" aria-label="Submission record">
+                            <h3 class="cred-pipeline__detail-section-title">Documents frozen at submission</h3>
+                            @if (gate.Documents.length === 0) {
+                                <p class="cred-pipeline__muted">No documents or attestations were frozen.</p>
+                            } @else {
+                                <ul class="cred-pipeline__frozen-list">
+                                    @for (doc of gate.Documents; track (doc.EvidenceDocumentID ?? doc.DocumentAttestationID ?? doc.Title)) {
+                                        <li class="cred-pipeline__frozen-item">
+                                            <span class="cred-pipeline__frozen-kind">{{ doc.Kind }}</span>
+                                            <strong>{{ doc.Title }}</strong>
+                                            @if (doc.RequirementName) {
+                                                <span class="cred-pipeline__muted">({{ doc.RequirementName }})</span>
+                                            }
+                                            <span class="cred-pipeline__muted">{{ doc.Detail }}</span>
+                                        </li>
+                                    }
+                                </ul>
+                            }
+                            @if (gate.RecordedAttestation; as att) {
+                                <div class="cred-pipeline__attestation-record">
+                                    <h4 class="cred-pipeline__detail-subsection-title">Governing body attestation</h4>
+                                    <p class="cred-pipeline__muted">
+                                        @if (att.OfficerName && att.OfficerRole) {
+                                            Signed by {{ att.OfficerName }} ({{ att.OfficerRole }})
+                                        }
+                                        @if (att.ApprovalDate) {
+                                            · Approved {{ att.ApprovalDate }}
+                                        }
+                                    </p>
+                                    <p class="cred-pipeline__attestation-statement">{{ gate.AttestationStatement }}</p>
+                                </div>
+                            }
+                        </section>
+                    }
                 }
 
                 <section class="cred-pipeline__detail-docs" aria-label="Application documents">

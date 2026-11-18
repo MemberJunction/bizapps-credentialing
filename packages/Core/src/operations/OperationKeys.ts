@@ -26,6 +26,8 @@ export const CredentialingOperation = {
     RequeueReading: 'Credentialing.RequeueReading',
     SaveResponseSources: 'Credentialing.SaveResponseSources',
     RefreshPrefills: 'Credentialing.RefreshPrefills',
+    GetSubmissionGate: 'Credentialing.GetSubmissionGate',
+    SubmitApplication: 'Credentialing.SubmitApplication',
 } as const;
 
 /** One of the {@link CredentialingOperation} keys. */
@@ -78,3 +80,9 @@ export const DOCUMENT_REPLACED_REASON = 'This document was replaced by a newer u
 
 /** Refusal when "Read again" is asked for a document the assistant has read, or cannot read. */
 export const READING_NOT_REQUEUEABLE_REASON = 'Only a document the assistant could not read can be read again.';
+
+/** Refusal when a non-applicant tries to submit an application. */
+export const ONLY_APPLICANT_SUBMIT_REASON = 'Only the applicant can submit an application.';
+
+/** Staff-facing note recorded when post-submission dispatch stops after MaxAttempts failures. */
+export const SUBMISSION_DISPATCH_GAVE_UP_NOTE = 'Follow-up work for this submission could not be started. Tell your administrator.';

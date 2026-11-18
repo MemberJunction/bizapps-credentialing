@@ -77,6 +77,14 @@ const ISO_DATE_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/;
  */
 export class SubmissionGate {
     /**
+     * Formats the fixed governing-body attestation statement with the subject's display name.
+     */
+    public static FormatAttestationStatement(subjectName: string): string {
+        const name = subjectName.trim() || 'the applicant';
+        return `I attest that the information in this application is accurate and complete, and that ${name}'s governing body has approved its submission.`;
+    }
+
+    /**
      * Evaluates eligibility standards, sections, required documents, and optional governing-body attestation.
      */
     public static Evaluate(input: GateInput, today: Date = new Date()): GateEvaluation {

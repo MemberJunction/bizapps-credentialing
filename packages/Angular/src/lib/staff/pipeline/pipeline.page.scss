@@ -312,3 +312,49 @@
     font-size: var(--mj-text-xs, 0.75rem);
     cursor: pointer;
 }
+
+.cred-pipeline__frozen-summary {
+    display: flex;
+    flex-direction: column;
+    gap: var(--mj-space-2, 0.5rem);
+    padding: var(--mj-space-3, 0.75rem);
+    border: 1px solid var(--mj-border-subtle);
+    border-radius: var(--mj-radius-sm, 4px);
+    background: var(--mj-bg-surface-sunken, var(--mj-bg-surface));
+}
+
+.cred-pipeline__frozen-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--mj-space-1, 0.25rem);
+}
+
+.cred-pipeline__frozen-item {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: var(--mj-space-2, 0.5rem);
+    font-size: var(--mj-text-sm, 0.875rem);
+}
+
+.cred-pipeline__frozen-kind {
+    font-size: var(--mj-text-xs, 0.75rem);
+    font-weight: var(--mj-font-semibold, 600);
+    text-transform: uppercase;
+    color: var(--mj-text-secondary);
+}
+
+.cred-pipeline__attestation-record {
+    margin-top: var(--mj-space-2, 0.5rem);
+    padding-top: var(--mj-space-2, 0.5rem);
+    border-top: 1px solid var(--mj-border-subtle);
+}
+
+.cred-pipeline__attestation-statement {
+    margin: var(--mj-space-1, 0.25rem) 0 0;
+    font-size: var(--mj-text-sm, 0.875rem);
+    color: var(--mj-text-primary);
+}
