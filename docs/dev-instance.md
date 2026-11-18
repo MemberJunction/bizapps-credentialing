@@ -1291,3 +1291,32 @@ The world's `Sample Reading Program` 2026 (OrgA) has R.1 (Prefill) and R.2 (Loca
 policy` by one `Document Extraction` source each (written through the entity on the Draft version
 before the loader activates it), R.3 (Manual) unbound, and `Other record` with no bound standard. Its
 subject `Sample Reading Applicant` has the contact `applicant.reading@example.test`.
+
+## Prefill resolution: write cost and record-change overhead (B2 Task 10)
+
+- **Why `TransactionGroup` was slower than direct entity saves.** `PrefillRunner.RunForApplication`
+  runs inside `OperationWrite.Run` (`RunInEntityTransaction`), which already holds one SQL Server
+  transaction. Enlisting 300 writes (150 `StandardResponse` updates + 150 `ResponseCitation`
+  inserts on a 150-standard application) in `TransactionGroup` (`BatchedSubmit = true` or `false`,
+  chunk sizes 3–300) measured **5,400–7,559 ms** because `SQLServerTransactionGroup` replaces
+  parameters with inline SQL literals and appends unique `_<guid>` table suffixes on each item,
+  busting SQL Server's plan cache on every write (`mj/packages/SQLServerDataProvider/src/SQLServerTransactionGroup.ts`).
+- **Direct entity saves + pre-loaded authoring + concurrent reads.** Pre-loading the version's
+  `Standard` and `ResponseSource` rows before acquiring the subject lock (the lock does not protect
+  authoring), running `loadStateInsideLock` and `DocumentExtractionEvaluator.Evaluate` concurrently
+  inside the lock, skipping `Unchanged` rows, and calling `OperationWrite.Save` directly inside the
+  single ambient transaction (`SkipEntityAIActions: true`, `SaveReturnMode: 'datestamps_only'`)
+  dropped the isolated 150-standard run to **2,883 ms** (`SQL: 2,725 ms`, `JS/RunView: 158 ms`:
+  6 read queries completing by `+78 ms`, 150 `StandardResponse` updates `1,353 ms` / `9.0 ms` avg,
+  150 `ResponseCitation` inserts `~1,200 ms` / `8.0 ms` avg).
+- **Where the remaining time goes (`spCreateRecordChange_Internal`).** Profiling the same 300
+  entity saves with `EntitySaveOptions.SkipRecordChanges` isolates the platform audit cost on this
+  ARM64 Docker SQL Server instance:
+  - Both `StandardResponse` and `ResponseCitation` recording `RecordChange` (production NFR-3.1): **~2.9–3.6 s** warm (`3,572 ms` in paired save microbenchmark).
+  - `SkipRecordChanges: true` on `ResponseCitation` only: **2,007 ms** (`1,508 ms` responses + `448 ms` citations).
+  - `SkipRecordChanges: true` on both: **602 ms** (`318 ms` responses + `264 ms` citations).
+  Thus **~83% (~2.5–3.0 s)** of the 300-write lock duration is MJ's per-save `INSERT INTO
+  @ResultChangesTable EXEC [__mj].spCreateRecordChange_Internal` inside `WrapSaveCallWithRecordChange`.
+  We keep `TrackRecordChanges` active on every credentialing entity (including `ResponseCitation`) to
+  preserve NFR-3.1's complete audit trail; any future plan needing sub-second 150-standard bulk
+  prefills would need platform-level batched record-change writing.

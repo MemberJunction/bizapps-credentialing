@@ -97,7 +97,7 @@ async function readAs<T extends object>(
     fields: string[],
     asUser: UserInfo,
 ): Promise<ReadOutcome<T>> {
-    const res = await View(ctx).RunView<T>({ EntityName: entityName, ExtraFilter: filter, Fields: fields, ResultType: 'simple' }, asUser);
+    const res = await View(ctx).RunView<T>({ EntityName: entityName, ExtraFilter: filter, Fields: fields, ResultType: 'simple', IgnoreMaxRows: true, SkipTotalRowCount: true }, asUser);
     return res.Success ? { Rows: res.Results ?? [], Refusal: null } : { Rows: [], Refusal: res.ErrorMessage ?? 'unknown' };
 }
 

@@ -1,4 +1,4 @@
-import { RemoteOperationError, type BaseEntity, type IMetadataProvider } from '@memberjunction/core';
+import { RemoteOperationError, type BaseEntity, type EntitySaveOptions, type IMetadataProvider } from '@memberjunction/core';
 import { OPERATION_REFUSED } from '@mj-biz-apps/credentialing-core';
 import { OperationSupport } from '../operations/OperationSupport.js';
 
@@ -18,7 +18,7 @@ const marked = new WeakMap<BaseEntity, Scope>();
 /** The two writes an operation makes through {@link OperationWrite.Run}. */
 export interface OperationWriteScope {
     /** Saves `entity` as an operation write; throws the entity's refusal as a `REFUSED` operation error. */
-    Save(entity: BaseEntity): Promise<void>;
+    Save(entity: BaseEntity, options?: EntitySaveOptions): Promise<void>;
     /** Deletes `entity` as an operation write; throws the entity's refusal as a `REFUSED` operation error. */
     Delete(entity: BaseEntity): Promise<void>;
     /**
@@ -49,8 +49,8 @@ class Scope implements OperationWriteScope {
         return this.parentSubjects.get(`${parentEntityName}:${parentID.toLowerCase()}`) ?? null;
     }
 
-    public async Save(entity: BaseEntity): Promise<void> {
-        await this.write(entity, () => entity.Save(), 'saved');
+    public async Save(entity: BaseEntity, options?: EntitySaveOptions): Promise<void> {
+        await this.write(entity, () => entity.Save(options), 'saved');
     }
 
     public async Delete(entity: BaseEntity): Promise<void> {

@@ -1,7 +1,6 @@
 import {
-    DatabaseProviderBase,
+    EntitySaveOptions,
     RunView,
-    TransactionGroupBase,
     type IMetadataProvider,
     type UserInfo,
 } from '@memberjunction/core';
@@ -41,7 +40,10 @@ type ResponseCitationEntity = mjBizAppsCredentialingResponseCitationEntity;
 
 const PURPOSE = 'Running prefill resolution';
 const STANDARD_RESPONSES_VIEW = '[__mj_BizAppsCredentialing].[vwStandardResponses]';
-const BATCH_CHUNK_SIZE = 15;
+const PREFILL_SAVE_OPTIONS = Object.assign(new EntitySaveOptions(), {
+    SkipEntityAIActions: true,
+    SaveReturnMode: 'datestamps_only' as const,
+});
 
 /** Application row fields used by prefill resolution. */
 export interface PrefillApplicationRecord {
@@ -97,9 +99,17 @@ export interface PrefillTransactionScope {
     InsertCitation(citation: Omit<PrefillCitationRecord, 'ID'>): Promise<void>;
 }
 
+/** Application header and optional pre-loaded authoring sources read before acquiring the lock. */
+export interface PrefillApplicationHeader {
+    ID: string;
+    SubjectID: string;
+    ProgramVersionID?: string;
+    Sources?: ResponseSourceRow[];
+}
+
 /** Data adapter separating locking/persistence from the resolution algorithm for unit testing. */
 export interface PrefillData {
-    FindApplicationSubject(applicationID: string): Promise<{ ID: string; SubjectID: string } | null>;
+    FindApplicationSubject(applicationID: string): Promise<PrefillApplicationHeader | null>;
     InLockedTransaction<T>(
         applicationID: string,
         subjectID: string,
@@ -144,6 +154,17 @@ export class PrefillWorker {
 
         return this.data.InLockedTransaction(appHeader.ID, appHeader.SubjectID, async (scope) => {
             await this.seams.InsideLock?.();
+            if (appHeader.Sources != null) {
+                const [state, candidatesByStandard] = await Promise.all([
+                    scope.LoadState(),
+                    this.evaluateAll(appHeader.Sources, appHeader.SubjectID, writer, provider),
+                ]);
+                if (state.Application.Status !== 'Draft') {
+                    return zeroCounts();
+                }
+                return this.applyAll(scope, state, candidatesByStandard);
+            }
+
             const state = await scope.LoadState();
             if (state.Application.Status !== 'Draft') {
                 return zeroCounts();
@@ -330,6 +351,10 @@ interface RawStandardIntakeRow {
 }
 
 class DatabasePrefillData implements PrefillData {
+    private preloadedVersionID: string | null = null;
+    private preloadedStandards: Map<string, IntakeMode> | null = null;
+    private preloadedSources: ResponseSourceRow[] | null = null;
+
     public constructor(
         private readonly provider: IMetadataProvider,
         private readonly writer: UserInfo,
@@ -337,25 +362,94 @@ class DatabasePrefillData implements PrefillData {
 
     public async FindApplicationSubject(
         applicationID: string,
-    ): Promise<{ ID: string; SubjectID: string } | null> {
+    ): Promise<PrefillApplicationHeader | null> {
         if (!IsValidUUID(applicationID)) {
             return null;
         }
-        const res = await RunView.FromMetadataProvider(this.provider).RunView<{ ID: string; SubjectID: string }>(
+        const res = await RunView.FromMetadataProvider(this.provider).RunView<{
+            ID: string;
+            SubjectID: string;
+            ProgramVersionID: string;
+        }>(
             {
                 EntityName: CredentialingEntity.Application,
                 ExtraFilter: `ID = '${EscapeSQLString(applicationID)}'`,
-                Fields: ['ID', 'SubjectID'],
+                Fields: ['ID', 'SubjectID', 'ProgramVersionID'],
                 ResultType: 'simple',
                 MaxRows: 1,
                 SkipTotalRowCount: true,
             },
             this.writer,
         );
-        if (!res.Success) {
+        const row = res.Success ? res.Results?.[0] : undefined;
+        if (row == null) {
             return null;
         }
-        return res.Results?.[0] ?? null;
+        // Program version authoring (standards and sources) is not protected by the subject lock,
+        // so pre-loading it here lets InsideLock run response/citation reads and extraction evaluation in one step.
+        const authoring = await this.loadVersionAuthoring(row.ProgramVersionID);
+        this.preloadedVersionID = row.ProgramVersionID.toLowerCase();
+        this.preloadedStandards = authoring.Standards;
+        this.preloadedSources = authoring.Sources;
+        return {
+            ID: row.ID,
+            SubjectID: row.SubjectID,
+            ProgramVersionID: row.ProgramVersionID,
+            Sources: authoring.Sources,
+        };
+    }
+
+    private async loadVersionAuthoring(
+        programVersionID: string,
+    ): Promise<{ Standards: Map<string, IntakeMode>; Sources: ResponseSourceRow[] }> {
+        const escapedVersionID = EscapeSQLString(programVersionID);
+        const system = SystemUser.Get(PURPOSE);
+        const systemAuthoring = await RunView.FromMetadataProvider(this.provider).RunViews<
+            RawStandardIntakeRow | ResponseSourceRow
+        >(
+            [
+                {
+                    EntityName: CredentialingEntity.Standard,
+                    ExtraFilter: `ProgramVersionID = '${escapedVersionID}'`,
+                    Fields: ['ID', 'IntakeMode'],
+                    ResultType: 'simple',
+                    IgnoreMaxRows: true,
+                    SkipTotalRowCount: true,
+                },
+                {
+                    EntityName: CredentialingEntity.ResponseSource,
+                    ExtraFilter: `ProgramVersionID = '${escapedVersionID}' AND Mode IN ('Prefill Only', 'Both')`,
+                    Fields: [
+                        'ID',
+                        'StandardID',
+                        'ProgramVersionID',
+                        'SourceType',
+                        'DocumentRequirementID',
+                        'Mode',
+                        'Rank',
+                        'Sequence',
+                    ],
+                    OrderBy: 'Rank ASC, Sequence ASC',
+                    ResultType: 'simple',
+                    IgnoreMaxRows: true,
+                    SkipTotalRowCount: true,
+                },
+            ],
+            system,
+        );
+        if (!systemAuthoring[0].Success || !systemAuthoring[1].Success) {
+            throw new Error(
+                `Loading standards and sources for prefill failed: ${systemAuthoring[0].ErrorMessage ?? systemAuthoring[1].ErrorMessage ?? 'unknown error'}`,
+            );
+        }
+        const standards = new Map<string, IntakeMode>();
+        for (const st of (systemAuthoring[0].Results ?? []) as RawStandardIntakeRow[]) {
+            standards.set(st.ID.toLowerCase(), st.IntakeMode);
+        }
+        return {
+            Standards: standards,
+            Sources: (systemAuthoring[1].Results ?? []) as ResponseSourceRow[],
+        };
     }
 
     public InLockedTransaction<T>(
@@ -369,52 +463,19 @@ class DatabasePrefillData implements PrefillData {
 
             const responseEntities = new Map<string, StandardResponseEntity>();
             const citationEntities = new Map<string, ResponseCitationEntity>();
-            let batch = await this.createBatchGroup();
-            let batchCount = 0;
-
-            const enqueue = async (saveWork: (group: TransactionGroupBase | null) => Promise<void>): Promise<void> => {
-                await saveWork(batch);
-                if (batch != null) {
-                    batchCount++;
-                    if (batchCount >= BATCH_CHUNK_SIZE) {
-                        const ok = await batch.Submit();
-                        if (!ok) {
-                            throw new Error('Batched prefill write failed.');
-                        }
-                        batch = await this.createBatchGroup();
-                        batchCount = 0;
-                    }
-                }
-            };
 
             const scope: PrefillTransactionScope = {
                 LoadState: () =>
                     this.loadStateInsideLock(writeScope, applicationID, responseEntities, citationEntities),
                 UpdateResponse: (responseID, patch) =>
-                    enqueue((g) => this.updateResponse(writeScope, g, responseEntities, responseID, patch)),
+                    this.updateResponse(writeScope, responseEntities, responseID, patch),
                 DeleteCitations: (citationIDs) =>
-                    this.deleteCitations(writeScope, batch, citationEntities, citationIDs),
+                    this.deleteCitations(writeScope, citationEntities, citationIDs),
                 InsertCitation: (citation) =>
-                    enqueue((g) => this.insertCitation(writeScope, g, citation)),
+                    this.insertCitation(writeScope, citation),
             };
-            const result = await work(scope);
-            if (batch != null && batchCount > 0) {
-                const ok = await batch.Submit();
-                if (!ok) {
-                    throw new Error('Batched prefill write failed.');
-                }
-            }
-            return result;
+            return work(scope);
         });
-    }
-
-    private async createBatchGroup(): Promise<TransactionGroupBase | null> {
-        if (!(this.provider instanceof DatabaseProviderBase)) {
-            return null;
-        }
-        const group = await this.provider.CreateTransactionGroup();
-        group.BatchedSubmit = true;
-        return group;
     }
 
     private async loadStateInsideLock(
@@ -503,56 +564,17 @@ class DatabasePrefillData implements PrefillData {
             citationEntities.set(c.ID.toLowerCase(), c);
         }
 
-        const escapedVersionID = EscapeSQLString(app.ProgramVersionID);
-        const systemAuthoring = await RunView.FromMetadataProvider(this.provider).RunViews<
-            RawStandardIntakeRow | ResponseSourceRow
-        >(
-            [
-                {
-                    EntityName: CredentialingEntity.Standard,
-                    ExtraFilter: `ProgramVersionID = '${escapedVersionID}'`,
-                    Fields: ['ID', 'IntakeMode'],
-                    ResultType: 'simple',
-                    IgnoreMaxRows: true,
-                    SkipTotalRowCount: true,
-                },
-                {
-                    EntityName: CredentialingEntity.ResponseSource,
-                    ExtraFilter: `ProgramVersionID = '${escapedVersionID}' AND Mode IN ('Prefill Only', 'Both')`,
-                    Fields: [
-                        'ID',
-                        'StandardID',
-                        'ProgramVersionID',
-                        'SourceType',
-                        'DocumentRequirementID',
-                        'Mode',
-                        'Rank',
-                        'Sequence',
-                    ],
-                    OrderBy: 'Rank ASC, Sequence ASC',
-                    ResultType: 'simple',
-                    IgnoreMaxRows: true,
-                    SkipTotalRowCount: true,
-                },
-            ],
-            system,
-        );
-
-        if (!systemAuthoring[0].Success || !systemAuthoring[1].Success) {
-            throw new Error(
-                `Loading standards and sources for prefill failed: ${systemAuthoring[0].ErrorMessage ?? systemAuthoring[1].ErrorMessage ?? 'unknown error'}`,
-            );
-        }
-
-        const standards = new Map<string, IntakeMode>();
-        for (const st of (systemAuthoring[0].Results ?? []) as RawStandardIntakeRow[]) {
-            standards.set(st.ID.toLowerCase(), st.IntakeMode);
-        }
+        const authoring =
+            this.preloadedVersionID === app.ProgramVersionID.toLowerCase() &&
+            this.preloadedStandards != null &&
+            this.preloadedSources != null
+                ? { Standards: this.preloadedStandards, Sources: this.preloadedSources }
+                : await this.loadVersionAuthoring(app.ProgramVersionID);
 
         return {
             Application: app,
-            Standards: standards,
-            Sources: (systemAuthoring[1].Results ?? []) as ResponseSourceRow[],
+            Standards: authoring.Standards,
+            Sources: authoring.Sources,
             Responses: responses.map((r) => ({
                 ID: r.ID,
                 StandardID: r.StandardID,
@@ -583,7 +605,6 @@ class DatabasePrefillData implements PrefillData {
 
     private async updateResponse(
         writeScope: OperationWriteScope,
-        batch: TransactionGroupBase | null,
         responseEntities: ReadonlyMap<string, StandardResponseEntity>,
         responseID: string,
         patch: Partial<PrefillResponseRecord>,
@@ -601,15 +622,11 @@ class DatabasePrefillData implements PrefillData {
         if (patch.SourceRetrievedAt !== undefined) entity.SourceRetrievedAt = patch.SourceRetrievedAt;
         if (patch.SourceRawValue !== undefined) entity.SourceRawValue = patch.SourceRawValue;
         if (patch.IsStale !== undefined) entity.IsStale = patch.IsStale;
-        if (batch != null) {
-            entity.TransactionGroup = batch;
-        }
-        await writeScope.Save(entity);
+        await writeScope.Save(entity, PREFILL_SAVE_OPTIONS);
     }
 
     private async deleteCitations(
         writeScope: OperationWriteScope,
-        _batch: TransactionGroupBase | null,
         citationEntities: ReadonlyMap<string, ResponseCitationEntity>,
         citationIDs: readonly string[],
     ): Promise<void> {
@@ -623,7 +640,6 @@ class DatabasePrefillData implements PrefillData {
 
     private async insertCitation(
         writeScope: OperationWriteScope,
-        batch: TransactionGroupBase | null,
         citation: Omit<PrefillCitationRecord, 'ID'>,
     ): Promise<void> {
         const system = SystemUser.Get(PURPOSE);
@@ -640,10 +656,7 @@ class DatabasePrefillData implements PrefillData {
         entity.Excerpt = citation.Excerpt;
         entity.StartOffset = citation.StartOffset;
         entity.EndOffset = citation.EndOffset;
-        if (batch != null) {
-            entity.TransactionGroup = batch;
-        }
-        await writeScope.Save(entity);
+        await writeScope.Save(entity, PREFILL_SAVE_OPTIONS);
     }
 }
 

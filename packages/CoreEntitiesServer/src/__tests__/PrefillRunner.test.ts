@@ -47,6 +47,7 @@ class MemoryPrefillData implements PrefillData {
     public Responses: PrefillResponseRecord[] = [];
     public Citations: PrefillCitationRecord[] = [];
     public SaveCalls = 0;
+    public DeleteCitationsCalls = 0;
 
     public async FindApplicationSubject(): Promise<{ ID: string; SubjectID: string } | null> {
         return { ID: APP_ID, SubjectID: SUBJECT_ID };
@@ -80,6 +81,7 @@ class MemoryPrefillData implements PrefillData {
                 Object.assign(row, patch);
             },
             async DeleteCitations(citationIDs) {
+                self.DeleteCitationsCalls++;
                 const drop = new Set(citationIDs);
                 self.Citations = self.Citations.filter((c) => !drop.has(c.ID));
             },
@@ -304,5 +306,82 @@ describe('PrefillWorker', () => {
         const human = data.Responses.find((r) => r.ID === 'R-HUMAN')!;
         expect(human.Status).toBe('Drafted');
         expect(human.ResponseText).toBe('Applicant wrote this.');
+    });
+
+    it('never deletes citations attached to responses left Unchanged or MarkedStale', async () => {
+        const data = new MemoryPrefillData();
+        data.Sources = [makeSource({ ID: 'S-PRE', StandardID: STD_PREFILL })];
+        data.Standards.set('s-stale', 'Prefill');
+        data.Standards.set('s-empty-nosrc', 'Prefill');
+
+        data.Responses = [
+            makeResponse({
+                ID: 'R-HUMAN',
+                StandardID: STD_PREFILL,
+                Status: 'Drafted',
+                AuthorType: 'Human',
+                ResponseText: 'Human text with citation',
+            }),
+            makeResponse({
+                ID: 'R-STALE',
+                StandardID: 'S-STALE',
+                Status: 'Confirmed',
+                AuthorType: 'Agent',
+                ResponseText: 'Confirmed text',
+                SourceReference: EXT_1,
+                SourceRawValue: 'Old value',
+            }),
+            makeResponse({
+                ID: 'R-EMPTY-NOSRC',
+                StandardID: 'S-EMPTY-NOSRC',
+                Status: 'Empty',
+            }),
+        ];
+        data.Citations = [
+            {
+                ID: 'CIT-HUMAN',
+                StandardResponseID: 'R-HUMAN',
+                EvidenceDocumentID: DOC_1,
+                ExtractionID: null,
+                SourceLabel: 'human-doc.pdf',
+                PageReference: '2',
+                Excerpt: 'Kept excerpt on human draft.',
+                StartOffset: 0,
+                EndOffset: 28,
+            },
+            {
+                ID: 'CIT-STALE',
+                StandardResponseID: 'R-STALE',
+                EvidenceDocumentID: DOC_1,
+                ExtractionID: EXT_1,
+                SourceLabel: 'safety-policy.pdf',
+                PageReference: '1',
+                Excerpt: 'Kept excerpt on confirmed answer.',
+                StartOffset: 0,
+                EndOffset: 33,
+            },
+            {
+                ID: 'CIT-EMPTY',
+                StandardResponseID: 'R-EMPTY-NOSRC',
+                EvidenceDocumentID: DOC_1,
+                ExtractionID: null,
+                SourceLabel: 'manual.pdf',
+                PageReference: '3',
+                Excerpt: 'Kept excerpt when no prefill candidate exists.',
+                StartOffset: 0,
+                EndOffset: 44,
+            },
+        ];
+
+        const evaluator = new StubEvaluator();
+        evaluator.CandidatesByStandard.set(STD_PREFILL.toLowerCase(), [makeCandidate()]);
+        evaluator.CandidatesByStandard.set('s-stale', [makeCandidate({ Value: 'Changed value', Reference: EXT_2 })]);
+
+        const worker = new PrefillWorker(data, [evaluator], () => new Date('2026-11-17T12:00:00Z'));
+        const counts = await worker.RunForApplication(APP_ID, makeUser());
+
+        expect(counts).toEqual({ Prefilled: 0, Located: 0, MarkedStale: 1, Cleared: 0, Unchanged: 2 });
+        expect(data.DeleteCitationsCalls).toBe(0);
+        expect(data.Citations.map((c) => c.ID)).toEqual(['CIT-HUMAN', 'CIT-STALE', 'CIT-EMPTY']);
     });
 });

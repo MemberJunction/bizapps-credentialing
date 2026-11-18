@@ -96,7 +96,7 @@ const RECORD_CHANGES_ENTITY = 'MJ: Record Changes';
 /** The subject IDs of the rows `user` reads from `entity`, lower-cased; a refused read fails the check. */
 async function subjectsRead(ctx: IntegrationCheckContext, entity: { Name: string; SubjectColumn: string }, user: UserInfo): Promise<string[]> {
     const res = await View(ctx).RunView<Record<string, string>>(
-        { EntityName: entity.Name, Fields: [entity.SubjectColumn], ResultType: 'simple' },
+        { EntityName: entity.Name, Fields: [entity.SubjectColumn], ResultType: 'simple', IgnoreMaxRows: true, SkipTotalRowCount: true },
         user,
     );
     Assert(res.Success, `${user.Email} reads ${entity.Name} (got "${res.ErrorMessage ?? ''}")`);
