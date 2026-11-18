@@ -43,6 +43,11 @@ describe('Credentialing Integration Test Bundles', () => {
         expect(ids).toEqual(['cred-world.1', 'cred-world.2']);
     });
 
+    it('registers the cred-applicant-world bundle with its two checks', () => {
+        const ids = IntegrationCheckRegistry.Instance.GetBundle('cred-applicant-world').map((c) => c.Id);
+        expect(ids).toEqual(['cred-applicant-world.1', 'cred-applicant-world.2']);
+    });
+
     it('registers the cred-users bundle with its one check', () => {
         const ids = IntegrationCheckRegistry.Instance.GetBundle('cred-users').map((c) => c.Id);
         expect(ids).toEqual(['cred-users.1']);

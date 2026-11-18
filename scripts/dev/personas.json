@@ -37,12 +37,26 @@
       "account": "world",
       "about": "external applicant; contact of Sample Applicant One only"
     },
+    "applicant-b": {
+      "email": "applicant.b@example.test",
+      "signIn": "magic-link",
+      "role": "Credentialing Applicant",
+      "account": "world",
+      "about": "external applicant; contact of Sample Applicant Two only (OrgA)"
+    },
     "applicant-two": {
       "email": "applicant.two@example.test",
       "signIn": "magic-link",
       "role": "Credentialing Applicant",
       "account": "world",
       "about": "external applicant; contact of both Sample Applicant One and Sample Applicant Two (for the subject picker)"
+    },
+    "applicant-org-b": {
+      "email": "applicant.orgb@example.test",
+      "signIn": "magic-link",
+      "role": "Credentialing Applicant",
+      "account": "world",
+      "about": "external applicant; contact of Sample Applicant Org B only (OrgB)"
     },
     "applicant-evidence": {
       "email": "applicant.evidence@example.test",

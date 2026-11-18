@@ -407,8 +407,8 @@ MJAPI after initial user creation, at the cost of recompiling MJExplorer.)
 
 ## Signing in as a persona
 
-`scripts/dev/personas.json` names the seven personas. Each has an email, a sign-in method and the
-account's origin:
+`scripts/dev/personas.json` names the development personas. Each has an email, a sign-in method and
+the account's origin:
 
 | Persona | Email | Sign-in | Role | Account created by |
 |---|---|---|---|---|
@@ -416,7 +416,12 @@ account's origin:
 | `staff-b` | `staff.b@example.test` | dev-login | Credentialing Staff (OrgB) | world |
 | `staff-none` | `staff.none@example.test` | dev-login | Credentialing Staff, no membership | world |
 | `admin` | `admin@example.test` | dev-login | Credentialing Admin | world |
-| `applicant-a` | `applicant.a@example.test` | magic link | Credentialing Applicant | world; the redemption adds its application row |
+| `applicant-a` | `applicant.a@example.test` | magic link | Credentialing Applicant (`Sample Applicant One`, OrgA) | world; the redemption adds its application row |
+| `applicant-b` | `applicant.b@example.test` | magic link | Credentialing Applicant (`Sample Applicant Two`, OrgA) | world |
+| `applicant-two` | `applicant.two@example.test` | magic link | Credentialing Applicant (both `Sample Applicant One` and `Two`, for the picker) | world |
+| `applicant-org-b` | `applicant.orgb@example.test` | magic link | Credentialing Applicant (`Sample Applicant Org B`, OrgB) | world |
+| `applicant-evidence` | `applicant.evidence@example.test` | magic link | Credentialing Applicant (`Sample Evidence Applicant`, OrgA) | world |
+| `applicant-reading` | `applicant.reading@example.test` | magic link | Credentialing Applicant (`Sample Reading Applicant`, OrgA) | world |
 | `reviewer-a` | `reviewer.a@example.test` | magic link | Credentialing Reviewer | the first redemption |
 | `committee-a` | `committee.a@example.test` | magic link | Credentialing Committee | the first redemption |
 
@@ -694,6 +699,11 @@ A user API key (`mj_sk_…`, `x-api-key` header) is not used by this harness.
 | `cred-invite-wire` | — (client harness only) | client only (checks 7, 8 and 10 against MJAPI's live `MagicLinkService`) |
 | `cred-evidence-rules` | `CRD-11 - Evidence` | server only (fixture store and text extractor; the `EvidenceIntake.Seams.AfterStore` race) |
 | `cred-evidence` | — (client harness only) | client only (the evidence routes over HTTP against MJAPI, real storage and extraction) |
+| `cred-responses` | `CRD-10 - Responses` | server only |
+| `cred-reader` | `CRD-12 - Reader` | server only |
+| `cred-prefill` | `CRD-13 - Prefill` | server only |
+| `cred-submission` | `CRD-14 - Submission` | server only |
+| `cred-applicant-world` | `CRD-15 - Applicant world` | server only (asserts applicant world shape and reload idempotency) |
 
 ```sh
 MJ_INTEGRATION_TEST=1 RUN_MUTATION_TESTS=1 corepack pnpm mj test run --name "CRD-02 - Version rules"   # 12 checks
@@ -702,11 +712,12 @@ MJ_INTEGRATION_TEST=1 RUN_MUTATION_TESTS=1 corepack pnpm mj test run --name "CRD
 MJ_INTEGRATION_TEST=1 RUN_MUTATION_TESTS=1 corepack pnpm mj test run --name "CRD-05 - Isolation"      # 9 checks
 MJ_INTEGRATION_TEST=1 RUN_MUTATION_TESTS=1 corepack pnpm mj test run --name "CRD-06 - World"          # 2 checks
 MJ_INTEGRATION_TEST=1 RUN_MUTATION_TESTS=1 corepack pnpm mj test run --name "CRD-07 - Applicant schema"  # 3 checks
-MJ_INTEGRATION_TEST=1 RUN_MUTATION_TESTS=1 corepack pnpm mj test run --name "CRD-08 - Subject isolation" # 9 checks
+MJ_INTEGRATION_TEST=1 RUN_MUTATION_TESTS=1 corepack pnpm mj test run --name "CRD-08 - Subject isolation" # 12 checks
 MJ_INTEGRATION_TEST=1 RUN_MUTATION_TESTS=1 corepack pnpm mj test run --name "CRD-09 - Invitations"       # 9 checks
+MJ_INTEGRATION_TEST=1 RUN_MUTATION_TESTS=1 corepack pnpm mj test run --name "CRD-15 - Applicant world"   # 2 checks
 corepack pnpm run test:integration cred-operations-wire                                               # 3 checks, GraphQL
 corepack pnpm run test:integration cred-invite-wire                                                   # 3 checks, GraphQL
-corepack pnpm run seed:dev                                                                            # 2 checks (cred-world), GraphQL
+corepack pnpm run seed:dev                                                                            # 2 checks (cred-world), GraphQL + sample document uploads
 corepack pnpm run seed:users                                                                          # 1 check (cred-users), GraphQL
 ```
 
@@ -715,15 +726,15 @@ the client transport (GraphQL against MJAPI on port `4050` using `MJ_API_KEY`, w
 `System` user, `Type = 'Owner'`, holding `Developer` and `Integration` so `MJ: Users`,
 `MJ: User Roles`, `MJ: User Applications`, Common/Committees entities, and all seven credentialing
 entities are writable over GraphQL):
-- `pnpm run seed:dev` (`node test-harnesses/integration.mjs cred-world`): loads the full
-  `CredentialingWorld` (`EnsureWorldUsers` + `EnsureWorldData` including `SampleProgram`,
-  `PlaceholderProgram` with 12 sections / 36 standards / 5 document requirements, and `ProgramB`),
-  verifies idempotent reload, and verifies `EnsureProgramTree` partial-delete repair on a run-unique
-  scratch tree (`Repair <hex>`), which it deletes again when the check ends (a Draft version's delete
-  removes its tree), so a second `seed:dev` leaves every row count unchanged. Measured: the row counts
-  of the seven credentialing tables, Common organizations, users, user roles, user applications and
-  committees were identical before and after two more runs. (Before this was fixed, every run left one
-  `Repair <hex>` program in `OrgA`; the earlier ones are still in this dev database.)
+- `pnpm run seed:dev` (`node test-harnesses/integration.mjs cred-world`): verifies the full
+  `CredentialingWorld` (`EnsureWorldUsers` + `EnsureWorldData` + `EnsureApplicantWorld`, where
+  applicant-data rows are written by the server-transport `CRD-06 - World` / `CRD-15 - Applicant world`
+  checks), idempotently uploads sample documents over HTTP against MJAPI into the real evidence store
+  for `applicant-b` (`Sample Applicant Two`, `degree-certificate.pdf` on `Degree certificate`, skipped
+  when a current document already exists for that requirement) and `applicant-a` (`Sample Applicant One`,
+  `applicant-a-notes.docx`, skipped when a current general document already exists), verifies idempotent
+  reload, and verifies `EnsureProgramTree` partial-delete repair on a run-unique scratch tree
+  (`Repair <hex>`), which it deletes again when the check ends.
 - `pnpm run seed:users` (`node test-harnesses/integration.mjs cred-users`): runs `EnsureWorldUsers`
   only (creates or finds the six world user accounts, their roles, and Credentialing application
   rows, with no accrediting organizations), for first-run setup verification. Restart MJAPI

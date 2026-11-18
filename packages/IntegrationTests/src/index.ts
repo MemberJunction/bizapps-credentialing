@@ -54,6 +54,7 @@ export * from './checks/cred-standard-rules.checks.js';
 export * from './checks/cred-operations.checks.js';
 export * from './checks/cred-isolation.checks.js';
 export * from './checks/cred-world.checks.js';
+export * from './checks/cred-applicant-world.checks.js';
 export * from './checks/cred-subject-isolation.checks.js';
 export * from './checks/cred-invite.checks.js';
 export * from './checks/cred-responses.checks.js';
