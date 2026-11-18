@@ -28,6 +28,7 @@
     "@angular/common": "^21.2.22",
     "@angular/core": "^21.2.22",
     "@angular/forms": "^21.2.22",
+    "@angular/platform-browser": "^21.2.22",
     "@memberjunction/core": "^6.2.1",
     "@memberjunction/core-entities": "^6.2.1",
     "@memberjunction/global": "^6.2.1",

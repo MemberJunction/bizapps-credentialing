@@ -44,6 +44,7 @@
     "@angular/compiler-cli": "21.2.22",
     "@angular/core": "21.2.22",
     "@angular/forms": "21.2.22",
+    "@angular/platform-browser": "21.2.22",
     "@changesets/cli": "^2.29.8",
     "@memberjunction/cli": "6.2.2",
     "@memberjunction/core": "6.2.2",
