@@ -10,6 +10,7 @@ import { BaseResourceComponent } from '@memberjunction/ng-shared';
 import { SharedGenericModule } from '@memberjunction/ng-shared-generic';
 import { MJAlertComponent, MJEmptyStateComponent } from '@memberjunction/ng-ui-components';
 import { CredentialingResource, type StaffOrganization, type Standing } from '../application/area-nav';
+import { RequestedPipelineApplicationID } from '../staff/pipeline/pipeline-data';
 import { PipelinePage } from '../staff/pipeline/pipeline.page';
 import { CredentialingAreaResource } from './credentialing-area-resource';
 
@@ -40,7 +41,8 @@ import { CredentialingAreaResource } from './credentialing-area-resource';
                     } @else {
                         <bizapps-cred-pipeline
                             [Provider]="Provider"
-                            [SelectedApplicationID]="SelectedApplicationID">
+                            [SelectedApplicationID]="SelectedApplicationID"
+                            [RefreshKey]="RefreshKey">
                         </bizapps-cred-pipeline>
                     }
                 }
@@ -68,15 +70,7 @@ export class CredentialingPipelineResource extends CredentialingAreaResource {
     }
 
     private resolveRequestedApplicationID(params: Record<string, string>): string | null {
-        const fromParams = params['applicationId']?.trim();
-        if (fromParams) {
-            return fromParams;
-        }
-        const rawConfig = this.Data?.Configuration?.['applicationId'];
-        if (typeof rawConfig === 'string' && rawConfig.trim().length > 0) {
-            return rawConfig.trim();
-        }
-        return null;
+        return RequestedPipelineApplicationID(params, this.Data?.Configuration);
     }
 
     async GetResourceDisplayName(_data: ResourceData): Promise<string> {

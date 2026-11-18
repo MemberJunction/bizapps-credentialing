@@ -25,6 +25,7 @@ import { CredentialingEntity } from '@mj-biz-apps/credentialing-core';
 import type { mjBizAppsCredentialingApplicationEntity } from '@mj-biz-apps/credentialing-entities';
 import { CredentialingRole } from '../../application/area-nav';
 import { StandingService } from '../../shared/standing.service';
+import { PIPELINE_APPLICATION_CONFIG_KEY } from './pipeline-data';
 
 @RegisterClass(BaseFormComponent, CredentialingEntity.Application, 100)
 @Component({
@@ -73,7 +74,7 @@ export class ApplicationRecordRedirectFormComponent extends BaseFormComponent {
             const credApp = this.appManager?.GetAppByName('Credentialing');
             await this.navigation.OpenNavItemByName(
                 'Pipeline',
-                { applicationId: applicationID },
+                { [PIPELINE_APPLICATION_CONFIG_KEY]: applicationID },
                 credApp?.ID,
                 { queryParams: { applicationId: applicationID } },
             );

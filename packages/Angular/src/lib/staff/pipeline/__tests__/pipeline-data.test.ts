@@ -8,6 +8,8 @@ import {
     PipelineData,
     type PipelineApplicationRow,
     type PipelineDataSource,
+    PIPELINE_APPLICATION_CONFIG_KEY,
+    RequestedPipelineApplicationID,
 } from '../pipeline-data';
 
 class StubPipelineSource implements PipelineDataSource {
@@ -197,5 +199,20 @@ describe('FilterPipelineApplications and PageSlice', () => {
         expect(empty.TotalPages).toBe(1);
         expect(empty.StartIndex).toBe(0);
         expect(empty.EndIndex).toBe(0);
+    });
+});
+
+describe('RequestedPipelineApplicationID', () => {
+    const CREDENTIALING_APP = 'D72F9280-EAFE-4DB4-A80C-8E2092B89DD5';
+    const APPLICATION = 'FFD1C514-16BB-4FC5-A9CC-15B41592F05D';
+
+    it("ignores Explorer's own applicationId (the MJ app) in the tab configuration", () => {
+        expect(RequestedPipelineApplicationID({}, { applicationId: CREDENTIALING_APP, navItemName: 'Pipeline' })).toBeNull();
+    });
+
+    it('takes the URL first, then the credentialing key the notification redirect sets', () => {
+        expect(RequestedPipelineApplicationID({ applicationId: ` ${APPLICATION} ` }, { applicationId: CREDENTIALING_APP })).toBe(APPLICATION);
+        expect(RequestedPipelineApplicationID({}, { applicationId: CREDENTIALING_APP, [PIPELINE_APPLICATION_CONFIG_KEY]: APPLICATION })).toBe(APPLICATION);
+        expect(RequestedPipelineApplicationID({}, null)).toBeNull();
     });
 });

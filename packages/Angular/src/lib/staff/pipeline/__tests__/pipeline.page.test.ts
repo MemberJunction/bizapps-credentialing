@@ -35,6 +35,27 @@ describe('PipelinePage', () => {
         expect(page.RequestedNotFoundMessage).toBe('');
     });
 
+    it('reloads the list and the invite targets silently when RefreshKey changes', async () => {
+        const before: PipelineSnapshot = { Applications: [], Programs: [], ActiveTargets: [], Subjects: [] };
+        const after: PipelineSnapshot = {
+            Applications: [],
+            Programs: [{ ID: 'P-2', Name: 'Sample Organization Review' }],
+            ActiveTargets: [],
+            Subjects: [],
+        };
+        const loadSpy = vi.spyOn(PipelineData.prototype, 'Load').mockResolvedValueOnce(before).mockResolvedValueOnce(after);
+        const page = createPage();
+        page.RefreshKey = 0;
+        await page.Load();
+
+        page.RefreshKey = 1;
+        expect(page.IsLoading).toBe(false);
+        await Promise.resolve();
+        await Promise.resolve();
+        expect(loadSpy).toHaveBeenCalledTimes(2);
+        expect(page.Snapshot.Programs.map((p) => p.Name)).toEqual(['Sample Organization Review']);
+    });
+
     it('opens the reissue result dialog with the formatted link and reloads the pipeline', async () => {
         const emptySnapshot: PipelineSnapshot = { Applications: [], Programs: [], ActiveTargets: [], Subjects: [] };
         const loadSpy = vi.spyOn(PipelineData.prototype, 'Load').mockResolvedValue(emptySnapshot);

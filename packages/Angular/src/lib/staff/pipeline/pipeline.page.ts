@@ -108,6 +108,24 @@ export class PipelinePage extends BaseAngularComponent implements OnInit {
     private _statusFilter = 'All';
     private _programFilter = 'All';
     private _requestedApplicationID: string | null = null;
+    private _refreshKey: number | null = null;
+
+    /**
+     * Bumped by the hosting resource each time Explorer shows its cached tab again. A change reloads the
+     * list and the invite targets without a loading state, so a version activated in Program Studio, or
+     * an application submitted since, appears without a page reload.
+     */
+    @Input()
+    public get RefreshKey(): number | null {
+        return this._refreshKey;
+    }
+    public set RefreshKey(value: number | null) {
+        const previous = this._refreshKey;
+        this._refreshKey = value;
+        if (previous != null && value !== previous) {
+            void this.Load(true);
+        }
+    }
 
     @ViewChild('detailSection') public DetailSectionRef?: ElementRef<HTMLElement>;
 
@@ -221,15 +239,20 @@ export class PipelinePage extends BaseAngularComponent implements OnInit {
         void this.Load();
     }
 
-    public async Load(): Promise<void> {
-        this.IsLoading = true;
-        this.ErrorMessage = '';
-        this.cdr.markForCheck();
+    /** Loads the pipeline. A `silent` load keeps the table on screen and shows no error over it. */
+    public async Load(silent = false): Promise<void> {
+        if (!silent) {
+            this.IsLoading = true;
+            this.ErrorMessage = '';
+            this.cdr.markForCheck();
+        }
         try {
             this.Snapshot = await PipelineData.FromProvider(this.ProviderToUse).Load();
-            await this.openRequestedApplication();
+            if (!silent) {
+                await this.openRequestedApplication();
+            }
         } catch (e) {
-            this.ErrorMessage = StudioMessages.FromError(e, 'load');
+            if (!silent) this.ErrorMessage = StudioMessages.FromError(e, 'load');
         } finally {
             this.IsLoading = false;
             this.cdr.markForCheck();

@@ -314,3 +314,23 @@ export class PipelineData {
         };
     }
 }
+
+/**
+ * The tab-configuration key that carries the credentialing application the Pipeline opens. Explorer
+ * itself writes `applicationId` into every tab's configuration — the MJ application (Credentialing)
+ * the tab belongs to — so that key never names a credentialing application.
+ */
+export const PIPELINE_APPLICATION_CONFIG_KEY = 'credentialingApplicationId';
+
+/** The application the Pipeline should open: the URL's `applicationId`, else {@link PIPELINE_APPLICATION_CONFIG_KEY}. */
+export function RequestedPipelineApplicationID(
+    params: Record<string, string>,
+    configuration: Record<string, unknown> | null | undefined,
+): string | null {
+    const fromParams = params['applicationId']?.trim();
+    if (fromParams) {
+        return fromParams;
+    }
+    const fromConfig = configuration?.[PIPELINE_APPLICATION_CONFIG_KEY];
+    return typeof fromConfig === 'string' && fromConfig.trim().length > 0 ? fromConfig.trim() : null;
+}
