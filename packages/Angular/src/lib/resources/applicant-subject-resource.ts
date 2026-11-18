@@ -64,6 +64,10 @@ export abstract class ApplicantSubjectResource extends CredentialingAreaResource
             this.cdr.markForCheck();
             return;
         }
+        if (this.State === 'NotAvailable') {
+            // An earlier URL named a subject the user holds no contact on; this one is theirs.
+            this.State = 'Open';
+        }
         if (resolution.Kind === 'Applications') {
             this.subjectContext.Choose(resolution.Subject.SubjectID);
             if (syncUrl && resolution.NeedsUrlSync) {

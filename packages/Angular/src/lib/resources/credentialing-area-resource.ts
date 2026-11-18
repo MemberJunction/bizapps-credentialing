@@ -55,7 +55,7 @@ export abstract class CredentialingAreaResource extends BaseResourceComponent im
             }
         });
         this.destroy$.subscribe(() => reattached.unsubscribe());
-        void this.guardAndOpen();
+        void this.GuardAndOpen();
     }
 
     /** Explorer showed this cached resource again: pages bound to {@link RefreshKey} reload. */
@@ -72,7 +72,12 @@ export abstract class CredentialingAreaResource extends BaseResourceComponent im
         return StandingService.ForProvider(this.ProviderToUse);
     }
 
-    private async guardAndOpen(): Promise<void> {
+    /**
+     * Opens the resource when the user's standing serves its area. `OnOpen` may itself decide what the
+     * resource shows (a subject in the URL the user holds no contact on is `NotAvailable`); that decision
+     * stands, and only a resource still `Loading` becomes `Open`.
+     */
+    protected async GuardAndOpen(): Promise<void> {
         try {
             const standing = await this.StandingLoader().Load();
             if (!AreaNav.CanOpen(standing, this.DriverClass)) {
@@ -80,7 +85,9 @@ export abstract class CredentialingAreaResource extends BaseResourceComponent im
                 return;
             }
             await this.OnOpen(standing);
-            this.State = 'Open';
+            if (this.State === 'Loading') {
+                this.State = 'Open';
+            }
         } catch (e) {
             this.ErrorMessage = StudioMessages.FromError(e, 'load');
             this.State = 'Error';
