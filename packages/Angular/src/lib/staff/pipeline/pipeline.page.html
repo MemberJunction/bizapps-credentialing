@@ -10,6 +10,10 @@
         </button>
     </header>
 
+    @if (RequestedNotFoundMessage) {
+        <mj-alert Variant="warning" Role="status" [Message]="RequestedNotFoundMessage" [Dismissible]="true" (Dismissed)="RequestedNotFoundMessage = ''"></mj-alert>
+    }
+
     @if (ReissueError) {
         <mj-alert Variant="error" [Message]="ReissueError" [Dismissible]="true" (Dismissed)="ReissueError = ''"></mj-alert>
     }

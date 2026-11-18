@@ -17,6 +17,7 @@ import {
     MJEmptyStateComponent,
 } from '@memberjunction/ng-ui-components';
 import {
+    NOT_FOUND_REASON,
     ApplicationLifecycleRules,
     GetApplicationWorkspaceOperation,
     GetDocumentLibraryOperation,
@@ -118,6 +119,9 @@ export class PipelinePage extends BaseAngularComponent implements OnInit {
         const normalized = value?.trim() || null;
         if (normalized !== this._requestedApplicationID) {
             this._requestedApplicationID = normalized;
+            if (!normalized) {
+                this.RequestedNotFoundMessage = '';
+            }
             if (normalized && this.Snapshot.Applications.length > 0) {
                 void this.openRequestedApplication();
             }
@@ -142,6 +146,8 @@ export class PipelinePage extends BaseAngularComponent implements OnInit {
     public DetailGate: GetSubmissionGateOutput | null = null;
     public DetailLoading = false;
     public DetailError = '';
+    /** `Record not found.` when the URL names an application this user cannot see (or that does not exist). */
+    public RequestedNotFoundMessage = '';
     public DetailLibrary: DocumentLibrary | null = null;
     public DetailDocumentsError = '';
     public DownloadingDocumentID: string | null = null;
@@ -318,7 +324,13 @@ export class PipelinePage extends BaseAngularComponent implements OnInit {
         const requested = this._requestedApplicationID;
         if (!requested) return;
         const match = this.Snapshot.Applications.find((a) => UUIDsEqual(a.ID, requested));
-        if (!match) return;
+        if (!match) {
+            // Another organization's application answers exactly as a nonexistent ID does.
+            this.RequestedNotFoundMessage = NOT_FOUND_REASON;
+            this.cdr.markForCheck();
+            return;
+        }
+        this.RequestedNotFoundMessage = '';
         if (!this.SelectedApplication || !UUIDsEqual(this.SelectedApplication.ID, match.ID)) {
             await this.OpenDetail(match);
         }

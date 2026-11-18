@@ -22,6 +22,19 @@ function createPage(): PipelinePage {
 describe('PipelinePage', () => {
     afterEach(() => vi.restoreAllMocks());
 
+    it('says Record not found. for a requested application this user cannot see, as for a random ID', async () => {
+        const emptySnapshot: PipelineSnapshot = { Applications: [], Programs: [], ActiveTargets: [], Subjects: [] };
+        vi.spyOn(PipelineData.prototype, 'Load').mockResolvedValue(emptySnapshot);
+        const page = createPage();
+        page.SelectedApplicationID = 'FFD1C514-16BB-4FC5-A9CC-15B41592F05D';
+        await page.Load();
+        expect(page.RequestedNotFoundMessage).toBe('Record not found.');
+        expect(page.SelectedApplication).toBeNull();
+
+        page.SelectedApplicationID = null;
+        expect(page.RequestedNotFoundMessage).toBe('');
+    });
+
     it('opens the reissue result dialog with the formatted link and reloads the pipeline', async () => {
         const emptySnapshot: PipelineSnapshot = { Applications: [], Programs: [], ActiveTargets: [], Subjects: [] };
         const loadSpy = vi.spyOn(PipelineData.prototype, 'Load').mockResolvedValue(emptySnapshot);
