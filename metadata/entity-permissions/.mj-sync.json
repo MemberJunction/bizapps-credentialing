@@ -1,0 +1,13 @@
+{
+  "entity": "MJ: Entity Permissions",
+  "filePattern": "**/.*.json",
+  "pull": {
+    "createNewFileIfNotFound": true,
+    "newFileName": ".entity-permissions.json",
+    "appendRecordsToExistingFile": true,
+    "updateExistingRecords": true,
+    "filter": "RoleID IN (SELECT ID FROM __mj.Role WHERE Name IN ('Credentialing Admin','Credentialing Staff','Credentialing Committee','Credentialing Reviewer','Credentialing Applicant'))",
+    "ignoreNullFields": true,
+    "ignoreVirtualFields": true
+  }
+}

@@ -1,0 +1,100 @@
+@if (Version) {
+    <section class="cred-settings" aria-label="Version settings">
+        @for (g of Groups; track g.Tier) {
+            <fieldset class="cred-settings__group" [attr.aria-describedby]="'cred-settings-note-' + g.Tier">
+                <legend class="cred-settings__heading">{{ g.Heading }}</legend>
+                <p class="cred-settings__note" [id]="'cred-settings-note-' + g.Tier">
+                    {{ NoteFor(g) }}
+                </p>
+                <div class="cred-settings__rows">
+                    @for (s of g.Settings; track s.Field) {
+                        <div class="cred-settings__row">
+                            @if (Editable[g.Tier]) {
+                                @if (s.Kind === 'flag') {
+                                    <label class="cred-settings__label" [for]="InputID(s.Field)">{{ s.Label }}</label>
+                                    <mj-switch [InputId]="InputID(s.Field)" [(ngModel)]="Version[s.Field]" OnLabel="Yes" OffLabel="No"></mj-switch>
+                                }
+                                @if (s.Kind === 'integer') {
+                                    <label class="cred-settings__label" [for]="InputID(s.Field)">{{ s.Label }} ({{ s.Unit }})</label>
+                                    <mj-numeric-input [InputId]="InputID(s.Field)" [(ngModel)]="Version[s.Field]" [Min]="MinFor(s.Field)" [Max]="MaxFor(s.Field)" [Step]="1" [Decimals]="0"
+                                        [attr.aria-invalid]="FieldError(s.Field) ? 'true' : null" [AriaDescribedBy]="FieldError(s.Field) ? ErrorID(s.Field) : ''"></mj-numeric-input>
+                                    @if (FieldError(s.Field)) {
+                                        <p [id]="ErrorID(s.Field)" class="cred-settings__error cred-settings__error--field" role="alert">{{ FieldError(s.Field) }}</p>
+                                    }
+                                }
+                                @if (s.Kind === 'rate') {
+                                    <label class="cred-settings__label" [for]="InputID(s.Field)">{{ s.Label }} (0 to 1)</label>
+                                    <mj-numeric-input [InputId]="InputID(s.Field)" [(ngModel)]="Version[s.Field]" [Min]="MinFor(s.Field)" [Max]="MaxFor(s.Field)" [Step]="0.01" [Decimals]="4"
+                                        [attr.aria-invalid]="FieldError(s.Field) ? 'true' : null" [AriaDescribedBy]="FieldError(s.Field) ? ErrorID(s.Field) : ''"></mj-numeric-input>
+                                    @if (FieldError(s.Field)) {
+                                        <p [id]="ErrorID(s.Field)" class="cred-settings__error cred-settings__error--field" role="alert">{{ FieldError(s.Field) }}</p>
+                                    }
+                                }
+                                @if (s.Kind === 'committee') {
+                                    <span class="cred-settings__label" [id]="InputID(s.Field) + '-label'">{{ s.Label }}</span>
+                                    <div class="cred-settings__committee">
+                                        <mj-dropdown
+                                            class="cred-settings__committee-pick"
+                                            [AriaLabelledBy]="InputID(s.Field) + '-label'"
+                                            [Data]="CommitteeChoices"
+                                            TextField="Name"
+                                            ValueField="ID"
+                                            [ValuePrimitive]="true"
+                                            Placeholder="Choose a committee"
+                                            [(ngModel)]="Version.CommitteeID">
+                                        </mj-dropdown>
+                                        @if (ShowNewCommittee) {
+                                            <button mjButton Variant="outline" type="button" [disabled]="IsCommitteeFormOpen" [attr.aria-expanded]="IsCommitteeFormOpen ? 'true' : 'false'"
+                                                (click)="OpenCommitteeForm()">
+                                                New committee
+                                            </button>
+                                        }
+                                    </div>
+                                    @if (Committees.length === 0) {
+                                        <p class="cred-settings__hint">{{ NoCommitteeSentence }}</p>
+                                    }
+                                    @if (ShowNewCommittee && IsCommitteeFormOpen) {
+                                        <bizapps-cred-new-committee-form
+                                            class="cred-settings__committee-form"
+                                            [Provider]="Provider"
+                                            [ProgramID]="ProgramID"
+                                            [CommitteeTypes]="CommitteeTypes"
+                                            (Created)="OnCommitteeCreated($event)"
+                                            (Cancelled)="CloseCommitteeForm()">
+                                        </bizapps-cred-new-committee-form>
+                                    }
+                                    <div class="cred-settings__committee-status" aria-live="polite">
+                                        @if (CommitteeMessage) {
+                                            <p class="cred-settings__saved" role="status">{{ CommitteeMessage }}</p>
+                                        }
+                                    </div>
+                                }
+                            } @else {
+                                <span class="cred-settings__label">{{ s.Label }}</span>
+                                <span class="cred-settings__value" [attr.data-field]="s.Field">{{ ValueText(s) }}</span>
+                            }
+                        </div>
+                    }
+                </div>
+            </fieldset>
+        }
+
+        @if (AnyEditable) {
+            <div class="cred-settings__actions">
+                <button mjButton Variant="primary" type="button" [disabled]="!CanSave" (click)="Save()" [attr.aria-busy]="IsSaving ? 'true' : null"
+                    [attr.aria-describedby]="FormError ? 'cred-settings-error' : null">
+                    Save settings
+                </button>
+                <button mjButton Variant="outline" type="button" [disabled]="IsSaving || !Version.Dirty" (click)="Discard()">Discard changes</button>
+            </div>
+        }
+        <div aria-live="polite">
+            @if (FormError) {
+                <p id="cred-settings-error" class="cred-settings__error" role="alert">{{ FormError }}</p>
+            }
+            @if (SavedMessage) {
+                <p class="cred-settings__saved" role="status">{{ SavedMessage }}</p>
+            }
+        </div>
+    </section>
+}

@@ -3,15 +3,18 @@
 How MJ metadata records (applications, lookup seeds, actions, prompts,
 queries…) are authored as files and pushed. This app's `metadata/` folder follows these rules; the full authoring guide
 with worked examples is [`../template-docs/metadata.md`](../template-docs/metadata.md),
-and the app-repo capture flow (metadata → `V*_Metadata_Sync.sql` migration) is in
+and how metadata reaches installs (one `V*__Metadata_Sync.sql` migration per release) is in
 [`../template-docs/codegen-and-metadata-migrations.md`](../template-docs/codegen-and-metadata-migrations.md).
 
 ## File organization
 
 - One subdirectory per entity: `.mj-sync.json` (entity name + push/pull
   options) + `.<records>.json` (array of `{ "fields": {...} }` objects).
-- New records **omit `primaryKey` and `sync`** — mj-sync writes them back on
-  first push. Re-pushing is safe (upsert semantics).
+- **Every record has a `primaryKey`**, nested `relatedEntities` children
+  included: a CLI `uuidgen` UUID for a row the file creates, or an `@lookup`
+  for a row a migration or CodeGen already created. Push creates a new row for
+  any record without one. Never author a `sync` block; push writes it.
+  Re-pushing is safe (upsert semantics).
 - List folders in the root `metadata/.mj-sync.json` `directoryOrder` so
   dependencies push in order.
 - **Externalize complex JSON values** with `@file:` references
@@ -24,7 +27,7 @@ and the app-repo capture flow (metadata → `V*_Metadata_Sync.sql` migration) is
 
 Never seed lookup tables with raw `INSERT`s you hand-write **as the source of
 truth** — author the records as metadata files (version-controlled, readable,
-upsertable, `@lookup:` resolution) and let the sync→migration capture produce
+upsertable, `@lookup:` resolution) and let the release's metadata seed produce
 the SQL that ships. Worked example: [`../template-docs/metadata.md`](../template-docs/metadata.md).
 
 ## Applications & nav items

@@ -1,0 +1,24 @@
+{
+  "fields": {
+    "TypeID": "@lookup:MJ: Test Types.Name=Integration Test",
+    "Name": "CRD-10 - Responses",
+    "Description": "Verify standard response draft, confirmation, reopen, withdrawal, locking, concurrency, and subject isolation: SaveResponse sets Drafted/Human or Empty; ConfirmResponse requires self-assessment and Applicant actor and stamps ConfirmedByUserID/ConfirmedAt; confirmed and submitted responses cannot be saved or confirmed, including via generated GraphQL update mutation over the wire; parallel ConfirmResponse with same ExpectedUpdatedAt allows only one; ReopenResponse requires Staff and reason; WithdrawApplication sets Withdrawn and allows re-invitation; second contact of same subject can save while another subject's contact gets Record not found.",
+    "InputDefinition": {},
+    "ExpectedOutcomes": {
+      "summary": "All twelve cred-responses checks pass."
+    },
+    "Configuration": {
+      "tier": "deterministic",
+      "transport": "server",
+      "checks": [
+        {
+          "type": "cred-responses"
+        }
+      ]
+    },
+    "Status": "Active"
+  },
+  "primaryKey": {
+    "ID": "696B19E5-0945-45BE-B463-17EAB953FEFE"
+  }
+}

@@ -54,7 +54,7 @@ packages/
   CoreEntitiesServer/  - @mj-biz-apps/credentialing-core-entities-server (server-side entity overrides)
   Server/              - @mj-biz-apps/credentialing-server     (server bootstrap -> MJAPI)
   Angular/             - @mj-biz-apps/credentialing-ng         (client bootstrap -> MJExplorer)
-plans/credentialing-design.md - the proposed domain model
+plans/active/credentialing-frd.md - the functional requirements document (domain model, roles, requirements, rules)
 docs/                  - how this repo works (branching, publishing, codegen, linking)
 docs/claude/           - the MemberJunction development guide (topic-split, with TOC)
 ```
@@ -84,6 +84,10 @@ topic before working in its area:
 | Metadata & mj-sync | [docs/claude/08-metadata-and-sync.md](docs/claude/08-metadata-and-sync.md) |
 | Testing | [docs/claude/09-testing.md](docs/claude/09-testing.md) |
 
+The authoring rules MJ and every BizApps repo share (plain migration DDL, CHECK values
+written for people, a `primaryKey` on every metadata record) are in MJ's
+[Schema and Code Authoring Guide](https://github.com/MemberJunction/MJ/blob/next/guides/SCHEMA_AND_CODE_AUTHORING_GUIDE.md), each with its reason.
+
 ## The rules that matter most in THIS repo
 
 1. **No commits without explicit approval** — never run `git commit` unless
@@ -107,7 +111,7 @@ topic before working in its area:
    Explorer bootstrap import) are local-only — never commit them to MJ. The
    *linking* files are generated at the workspace parent, outside both repos, and
    are never committed anywhere.
-7. **Dependency schemas are read-only** — __mj_BizAppsCommon and __mj_BizAppsTasks belong to their apps; this repo never generates, migrates, or alters them (mj.config.cjs excludeSchemas + entityImportPackages).
+7. **Dependency schemas are read-only** — __mj_BizAppsCommon, __mj_BizAppsTasks and __mj_BizAppsCommittees belong to their apps; this repo never generates, migrates, or alters them (mj.config.cjs excludeSchemas + entityImportPackages).
 
 ## Build & dev commands
 
@@ -122,5 +126,21 @@ pnpm run mj:codegen           # regenerate entities/resolvers/forms after a sche
 pnpm --filter @mj-biz-apps/credentialing-ng run build
 ```
 
-The full development workflow (where to add code, capturing codegen +
-metadata-sync migrations, releasing) is in the README's "Development" section.
+The full development workflow (where to add code, capturing codegen
+migrations, releasing) is in the README's "Development" section. Metadata
+is the exception: a PR adds JSON only, and the `Metadata_Sync` migration is
+generated once per release (below).
+
+## Release lines
+
+`next` is built on MJ Edge and never publishes. Production releases come from release lines (`lts/<MJ major.minor>`), listed in `release-lines.json`. Land every change on `next` first, then add a `backport lts/X.Y` label; a PR that adds a migration needs a label for every open line, or its files listed as edge-only in `release-lines.json`. Never open a PR straight into a line or into `main`. Full rules, publishing and the line cut: [guides/RELEASE_LINES.md](guides/RELEASE_LINES.md).
+
+## Metadata ships as release migrations
+
+`mj app install` and upgrades run migrations only. There is no metadata phase, by design. A record that exists only as JSON under `metadata/` reaches no host until a release ships it inside a migration.
+
+- **PRs carry metadata JSON only.** Never hand-write or generate a `*__Metadata_Sync.sql` in a feature PR.
+- **The build engineer** generates one differential `Metadata_Sync` migration per release, from a fresh database.
+- **Rows missing after a fresh install** usually mean a release shipped without its metadata migration. Hand that to the build engineer rather than changing the installer.
+
+The model, and the Open App steps that differ from core (`--schema`, the `${mjSchema}` substitution): [Release Metadata Migrations Guide](https://github.com/MemberJunction/MJ/blob/next/guides/RELEASE_METADATA_MIGRATIONS_GUIDE.md).

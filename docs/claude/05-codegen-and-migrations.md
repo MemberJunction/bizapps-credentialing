@@ -23,8 +23,8 @@ regenerated code **with** the migration that caused it.
 3. **Only then** write TypeScript against the new fields — with generated
    types, not `.Get()`/`.Set()` weak typing.
 
-This repo's loop-level detail (capturing codegen SQL, metadata-sync
-migrations, what to fold vs what CodeGen re-applies everywhere):
+This repo's loop-level detail (capturing codegen SQL, how metadata ships
+in the per-release seed, what to fold vs what CodeGen re-applies everywhere):
 [`../template-docs/codegen-and-metadata-migrations.md`](../template-docs/codegen-and-metadata-migrations.md).
 
 ## Migration authoring rules
@@ -32,11 +32,14 @@ migrations, what to fold vs what CodeGen re-applies everywhere):
 - **Naming**: `V<YYYYMMDDHHMM>__v<app-version>_<Description>.sql`; timestamps
   strictly increasing (CI-gated in this repo).
 - **`${flyway:defaultSchema}`** for your schema — never a hardcoded schema
-  name. Literal `__mj` only for rows you insert into MJ core tables.
+  name. `${mjSchema}` for MJ core objects, never a literal `__mj`.
 - **Hardcoded UUIDs** for metadata rows — never `NEWID()` (breaks
   reproducibility across installs).
-- **Never include what CodeGen owns**: no `__mj_CreatedAt`/`__mj_UpdatedAt`
-  columns, no FK indexes.
+- **Never declare what CodeGen owns in hand-written DDL**: no
+  `__mj_CreatedAt`/`__mj_UpdatedAt` columns and no FK indexes up front.
+  They belong only in the CodeGen output folded below the separator (along with
+  the base views, CRUD stored procedures, and triggers; leave out only the
+  recurring refresh procedure calls).
 - **One `ALTER TABLE` per table** — multiple `ADD` clauses comma-separated,
   not repeated statements.
 - **`sp_addextendedproperty` (`MS_Description`) for every new column** (except

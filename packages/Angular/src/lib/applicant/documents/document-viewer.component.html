@@ -1,0 +1,140 @@
+<dialog
+    #viewerDialog
+    class="cred-viewer__dialog"
+    aria-labelledby="cred-viewer-title"
+    (cancel)="OnDialogCancel($event)"
+    (keydown)="OnDialogKeydown($event)">
+    <div class="cred-viewer__shell">
+        <header class="cred-viewer__header">
+            <div class="cred-viewer__title-wrap">
+                <h2 id="cred-viewer-title" class="cred-viewer__title">
+                    {{ DisplayFileName || 'Document viewer' }}
+                </h2>
+                @if (Citation; as cite) {
+                    @if (cite.PageReference) {
+                        <span class="cred-viewer__page-ref">Cited: {{ cite.PageReference }}</span>
+                    }
+                }
+            </div>
+            <div class="cred-viewer__header-actions">
+                <button
+                    mjButton
+                    Variant="outline"
+                    type="button"
+                    [disabled]="IsDownloading || !DocumentID"
+                    (click)="DownloadOriginal()">
+                    {{ IsDownloading ? 'Downloading...' : 'Download original' }}
+                </button>
+                <button mjButton Variant="outline" type="button" (click)="Close()">
+                    Close
+                </button>
+            </div>
+        </header>
+
+        <div class="cred-viewer__tabs" role="tablist" aria-label="Document view" (keydown)="OnTabKeydown($event)">
+            <button
+                type="button"
+                role="tab"
+                id="cred-viewer-tab-original"
+                class="cred-viewer__tab"
+                [class.cred-viewer__tab--active]="ActiveTab === 'original'"
+                [attr.aria-selected]="ActiveTab === 'original'"
+                aria-controls="cred-viewer-panel-original"
+                (click)="SelectTab('original')">
+                Original
+            </button>
+            <button
+                type="button"
+                role="tab"
+                id="cred-viewer-tab-text"
+                class="cred-viewer__tab"
+                [class.cred-viewer__tab--active]="ActiveTab === 'text'"
+                [attr.aria-selected]="ActiveTab === 'text'"
+                aria-controls="cred-viewer-panel-text"
+                (click)="SelectTab('text')">
+                Extracted text
+            </button>
+        </div>
+
+        <div class="cred-viewer__content">
+            @if (ActiveTab === 'original') {
+                <section
+                    id="cred-viewer-panel-original"
+                    class="cred-viewer__panel"
+                    role="tabpanel"
+                    aria-labelledby="cred-viewer-tab-original">
+                    @if (IsLoadingOriginal) {
+                        <mj-loading Text="Loading original document..."></mj-loading>
+                    } @else if (OriginalError) {
+                        <mj-alert Variant="error" [Message]="OriginalError"></mj-alert>
+                    } @else if (HasBlobLoaded) {
+                        @switch (PreviewKind) {
+                            @case ('pdf') {
+                                @if (SafePdfUrl; as pdfUrl) {
+                                    <iframe
+                                        class="cred-viewer__frame"
+                                        [src]="pdfUrl"
+                                        [title]="DisplayFileName || 'PDF document'">
+                                    </iframe>
+                                }
+                            }
+                            @case ('image') {
+                                @if (SafeImageUrl; as imgUrl) {
+                                    <div class="cred-viewer__image-wrap">
+                                        <img
+                                            class="cred-viewer__image"
+                                            [src]="imgUrl"
+                                            [alt]="DisplayFileName || 'Document image'" />
+                                    </div>
+                                }
+                            }
+                            @default {
+                                <div class="cred-viewer__unsupported">
+                                    <p>{{ UnsupportedMessage }}</p>
+                                    <button
+                                        mjButton
+                                        Variant="primary"
+                                        type="button"
+                                        [disabled]="IsDownloading"
+                                        (click)="DownloadOriginal()">
+                                        Download original
+                                    </button>
+                                </div>
+                            }
+                        }
+                    }
+                </section>
+            } @else {
+                <section
+                    id="cred-viewer-panel-text"
+                    class="cred-viewer__panel cred-viewer__panel--text"
+                    role="tabpanel"
+                    aria-labelledby="cred-viewer-tab-text">
+                    @if (IsLoadingText) {
+                        <mj-loading Text="Loading extracted text..."></mj-loading>
+                    } @else if (TextError) {
+                        <mj-alert Variant="error" [Message]="TextError"></mj-alert>
+                    } @else {
+                        @if (EffectiveTextNote; as note) {
+                            <div class="cred-viewer__note" role="note">{{ note }}</div>
+                        }
+                        @if (ExtractedText; as fullText) {
+                            @if (Highlight; as split) {
+                                @if (split.Found) {
+                                    <pre class="cred-viewer__text">{{ split.Before }}<mark #citedMark class="cred-viewer__mark">{{ split.Match }}</mark>{{ split.After }}</pre>
+                                } @else {
+                                    <div class="cred-viewer__note cred-viewer__note--warn" role="note">{{ split.Note }}</div>
+                                    <pre class="cred-viewer__text">{{ split.Text }}</pre>
+                                }
+                            } @else {
+                                <pre class="cred-viewer__text">{{ fullText }}</pre>
+                            }
+                        } @else if (!EffectiveTextNote) {
+                            <p class="cred-viewer__empty">No extracted text is available for this document.</p>
+                        }
+                    }
+                </section>
+            }
+        </div>
+    </div>
+</dialog>

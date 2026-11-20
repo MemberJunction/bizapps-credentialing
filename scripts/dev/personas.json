@@ -1,0 +1,90 @@
+{
+  "application": "Credentialing",
+  "issuer": {
+    "email": "admin@memberjunction.org",
+    "signIn": "dev-login",
+    "about": "the local dev Owner (pnpm run dev:owner); issues every magic link because MJ lets an Owner issue invites (CanIssueInvites) and its Developer role may create MJ: Magic Link Invites rows. No credentialing role may create invite rows in B1 (docs/isolation-read-paths.md)."
+  },
+  "personas": {
+    "staff-a": {
+      "email": "staff.a@example.test",
+      "signIn": "dev-login",
+      "account": "world",
+      "about": "Credentialing Staff, member of the sample accrediting body A"
+    },
+    "staff-b": {
+      "email": "staff.b@example.test",
+      "signIn": "dev-login",
+      "account": "world",
+      "about": "Credentialing Staff, member of the sample accrediting body B"
+    },
+    "staff-none": {
+      "email": "staff.none@example.test",
+      "signIn": "dev-login",
+      "account": "world",
+      "about": "Credentialing Staff with no organization membership"
+    },
+    "admin": {
+      "email": "admin@example.test",
+      "signIn": "dev-login",
+      "account": "world",
+      "about": "Credentialing Admin; sets up accrediting organizations"
+    },
+    "applicant-a": {
+      "email": "applicant.a@example.test",
+      "signIn": "magic-link",
+      "role": "Credentialing Applicant",
+      "account": "world",
+      "about": "external applicant; contact of Sample Applicant One only"
+    },
+    "applicant-b": {
+      "email": "applicant.b@example.test",
+      "signIn": "magic-link",
+      "role": "Credentialing Applicant",
+      "account": "world",
+      "about": "external applicant; contact of Sample Applicant Two only (OrgA)"
+    },
+    "applicant-two": {
+      "email": "applicant.two@example.test",
+      "signIn": "magic-link",
+      "role": "Credentialing Applicant",
+      "account": "world",
+      "about": "external applicant; contact of both Sample Applicant One and Sample Applicant Two (for the subject picker)"
+    },
+    "applicant-org-b": {
+      "email": "applicant.orgb@example.test",
+      "signIn": "magic-link",
+      "role": "Credentialing Applicant",
+      "account": "world",
+      "about": "external applicant; contact of Sample Applicant Org B only (OrgB)"
+    },
+    "applicant-evidence": {
+      "email": "applicant.evidence@example.test",
+      "signIn": "magic-link",
+      "role": "Credentialing Applicant",
+      "account": "world",
+      "about": "external applicant; contact of Sample Evidence Applicant (Sample Evidence Program with Normal and Restricted Allowed requirements)"
+    },
+    "applicant-reading": {
+      "email": "applicant.reading@example.test",
+      "signIn": "magic-link",
+      "role": "Credentialing Applicant",
+      "account": "world",
+      "about": "external applicant; contact of Sample Reading Applicant (Sample Reading Program: R.1 Prefill and R.2 Locate bound to Safety policy, R.3 Manual, Other record unbound)"
+    },
+    "reviewer-a": {
+      "email": "reviewer.a@example.test",
+      "signIn": "magic-link",
+      "role": "Credentialing Reviewer",
+      "account": "magic-link",
+      "about": "external reviewer; the first redemption creates the account with the role and the application row"
+    },
+    "committee-a": {
+      "email": "committee.a@example.test",
+      "signIn": "magic-link",
+      "role": "Credentialing Committee",
+      "account": "magic-link",
+      "about": "external committee member; the first redemption creates the account with the role and the application row"
+    }
+  }
+}

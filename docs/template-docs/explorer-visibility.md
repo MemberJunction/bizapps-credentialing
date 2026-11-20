@@ -56,11 +56,12 @@ in the bundle:
 - export the component (or a thin subclass) from `packages/Angular/src/public-api.ts`;
 - keep the `startupExport` function (`LoadBizAppsCredentialingClient`) — its only job is to
   give the bundler a reason not to tree-shake the module;
-- MJExplorer must import your client package. When the app is **installed**
-  (`mj app install`), the CLI maintains
-  `packages/MJExplorer/src/app/generated/open-app-bootstrap.generated.ts` for
-  you. In a **linked dev** setup you add the `import '@mj-biz-apps/credentialing-ng';` line
-  yourself ([linking-to-mj.md](linking-to-mj.md) §2).
+- MJExplorer must load your client package. In MJ 6.2.2, `dynamicPackages.client`
+  in `mj/mj.config.cjs` + your `-ng` dependency in `mj/packages/MJExplorer/package.json`
+  drives `mj codegen manifest ... --open-app-client-bootstrap`, which writes
+  `OPEN_APP_CLIENT_MODULES` directly into
+  `packages/MJExplorer/src/app/generated/class-registrations-manifest.ts`
+  ([linking-to-mj.md](linking-to-mj.md) §2).
 
 Any change here needs an **MJExplorer rebuild** — the imports are resolved at
 build time, not runtime.
@@ -105,34 +106,70 @@ Nav item kinds:
 | An MJ Dashboard record | `"Dashboards"` | not needed | **required** |
 | A plain route | n/a | n/a | use the `Route` field instead |
 
-**The `DefaultForNewUser` trap.** CodeGen auto-creates a machine-named "bucket"
-Application per schema (`Name` = the schema name, `Description` = "Generated for
-schema") so generated entities have something to hang `MJ: Application Entities`
-links and role grants on. Its INSERT omits `DefaultForNewUser`, so it takes the
-column default of `1` — visible to every new user. If your product app ships
-`false`, a new user sees the bucket in the switcher and **not** your app. Ship
-`true`. Two rows per schema-backed UI app is the normal, expected shape.
+**The `DefaultForNewUser` note.** In earlier MJ versions CodeGen's auto-created
+machine-named bucket `Application` defaulted `DefaultForNewUser` to `1`; in
+MJ 6.2.2 CodeGen sets `DefaultForNewUser = 0` on auto-created schema bucket apps.
+Product apps with open user visibility ship `DefaultForNewUser: true`, while
+role-gated apps (such as Credentialing) intentionally ship `false` so access is
+granted explicitly through `MJ: Application Roles` / `MJ: User Applications`.
 
 ## 5. Access for users who already exist
 
 `DefaultForNewUser` only applies when a user record is **created**. Existing dev
-users need an explicit `MJ: User Applications` row — in an mjdev instance that's
-`mjdev apps enable <slug> <app>`; otherwise add the row (or a
-`__mj.UserApplication` INSERT in your metadata-sync migration) yourself.
+users need an explicit `MJ: User Applications` row — either through Explorer's
+**Application launcher → Configure… → Available Applications → Add → Save Changes**
+(for roles granted access in `metadata/application-roles/`), or through an entity
+save script calling `md.GetEntityObject('MJ: User Applications', contextUser)`
+(never raw SQL DML).
+
+## Nav items decided in code: `ClassName`
+
+`DefaultNavItems` is the same list for every user. When the items depend on who is
+signed in, set `ClassName` on the `MJ: Applications` record to a subclass of
+`BaseApplication` (`@memberjunction/ng-base-application`) registered under that
+name, and override `GetNavItems()`:
+
+```ts
+@RegisterClass(BaseApplication, 'CredentialingApplication')
+export class CredentialingApplication extends BaseApplication {
+  override async GetNavItems(): Promise<NavItem[]> { /* items for this user */ }
+}
+```
+
+Explorer creates the application object through the class factory by `ClassName`
+and calls `GetNavItems()` often (every workspace change, tab restore, omnibar
+search), so anything the method reads must be cached. The subclass is bundled the
+same way as a resource component (§2: exported, and anchored from the startup
+export). If the class is not loaded, Explorer falls back to `BaseApplication`, which
+shows `DefaultNavItems`.
+
+**`DefaultNavItems` must still list every item.** Explorer's route guard resolves a
+deep link `/app/<app>/<Nav Item>` from the record's `DefaultNavItems` JSON alone, not
+from `GetNavItems()` (MJ 6.2.2, `explorer-core/src/app-routing.module.ts`). An item
+missing there logs `Nav item … not found` and the URL's query parameters never reach
+the resource. So list every label the app can show, and — because that list is no
+longer what each user may see — make each resource check for itself that the
+signed-in user's roles serve it, rendering a plain "not available" message otherwise.
+
+This app does exactly that: `CredentialingApplication`
+(`packages/Angular/src/lib/application/`) shows each user only the areas their
+roles serve — Staff (`Program Studio`), Admin (`Set up organization` / `New
+organization`), Review (`Assignments`), Applicant (`My Applications`) — its
+`DefaultNavItems` lists all five, and every resource extends
+`CredentialingAreaResource`, which asks `AreaNav.CanOpen` before loading anything.
 
 ## Getting it into a release
 
 `metadata/` is **dev-time only** — an install never reads it. The Application
-row reaches other databases as SQL: push to your dev DB, then capture the
-emitted SQL into a `V<timestamp>__v<x.y.x>_Metadata_Sync.sql` migration with
-**hardcoded UUIDs** ([metadata.md](metadata.md) § the workflow,
+row reaches other databases as SQL, but you don't write that SQL: commit the
+metadata JSON, and the build engineer's per-release `V<timestamp>__v<x.y.x>__Metadata_Sync.sql`
+carries it ([metadata.md](metadata.md) § the workflow,
 [codegen-and-metadata-migrations.md](codegen-and-metadata-migrations.md)).
 
-> Capture from a **from-zero** database. Captured SQL records deltas against the
-> capture database's current state, so a capture taken after a partial
-> `drop-schema` cycle can silently omit the Application row while keeping the
-> `MJ: Application Entities` rows that reference it — and every clean deploy then
-> fails on `FK_ApplicationEntity_Application`.
+> That seed must be generated from a **from-zero** database. A seed generated
+> after a partial `drop-schema` cycle can silently omit the Application row while
+> keeping the `MJ: Application Entities` rows that reference it — and every clean
+> deploy then fails on `FK_ApplicationEntity_Application`. Model: [Release Metadata Migrations Guide](https://github.com/MemberJunction/MJ/blob/next/guides/RELEASE_METADATA_MIGRATIONS_GUIDE.md).
 
 ## Checklist when nothing shows up
 

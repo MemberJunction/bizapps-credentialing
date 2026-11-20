@@ -1,0 +1,53 @@
+<section class="cred-attest" aria-labelledby="cred-attest-heading">
+    <h2 id="cred-attest-heading" class="cred-attest__heading">Governing body attestation</h2>
+    <p class="cred-attest__hint">
+        Provide the attesting officer's name and role, or the date the governing body approved this submission, and confirm the statement below.
+    </p>
+
+    <div class="cred-attest__grid">
+        <label class="cred-attest__field">
+            <span class="cred-attest__label">Officer name</span>
+            <input
+                type="text"
+                class="cred-attest__input"
+                name="attestationOfficerName"
+                [disabled]="Disabled"
+                [ngModel]="Attestation.OfficerName ?? ''"
+                (ngModelChange)="OnFieldChange({ OfficerName: $event || null })" />
+        </label>
+
+        <label class="cred-attest__field">
+            <span class="cred-attest__label">Officer role</span>
+            <input
+                type="text"
+                class="cred-attest__input"
+                name="attestationOfficerRole"
+                [disabled]="Disabled"
+                [ngModel]="Attestation.OfficerRole ?? ''"
+                (ngModelChange)="OnFieldChange({ OfficerRole: $event || null })" />
+        </label>
+
+        <label class="cred-attest__field">
+            <span class="cred-attest__label">Governing body approval date</span>
+            <input
+                type="date"
+                class="cred-attest__input"
+                name="attestationApprovalDate"
+                [max]="TodayIsoDate"
+                [disabled]="Disabled"
+                [ngModel]="Attestation.ApprovalDate ?? ''"
+                (ngModelChange)="OnFieldChange({ ApprovalDate: $event || null })" />
+        </label>
+    </div>
+
+    <label class="cred-attest__statement-row" [class.cred-attest__statement-row--disabled]="Disabled">
+        <input
+            type="checkbox"
+            class="cred-attest__checkbox"
+            name="attestationAccepted"
+            [disabled]="Disabled"
+            [ngModel]="Attestation.Accepted"
+            (ngModelChange)="OnFieldChange({ Accepted: !!$event })" />
+        <span class="cred-attest__statement">{{ Statement }}</span>
+    </label>
+</section>

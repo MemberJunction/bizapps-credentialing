@@ -1,0 +1,24 @@
+{
+  "fields": {
+    "TypeID": "@lookup:MJ: Test Types.Name=Integration Test",
+    "Name": "CRD-07 - Applicant schema",
+    "Description": "Verify all seventeen BizApps Credentialing entities are registered and the applicant-schema filtered unique indexes enforce one live application and one current extraction.",
+    "InputDefinition": {},
+    "ExpectedOutcomes": {
+      "summary": "All three cred-applicant-schema checks pass."
+    },
+    "Configuration": {
+      "tier": "deterministic",
+      "transport": "server",
+      "checks": [
+        {
+          "type": "cred-applicant-schema"
+        }
+      ]
+    },
+    "Status": "Active"
+  },
+  "primaryKey": {
+    "ID": "B260BC1C-5092-4D2D-842C-7A9BD0617602"
+  }
+}

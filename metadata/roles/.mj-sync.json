@@ -1,0 +1,13 @@
+{
+  "entity": "MJ: Roles",
+  "filePattern": "**/.*.json",
+  "pull": {
+    "createNewFileIfNotFound": true,
+    "newFileName": ".roles.json",
+    "appendRecordsToExistingFile": true,
+    "updateExistingRecords": true,
+    "filter": "Name LIKE 'Credentialing %'",
+    "ignoreNullFields": true,
+    "ignoreVirtualFields": true
+  }
+}

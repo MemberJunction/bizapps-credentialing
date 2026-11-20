@@ -1,0 +1,24 @@
+{
+  "fields": {
+    "TypeID": "@lookup:MJ: Test Types.Name=Integration Test",
+    "Name": "CRD-02 - Version rules",
+    "Description": "Verify the server enforces program version lifecycle, activation, one-draft, label, settings and delete rules, including under concurrent writes and stale snapshots.",
+    "InputDefinition": {},
+    "ExpectedOutcomes": {
+      "summary": "All twelve cred-version-rules checks pass on scratch programs, including number settings outside their range refused with a sentence; the sample program is left unchanged."
+    },
+    "Configuration": {
+      "tier": "deterministic",
+      "transport": "server",
+      "checks": [
+        {
+          "type": "cred-version-rules"
+        }
+      ]
+    },
+    "Status": "Active"
+  },
+  "primaryKey": {
+    "ID": "F44C95ED-701B-4169-872E-0E877D68C511"
+  }
+}

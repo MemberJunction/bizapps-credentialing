@@ -6,9 +6,9 @@ under `metadata/` and pushed into your dev database with `mj sync`. This doc
 is how to format and write them. The lifecycle rule to internalize first:
 
 > `metadata/` is the **dev-time source of truth**. The install engine never
-> reads it — consumers receive your metadata through the
-> `V*_Metadata_Sync.sql` migrations you capture from it
-> (see [codegen-and-metadata-migrations.md](codegen-and-metadata-migrations.md)).
+> reads it — consumers receive your metadata through the one
+> `V*__Metadata_Sync.sql` migration the build engineer generates from it each
+> release (see [codegen-and-metadata-migrations.md](codegen-and-metadata-migrations.md)).
 
 ## Directory layout
 
@@ -41,9 +41,9 @@ metadata/
 ```
 
 `autoCreateMissingRecords: true` lets a record that carries a `primaryKey`
-but doesn't exist in the DB be **created** with that exact ID — that's how
-your `schema-info` row appears on first push once you've activated it (next
-section).
+but doesn't exist in the DB be **created** with that exact ID (or updated via
+an `@lookup:` natural key when an earlier step such as `mj migrate --schema`
+already inserted the row in `__mj.SchemaInfo`).
 
 ## Schema registration (`schema-info/`) — ⚠️ REQUIRED, and you must fill it out
 
@@ -65,10 +65,10 @@ won't apply your prefix). **Activate it before your first real sync:**
    |---|---|
    | `SchemaName` | Exactly your `mj-app.json` `schema.name` |
    | `EntityIDMin` / `EntityIDMax` | An integer range reserved for your app's entities, non-overlapping with other apps (e.g. `10000001`–`10099999`) |
-   | `EntityNamePrefix` | Your prefix (e.g. `MJ_BizApps_Credentialing`) — must agree with `mj.config.cjs` `NameRulesBySchema` |
+   | `EntityNamePrefix` | Omit if > 25 chars (`__mj.SchemaInfo.EntityNamePrefix` is `NVARCHAR(25)`) — CodeGen reads `mj.config.cjs` `NameRulesBySchema` first |
    | `Description` | One line about the schema |
-   | `primaryKey.ID` | A **freshly generated UUID** (`uuidgen`) — keep it stable forever once pushed anywhere |
-3. Push (workflow below) — the row is created with your pinned ID.
+   | `primaryKey.ID` | `@lookup:MJ: Schema Info.SchemaName=<your_schema>` when `mj migrate --schema` runs first (which creates the row), or a freshly generated UUID (`uuidgen`) otherwise |
+3. Push (workflow below) — the row is created or updated with your range and description.
 
 `metadata/schema-info/README.md` carries the same instructions next to the
 file itself.
@@ -96,24 +96,26 @@ file itself.
 
 ## Record file format
 
-A JSON array; each element is one record with a `fields` object:
+A JSON array; each element is one record with a `primaryKey` and a `fields` object:
 
 ```json
 [
-  { "fields": { "Name": "Standard", "Description": "Default item type", "DefaultRank": 10 } },
-  { "fields": { "Name": "Premium",  "Description": "Premium item type",  "DefaultRank": 20 } }
+  { "primaryKey": { "ID": "<UUID from uuidgen>" }, "fields": { "Name": "Standard", "Description": "Default item type", "DefaultRank": 10 } },
+  { "primaryKey": { "ID": "<UUID from uuidgen>" }, "fields": { "Name": "Premium",  "Description": "Premium item type",  "DefaultRank": 20 } }
 ]
 ```
 
-- **New records: write ONLY `fields`.** On first push, mj-sync writes back a
-  `primaryKey` (the generated ID) and a `sync` block (timestamp + checksum) —
-  commit that write-back, and never hand-edit either block.
+- **Every record has a `primaryKey`**, nested `relatedEntities` children
+  included. A row the file creates gets a hardcoded UUID from CLI `uuidgen`
+  (`uuidgen | tr '[:lower:]' '[:upper:]'`), stable forever once pushed
+  anywhere. A row a migration or CodeGen already created gets an `@lookup`
+  that resolves to it. `mj sync push` creates a new row for any record without
+  a `primaryKey`, so leaving it off inserts a duplicate on every fresh database.
+- **Never author or hand-edit a `sync` block** (timestamp + checksum); push
+  writes it.
 - Pushes are **upserts** — safe to re-run. But note: `mj sync push` is a
   **full reconcile** — it can DELETE rows that exist in the DB for that entity
   scope but not in your files. It is a single-author, dev-time tool.
-- Pinning an ID on purpose (like `schema-info/` does) is how you make a
-  record deterministic across databases: supply `primaryKey.ID` yourself with
-  a hardcoded UUID and keep it stable forever once pushed anywhere.
 
 ## Reference syntax
 
@@ -135,7 +137,7 @@ registered `MJ_BizApps_Credentialing: Item Types`. To seed it: create
 `metadata/item-types/` with the folder config + record file shown above, add
 `"item-types"` to the root `directoryOrder`, then push (below). Don't seed
 lookup tables with hand-written INSERTs as the source of truth — author here,
-let the capture step produce the SQL that ships.
+let the release's metadata seed produce the SQL that ships.
 
 ## Worked example 2 — an application with nav items
 
@@ -184,19 +186,18 @@ component → registration → bundle → nav item → user-access chain, and wh
 when nothing appears, is in
 [explorer-visibility.md](explorer-visibility.md).
 
-## The workflow (edit → push → capture → commit)
+## The workflow (edit → push → commit)
 
 ```sh
-# from the MJ repo root, with this app linked (docs/template-docs/linking-to-mj.md)
-pnpm exec mj-sync validate --dir=./metadata     # 1. validate
-pnpm exec mj sync push --dir=./metadata --format=json  # 2. push to YOUR dev DB
-# 3. capture the SQL as migrations/V<ts>__v<x.y.x>_Metadata_Sync.sql
-#    (hardcoded UUIDs; ${flyway:defaultSchema} for your schema, literal __mj for core rows)
-# 4. commit metadata files (incl. write-backs) + the migration + a changeset
+# from this app repo's root, with `.env` at the repo root (docs/template-docs/linking-to-mj.md)
+pnpm exec mj sync validate --dir=./metadata     # 1. validate
+pnpm exec mj sync push --dir=./metadata --ci    # 2. push to YOUR dev DB
+# 3. strip any `sync` block written back by push, then commit the metadata JSON + a changeset.
+#    Do NOT capture a Metadata_Sync.sql: the build engineer generates one per release.
 ```
 
-Teammates and installs get the migration, **not** your sync — never treat
-push as a distribution mechanism.
+Teammates and installs get the release's metadata migration, **not** your
+sync — never treat push as a distribution mechanism. The model: [Release Metadata Migrations Guide](https://github.com/MemberJunction/MJ/blob/next/guides/RELEASE_METADATA_MIGRATIONS_GUIDE.md).
 
 ## Gotchas
 

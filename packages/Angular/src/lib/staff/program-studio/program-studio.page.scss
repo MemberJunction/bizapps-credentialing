@@ -1,0 +1,92 @@
+:host {
+    display: block;
+    height: 100%;
+}
+
+.cred-studio {
+    display: grid;
+    grid-template-columns: minmax(14rem, 20rem) minmax(0, 1fr);
+    height: 100%;
+    min-height: 0;
+    background: var(--mj-bg-page);
+    color: var(--mj-text-primary);
+}
+
+.cred-studio__list {
+    min-height: 0;
+    padding: var(--mj-space-4, 1rem);
+    border-right: 1px solid var(--mj-border-default);
+    background: var(--mj-bg-surface);
+    overflow: hidden;
+}
+
+.cred-studio__main {
+    display: flex;
+    flex-direction: column;
+    gap: var(--mj-space-4, 1rem);
+    min-width: 0;
+    min-height: 0;
+    padding: var(--mj-space-5, 1.25rem);
+    overflow-y: auto;
+}
+
+.cred-studio__program {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: var(--mj-space-3, 0.75rem);
+}
+
+.cred-studio__program-text {
+    min-width: 0;
+}
+
+.cred-studio__program-name {
+    margin: 0;
+    font-size: var(--mj-text-xl, 1.25rem);
+    font-weight: var(--mj-font-semibold, 600);
+}
+
+.cred-studio__program-meta,
+.cred-studio__program-description {
+    margin: var(--mj-space-1, 0.25rem) 0 0;
+    font-size: var(--mj-text-sm, 0.875rem);
+    color: var(--mj-text-secondary);
+}
+
+.cred-studio__version-pick {
+    display: flex;
+    flex-direction: column;
+    gap: var(--mj-space-1, 0.25rem);
+    min-width: 12rem;
+}
+
+.cred-studio__label {
+    font-size: var(--mj-text-sm, 0.875rem);
+    font-weight: var(--mj-font-medium, 500);
+}
+
+.cred-studio__refreshing {
+    font-size: var(--mj-text-sm, 0.875rem);
+    color: var(--mj-text-secondary);
+}
+
+.cred-studio__authoring {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--mj-space-4, 1rem);
+    align-items: start;
+}
+
+@media (max-width: 64rem) {
+    .cred-studio {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .cred-studio__list {
+        max-height: 16rem;
+        border-right: 0;
+        border-bottom: 1px solid var(--mj-border-default);
+    }
+}

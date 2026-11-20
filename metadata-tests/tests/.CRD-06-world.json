@@ -1,0 +1,24 @@
+{
+  "fields": {
+    "TypeID": "@lookup:MJ: Test Types.Name=Integration Test",
+    "Name": "CRD-06 - World",
+    "Description": "Verify world loading and the placeholder organization program fixture: 12 sections, 36 standards, 5 document requirements, 1 interpretive standard, idempotent reload, and EnsureProgramTree partial-load self-repair.",
+    "InputDefinition": {},
+    "ExpectedOutcomes": {
+      "summary": "Both cred-world checks pass: the placeholder program is complete and idempotent, and EnsureProgramTree repairs a partially deleted tree while preserving surviving IDs."
+    },
+    "Configuration": {
+      "tier": "deterministic",
+      "transport": "both",
+      "checks": [
+        {
+          "type": "cred-world"
+        }
+      ]
+    },
+    "Status": "Active"
+  },
+  "primaryKey": {
+    "ID": "9D2A7AF2-A23A-4038-8E5B-101FFE338091"
+  }
+}

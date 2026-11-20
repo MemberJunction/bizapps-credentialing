@@ -1,0 +1,126 @@
+<section class="cred-std" aria-labelledby="cred-std-heading">
+    <header class="cred-std__header">
+        <h3 id="cred-std-heading" class="cred-std__heading">
+            @if (IsNew) { New standard } @else if (Standard) { Standard {{ Standard.Code }} } @else { Standard }
+        </h3>
+        <button mjButton Variant="icon" type="button" AriaLabel="Close the standard" (click)="Close()"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
+    </header>
+
+    @if (IsLoading) {
+        <mj-loading Text="Loading the standard..."></mj-loading>
+    } @else if (LoadError) {
+        <p class="cred-std__error" role="alert">{{ LoadError }}</p>
+    } @else if (Standard) {
+        @if (CanAuthor) {
+            <form class="cred-std__form" (ngSubmit)="Save()" novalidate>
+                <div class="cred-std__field">
+                    <label for="cred-std-code">Code</label>
+                    <input id="cred-std-code" name="code" type="text" class="mj-input" autocomplete="off" [(ngModel)]="Standard.Code"
+                        [attr.aria-invalid]="ErrorFor('Code') ? 'true' : null" [attr.aria-describedby]="ErrorFor('Code') ? 'cred-std-code-error' : null" />
+                    @if (ErrorFor('Code')) {
+                        <p id="cred-std-code-error" class="cred-std__error" role="alert">{{ ErrorFor('Code') }}</p>
+                    }
+                </div>
+                <div class="cred-std__field">
+                    <label for="cred-std-statement">Statement</label>
+                    <textarea id="cred-std-statement" name="statement" rows="4" class="mj-input" [(ngModel)]="Standard.Statement"
+                        [attr.aria-invalid]="ErrorFor('Statement') ? 'true' : null" [attr.aria-describedby]="ErrorFor('Statement') ? 'cred-std-statement-error' : null"></textarea>
+                    @if (ErrorFor('Statement')) {
+                        <p id="cred-std-statement-error" class="cred-std__error" role="alert">{{ ErrorFor('Statement') }}</p>
+                    }
+                </div>
+                <div class="cred-std__field">
+                    <label for="cred-std-guidance">Guidance</label>
+                    <textarea id="cred-std-guidance" name="guidance" rows="3" class="mj-input" [(ngModel)]="Standard.Guidance"></textarea>
+                </div>
+                <div class="cred-std__pair">
+                    <div class="cred-std__field">
+                        <span id="cred-std-response-label" class="cred-std__label">Response type</span>
+                        <mj-dropdown name="responseType" AriaLabelledBy="cred-std-response-label" [Data]="ResponseTypes" [(ngModel)]="Standard.ResponseType"></mj-dropdown>
+                    </div>
+                    <div class="cred-std__field">
+                        <span id="cred-std-intake-label" class="cred-std__label">Intake mode</span>
+                        <mj-dropdown name="intakeMode" AriaLabelledBy="cred-std-intake-label" [Data]="IntakeModes" [(ngModel)]="Standard.IntakeMode"></mj-dropdown>
+                    </div>
+                </div>
+                <div class="cred-std__switches">
+                    <div class="cred-std__switch">
+                        <mj-switch name="interpretive" InputId="cred-std-interpretive" [(ngModel)]="Standard.IsInterpretive"
+                            [AriaDescribedBy]="ErrorFor('IsInterpretive') ? 'cred-std-interpretive-error' : ''"></mj-switch>
+                        <label for="cred-std-interpretive">Interpretive (always reviewed by people)</label>
+                    </div>
+                    @if (ErrorFor('IsInterpretive')) {
+                        <p id="cred-std-interpretive-error" class="cred-std__error" role="alert">{{ ErrorFor('IsInterpretive') }}</p>
+                    }
+                    <div class="cred-std__switch">
+                        <mj-switch name="eligibility" InputId="cred-std-eligibility" [(ngModel)]="Standard.IsEligibility"></mj-switch>
+                        <label for="cred-std-eligibility">Eligibility (decides whether an applicant may apply)</label>
+                    </div>
+                    <div class="cred-std__switch">
+                        <mj-switch name="newForVersion" InputId="cred-std-new" [(ngModel)]="Standard.IsNewForVersion"></mj-switch>
+                        <label for="cred-std-new">New for this version</label>
+                    </div>
+                </div>
+                <div class="cred-std__field">
+                    <label for="cred-std-hint">Evidence hint</label>
+                    <input id="cred-std-hint" name="evidenceHint" type="text" class="mj-input" autocomplete="off" [(ngModel)]="Standard.EvidenceHint" />
+                </div>
+                <div class="cred-std__field">
+                    <span class="cred-std__label">Evaluation mode</span>
+                    <span class="cred-std__value" data-field="EvaluationMode">{{ Standard.EvaluationMode }}</span>
+                    <span class="cred-std__note">{{ EvaluationModeNote }}</span>
+                </div>
+                <div class="cred-std__actions">
+                    <button mjButton Variant="primary" type="submit" [disabled]="!CanSave" [attr.aria-busy]="IsSaving ? 'true' : null"
+                        [attr.aria-describedby]="ErrorFor('Form') ? 'cred-std-form-error' : null">
+                        @if (IsNew) { Add standard } @else { Save standard }
+                    </button>
+                    <button mjButton Variant="outline" type="button" (click)="Close()">Cancel</button>
+                </div>
+                <div aria-live="polite">
+                    @if (ErrorFor('Form')) {
+                        <p id="cred-std-form-error" class="cred-std__error" role="alert">{{ ErrorFor('Form') }}</p>
+                    }
+                </div>
+            </form>
+            <bizapps-cred-response-sources
+                [Provider]="ProviderToUse"
+                [StandardID]="Standard.ID"
+                [IsNew]="IsNew"
+                [IntakeMode]="Standard.IntakeMode"
+                [VersionStatus]="VersionStatus"
+                [Requirements]="Requirements"
+                (ReloadRequested)="ReloadRequested.emit()">
+            </bizapps-cred-response-sources>
+        } @else {
+            <div aria-live="polite">
+                @if (ErrorMessage) {
+                    <p class="cred-std__error" role="alert">{{ ErrorMessage }}</p>
+                }
+            </div>
+            @if (!IsNew) {
+            <dl class="cred-std__readonly">
+                <dt>Code</dt><dd data-field="Code">{{ Standard.Code }}</dd>
+                <dt>Statement</dt><dd data-field="Statement">{{ Standard.Statement }}</dd>
+                <dt>Guidance</dt><dd data-field="Guidance">{{ Standard.Guidance || 'None' }}</dd>
+                <dt>Response type</dt><dd data-field="ResponseType">{{ Standard.ResponseType }}</dd>
+                <dt>Intake mode</dt><dd data-field="IntakeMode">{{ Standard.IntakeMode }}</dd>
+                <dt>Interpretive</dt><dd data-field="IsInterpretive">{{ Standard.IsInterpretive ? 'Yes' : 'No' }}</dd>
+                <dt>Eligibility</dt><dd data-field="IsEligibility">{{ Standard.IsEligibility ? 'Yes' : 'No' }}</dd>
+                <dt>New for this version</dt><dd data-field="IsNewForVersion">{{ Standard.IsNewForVersion ? 'Yes' : 'No' }}</dd>
+                <dt>Evidence hint</dt><dd data-field="EvidenceHint">{{ Standard.EvidenceHint || 'None' }}</dd>
+                <dt>Evaluation mode</dt><dd data-field="EvaluationMode">{{ Standard.EvaluationMode }} <span class="cred-std__note">{{ EvaluationModeNote }}</span></dd>
+            </dl>
+            <bizapps-cred-response-sources
+                [Provider]="ProviderToUse"
+                [StandardID]="Standard.ID"
+                [IsNew]="IsNew"
+                [IntakeMode]="Standard.IntakeMode"
+                [VersionStatus]="VersionStatus"
+                [Requirements]="Requirements"
+                (ReloadRequested)="ReloadRequested.emit()">
+            </bizapps-cred-response-sources>
+            }
+        }
+    }
+</section>

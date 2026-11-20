@@ -1,0 +1,201 @@
+<div class="cred-runner">
+    @if (Applications.length === 0) {
+        <mj-empty-state
+            Icon="fa-solid fa-file-signature"
+            Message="You have no applications yet."
+            Role="status">
+        </mj-empty-state>
+    } @else if (NotAvailable) {
+        <mj-empty-state
+            Icon="fa-solid fa-lock"
+            Message="This area is not available to your account."
+            Role="status">
+        </mj-empty-state>
+    } @else if (IsLoading) {
+        <mj-loading Text="Loading standards..."></mj-loading>
+    } @else if (ErrorMessage) {
+        <mj-alert Variant="error" Title="Standards could not load" [Message]="ErrorMessage"></mj-alert>
+    } @else if (Workspace; as ws) {
+        <header class="cred-runner__header">
+            <div class="cred-runner__header-main">
+                <div class="cred-runner__title-row">
+                    <h1 class="cred-runner__title">{{ ws.Application.ProgramName }}</h1>
+                    <span class="cred-runner__version">{{ ws.Application.VersionLabel }}</span>
+                    <span class="cred-runner__status">{{ ws.Application.Status }}</span>
+                </div>
+                <p class="cred-runner__subtitle">
+                    {{ ws.Application.OrganizationName }} · {{ TotalProgress.Confirmed }} of {{ TotalProgress.Total }} confirmed
+                </p>
+            </div>
+            <div class="cred-runner__header-actions">
+                @if (Applications.length > 1) {
+                    <label class="cred-runner__app-select-wrap">
+                        <span class="cred-runner__app-select-label">Application</span>
+                        <select
+                            class="cred-runner__app-select"
+                            [ngModel]="ws.Application.ApplicationID"
+                            (ngModelChange)="OnSelectApplication($event)">
+                            @for (app of Applications; track app.ApplicationID) {
+                                <option [value]="app.ApplicationID">
+                                    {{ app.ProgramName }} ({{ app.VersionLabel }} · {{ app.Status }})
+                                </option>
+                            }
+                        </select>
+                    </label>
+                }
+                @if (CanWithdraw) {
+                    <button
+                        mjButton
+                        Variant="outline"
+                        type="button"
+                        (click)="OpenWithdrawDialog()">
+                        Withdraw application
+                    </button>
+                }
+                <button
+                    mjButton
+                    Variant="primary"
+                    type="button"
+                    (click)="OnReviewAndSubmit()">
+                    Review and submit
+                </button>
+            </div>
+        </header>
+
+        @if (ApplicationLockedBanner; as lockedMsg) {
+            <mj-alert Variant="info" [Message]="lockedMsg"></mj-alert>
+        }
+
+        @if (ws.Application.Status === 'Withdrawn' && ws.Application.WithdrawalReason) {
+            <mj-alert Variant="warning" [Message]="'Withdrawal reason: ' + ws.Application.WithdrawalReason"></mj-alert>
+        }
+
+        @if (!ws.Application.CanPrefill) {
+            <div class="cred-runner__banner" role="note">
+                {{ CannotPrefillBanner }}
+            </div>
+        }
+
+        @let selection = Selection;
+        <div class="cred-runner__layout">
+            <aside class="cred-runner__rail">
+                <bizapps-cred-section-rail
+                    [Sections]="ws.Sections"
+                    [ActiveSectionID]="selection.SectionID"
+                    (SectionSelected)="OnSelectSection($event)">
+                </bizapps-cred-section-rail>
+            </aside>
+
+            <main class="cred-runner__main">
+                <div class="cred-runner__toolbar">
+                    @if (selection.ActiveSection; as section) {
+                        <div class="cred-runner__section-info">
+                            <h2 class="cred-runner__section-title">{{ section.Number }}. {{ section.Name }}</h2>
+                            @if (section.Description) {
+                                <p class="cred-runner__section-desc">{{ section.Description }}</p>
+                            }
+                        </div>
+                    }
+
+                    <div class="cred-runner__filters" role="group" aria-label="Filter standards">
+                        @for (opt of FilterOptions; track opt.ID) {
+                            <button
+                                type="button"
+                                class="cred-runner__filter-btn"
+                                [class.cred-runner__filter-btn--active]="selection.Filter === opt.ID"
+                                [attr.aria-pressed]="selection.Filter === opt.ID"
+                                (click)="OnSelectFilter(opt.ID)">
+                                {{ opt.Label }}
+                            </button>
+                        }
+                    </div>
+                </div>
+
+                @if (CanRefreshPrefills) {
+                    <div class="cred-runner__prefill-bar">
+                        <button
+                            mjButton
+                            Variant="outline"
+                            type="button"
+                            [disabled]="IsRefreshingPrefills"
+                            [attr.aria-busy]="IsRefreshingPrefills ? 'true' : null"
+                            (click)="RefreshPrefills()">
+                            {{ IsRefreshingPrefills ? 'Refreshing prefills...' : 'Refresh prefills' }}
+                        </button>
+                        @if (RefreshSummary) {
+                            <span class="cred-runner__prefill-summary" role="status">{{ RefreshSummary }}</span>
+                        }
+                        @if (RefreshError) {
+                            <mj-alert Variant="error" [Message]="RefreshError" [Dismissible]="true" (Dismissed)="RefreshError = ''"></mj-alert>
+                        }
+                    </div>
+                }
+
+                @if (selection.VisibleStandards.length === 0) {
+                    <mj-empty-state
+                        Icon="fa-solid fa-check-double"
+                        [Message]="selection.Filter === 'needs-review'
+                            ? 'All standards in this section are confirmed.'
+                            : selection.Filter === 'confirmed'
+                                ? 'No confirmed answers in this section yet.'
+                                : 'This section has no standards.'"
+                        Role="status">
+                    </mj-empty-state>
+                } @else {
+                    <div class="cred-runner__cards">
+                        @for (standard of selection.VisibleStandards; track standard.StandardID) {
+                            <bizapps-cred-standard-card
+                                [attr.data-standard-id]="standard.StandardID"
+                                [Provider]="ProviderToUse"
+                                [Application]="ws.Application"
+                                [Standard]="standard"
+                                (ResponseUpdated)="OnResponseUpdated($event)">
+                            </bizapps-cred-standard-card>
+                        }
+                    </div>
+                }
+            </main>
+        </div>
+    }
+
+    <dialog
+        #withdrawDialog
+        class="cred-runner__dialog"
+        aria-labelledby="cred-withdraw-title"
+        (cancel)="OnWithdrawDialogCancel($event)">
+        <div class="cred-runner__dialog-body">
+            <h3 id="cred-withdraw-title" class="cred-runner__dialog-title">Withdraw application</h3>
+            <p class="cred-runner__dialog-desc">
+                Withdrawing closes this application. Give the reason so it is recorded.
+            </p>
+            <label for="cred-withdraw-reason" class="cred-runner__dialog-label">Reason for withdrawing</label>
+            <textarea
+                id="cred-withdraw-reason"
+                class="cred-runner__dialog-textarea"
+                rows="3"
+                [disabled]="IsWithdrawing"
+                [(ngModel)]="WithdrawReason"></textarea>
+            @if (WithdrawError) {
+                <mj-alert Variant="error" [Message]="WithdrawError"></mj-alert>
+            }
+            <div class="cred-runner__dialog-actions">
+                <button
+                    mjButton
+                    Variant="primary"
+                    type="button"
+                    [disabled]="IsWithdrawing"
+                    (click)="ConfirmWithdraw()">
+                    {{ IsWithdrawing ? 'Withdrawing...' : 'Withdraw application' }}
+                </button>
+                <button
+                    mjButton
+                    Variant="outline"
+                    type="button"
+                    [disabled]="IsWithdrawing"
+                    (click)="CloseWithdrawDialog()">
+                    Cancel
+                </button>
+            </div>
+        </div>
+    </dialog>
+</div>

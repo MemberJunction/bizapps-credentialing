@@ -1,0 +1,102 @@
+<div class="cred-my-apps">
+    @if (IsLoading) {
+        <mj-loading Text="Loading your applications..."></mj-loading>
+    } @else if (ErrorMessage) {
+        <mj-alert Variant="error" Title="My Applications could not load" [Message]="ErrorMessage"></mj-alert>
+    } @else {
+        @switch (View.Kind) {
+            @case ('NotAvailable') {
+                <mj-empty-state Icon="fa-solid fa-lock" [Message]="NotAvailableMessage" Role="status"></mj-empty-state>
+            }
+            @case ('NoSubjects') {
+                <mj-empty-state Icon="fa-solid fa-user-slash" [Message]="NoSubjectMessage" Role="status"></mj-empty-state>
+            }
+            @case ('PickSubject') {
+                <section class="cred-my-apps__picker" aria-labelledby="cred-subject-picker-heading">
+                    <h1 id="cred-subject-picker-heading" class="cred-my-apps__title">{{ PickerHeading }}</h1>
+                    <p class="cred-my-apps__subtitle">Select the applicant record you want to work on.</p>
+                    <ul class="cred-my-apps__subject-list">
+                        @for (subject of View.Subjects; track subject.SubjectID) {
+                            <li>
+                                <button
+                                    type="button"
+                                    class="cred-my-apps__subject-card"
+                                    (click)="SelectSubject(subject)">
+                                    <span class="cred-my-apps__subject-name">{{ subject.DisplayName }}</span>
+                                    <span class="cred-my-apps__subject-meta">
+                                        {{ subject.SubjectType }} · {{ subject.Applications.length }}
+                                        {{ subject.Applications.length === 1 ? 'application' : 'applications' }}
+                                    </span>
+                                </button>
+                            </li>
+                        }
+                    </ul>
+                </section>
+            }
+            @case ('Applications') {
+                <header class="cred-my-apps__header">
+                    <div>
+                        <h1 class="cred-my-apps__title">My Applications</h1>
+                        @if (View.CanSwitch) {
+                            <p class="cred-my-apps__subtitle">
+                                Working for <strong>{{ View.Subject.DisplayName }}</strong>
+                            </p>
+                        }
+                    </div>
+                    @if (View.CanSwitch) {
+                        <button
+                            mjButton
+                            Variant="outline"
+                            type="button"
+                            class="cred-my-apps__switch-btn"
+                            (click)="SwitchSubject()">
+                            Switch applicant
+                        </button>
+                    }
+                </header>
+
+                @if (View.Subject.Applications.length === 0) {
+                    <mj-empty-state
+                        Icon="fa-solid fa-file-signature"
+                        [Message]="NoApplicationsMessage"
+                        Role="status">
+                    </mj-empty-state>
+                } @else {
+                    <ul class="cred-my-apps__list">
+                        @for (app of View.Subject.Applications; track app.ApplicationID) {
+                            <li class="cred-my-apps__card">
+                                <div class="cred-my-apps__card-main">
+                                    <div class="cred-my-apps__card-title-row">
+                                        <h2 class="cred-my-apps__program">{{ app.ProgramName }}</h2>
+                                        <span class="cred-my-apps__version">{{ app.VersionLabel }}</span>
+                                    </div>
+                                    <p class="cred-my-apps__org">{{ app.OrganizationName }}</p>
+                                    <div class="cred-my-apps__meta-row">
+                                        <span class="cred-my-apps__status">
+                                            <i [class]="StatusIcon(app.Status)" aria-hidden="true"></i>
+                                            {{ app.Status }}
+                                        </span>
+                                        <span class="cred-my-apps__progress">{{ ProgressText(app) }}</span>
+                                        @if (FormatSubmitted(app.SubmittedAt); as submittedDate) {
+                                            <span class="cred-my-apps__submitted">Submitted {{ submittedDate }}</span>
+                                        }
+                                    </div>
+                                </div>
+                                <div class="cred-my-apps__card-actions">
+                                    <button
+                                        mjButton
+                                        [Variant]="app.Status === 'Draft' ? 'primary' : 'outline'"
+                                        type="button"
+                                        class="cred-my-apps__action-btn"
+                                        (click)="OpenApp(View.Subject, app)">
+                                        {{ ActionLabel(app.Status) }}
+                                    </button>
+                                </div>
+                            </li>
+                        }
+                    </ul>
+                }
+            }
+        }
+    }
+</div>

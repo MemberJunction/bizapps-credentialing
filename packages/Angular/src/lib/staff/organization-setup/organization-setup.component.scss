@@ -1,0 +1,64 @@
+:host {
+    display: block;
+}
+
+.cred-org-setup {
+    max-width: 36rem;
+    padding: var(--mj-space-6, 1.5rem);
+    color: var(--mj-text-primary);
+}
+
+.cred-org-setup__heading {
+    margin: 0 0 var(--mj-space-2, 0.5rem);
+    font-size: var(--mj-text-xl, 1.25rem);
+    font-weight: var(--mj-font-semibold, 600);
+}
+
+.cred-org-setup__intro {
+    margin: 0 0 var(--mj-space-5, 1.25rem);
+    color: var(--mj-text-secondary);
+    line-height: 1.5;
+}
+
+.cred-org-setup__form {
+    display: flex;
+    flex-direction: column;
+    gap: var(--mj-space-4, 1rem);
+}
+
+.cred-org-setup__field {
+    display: flex;
+    flex-direction: column;
+    gap: var(--mj-space-1, 0.25rem);
+
+    label {
+        font-size: var(--mj-text-sm, 0.875rem);
+        font-weight: var(--mj-font-medium, 500);
+        color: var(--mj-text-primary);
+    }
+
+    input[aria-invalid='true'] {
+        border-color: var(--mj-status-error);
+    }
+}
+
+.cred-org-setup__actions {
+    display: flex;
+    gap: var(--mj-space-2, 0.5rem);
+}
+
+.cred-org-setup__error {
+    margin: 0;
+    font-size: var(--mj-text-sm, 0.875rem);
+    color: var(--mj-status-error);
+}
+
+.cred-org-setup__success {
+    margin: 0;
+    padding: var(--mj-space-3, 0.75rem);
+    border: 1px solid var(--mj-status-success);
+    border-radius: var(--mj-radius-sm, 4px);
+    background: color-mix(in srgb, var(--mj-status-success) 10%, transparent);
+    color: var(--mj-text-primary);
+    line-height: 1.5;
+}

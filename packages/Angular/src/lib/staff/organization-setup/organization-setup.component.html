@@ -1,0 +1,60 @@
+<section class="cred-org-setup">
+    <h2 class="cred-org-setup__heading">{{ Heading }}</h2>
+    <p class="cred-org-setup__intro">
+        Name the accrediting organization and give the email address of an existing user who will be its first staff member.
+        They get the Credentialing Staff role and access to this application.
+    </p>
+
+    <form class="cred-org-setup__form" (ngSubmit)="Submit()" novalidate>
+        <div class="cred-org-setup__field">
+            <label for="cred-org-setup-name">Organization name</label>
+            <input
+                id="cred-org-setup-name"
+                name="organizationName"
+                type="text"
+                class="mj-input"
+                autocomplete="off"
+                [(ngModel)]="OrganizationName"
+                [readonly]="IsSubmitting"
+                [attr.aria-invalid]="ErrorField === 'Name' ? 'true' : null"
+                [attr.aria-describedby]="ErrorField === 'Name' ? 'cred-org-setup-name-error' : null" />
+            @if (ErrorField === 'Name') {
+                <p id="cred-org-setup-name-error" class="cred-org-setup__error" role="alert">{{ ErrorMessage }}</p>
+            }
+        </div>
+
+        <div class="cred-org-setup__field">
+            <label for="cred-org-setup-email">First staff member's email</label>
+            <input
+                id="cred-org-setup-email"
+                name="staffEmail"
+                type="text"
+                inputmode="email"
+                class="mj-input"
+                autocomplete="off"
+                [(ngModel)]="StaffEmail"
+                [readonly]="IsSubmitting"
+                [attr.aria-invalid]="ErrorField === 'Email' ? 'true' : null"
+                [attr.aria-describedby]="ErrorField === 'Email' ? 'cred-org-setup-email-error' : null" />
+            @if (ErrorField === 'Email') {
+                <p id="cred-org-setup-email-error" class="cred-org-setup__error" role="alert">{{ ErrorMessage }}</p>
+            }
+        </div>
+
+        <div class="cred-org-setup__actions">
+            <button mjButton Variant="primary" type="submit" [disabled]="!CanSubmit" [attr.aria-busy]="IsSubmitting ? 'true' : null">
+                @if (IsSubmitting) {
+                    <i class="fa-solid fa-spinner fa-spin" aria-hidden="true"></i>
+                }
+                Create organization
+            </button>
+        </div>
+
+        @if (ErrorField === 'Form') {
+            <p class="cred-org-setup__error" role="alert">{{ ErrorMessage }}</p>
+        }
+        @if (SuccessMessage) {
+            <p class="cred-org-setup__success" role="status">{{ SuccessMessage }}</p>
+        }
+    </form>
+</section>

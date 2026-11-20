@@ -1,0 +1,218 @@
+@if (Version; as version) {
+    <section class="cred-tree" [attr.aria-label]="'Version ' + version.Label">
+        <header class="cred-tree__header">
+            <div class="cred-tree__title">
+                <h3 class="cred-tree__heading">Version {{ version.Label }}</h3>
+                <span class="cred-tree__status" [attr.data-status]="version.Status">{{ version.Status }}</span>
+            </div>
+            <div class="cred-tree__actions">
+                @if (View.ShowActivate) {
+                    <button mjButton Variant="primary" Size="sm" type="button" [disabled]="IsBusy" (click)="Activate()"
+                        [attr.aria-describedby]="ErrorFor('version') ? 'cred-tree-version-error' : null">
+                        <i class="fa-solid fa-circle-check" aria-hidden="true"></i> Activate
+                    </button>
+                }
+                @if (View.ShowRetire) {
+                    <button mjButton Variant="outline" Size="sm" type="button" [disabled]="IsBusy" (click)="Retire()"
+                        [attr.aria-describedby]="ErrorFor('version') ? 'cred-tree-version-error' : null">
+                        <i class="fa-solid fa-box-archive" aria-hidden="true"></i> Retire
+                    </button>
+                }
+                @if (View.ShowEditInDraft) {
+                    <button mjButton Variant="primary" Size="sm" type="button" [disabled]="IsBusy" (click)="OpenDraftDialog()">
+                        <i class="fa-solid fa-pen-to-square" aria-hidden="true"></i> Edit in draft
+                    </button>
+                }
+                @if (View.ShowDelete) {
+                    <button mjButton Variant="danger" Size="sm" type="button" [disabled]="IsBusy" (click)="DeleteDraft()"
+                        [attr.aria-describedby]="ErrorFor('version') ? 'cred-tree-version-error' : null">
+                        <i class="fa-solid fa-trash" aria-hidden="true"></i> Delete draft
+                    </button>
+                }
+            </div>
+        </header>
+        <div aria-live="polite">
+            @if (ErrorFor('version')) {
+                <p id="cred-tree-version-error" class="cred-tree__error" role="alert">{{ ErrorFor('version') }}</p>
+                @if (NeedsCommittee) {
+                    <button mjButton Variant="outline" Size="sm" type="button" (click)="SettingsRequested.emit()">
+                        <i class="fa-solid fa-sliders" aria-hidden="true"></i> Choose the committee in Settings
+                    </button>
+                }
+            }
+        </div>
+        @if (!View.CanAuthor) {
+            <p class="cred-tree__frozen">This version is {{ version.Status }}, so its sections and standards cannot be changed. Use Edit in draft to start a new version from it.</p>
+        }
+
+        @if (Tree.length === 0) {
+            <p class="cred-tree__empty">This version has no sections yet.</p>
+        }
+
+        <ol class="cred-tree__sections">
+            @for (node of Tree; track node.Section.ID; let first = $first; let last = $last) {
+                <li class="cred-tree__section">
+                    @if (IsEditingSection(node.Section.ID) && EditingSection) {
+                        <form class="cred-tree__form" (ngSubmit)="SaveSection()" novalidate [attr.aria-label]="'Edit section ' + node.Section.Number">
+                            <div class="cred-tree__fields">
+                                <div class="cred-tree__field cred-tree__field--number">
+                                    <label [for]="'cred-section-number-' + node.Section.ID">Number</label>
+                                    <input [id]="'cred-section-number-' + node.Section.ID" name="number" type="text" class="mj-input" [(ngModel)]="EditingSection.Number"
+                                        [attr.aria-invalid]="SectionErrorFor(node.Section.ID, 'Number') ? 'true' : null"
+                                        [attr.aria-describedby]="SectionErrorFor(node.Section.ID, 'Number') ? 'cred-section-number-error-' + node.Section.ID : null" />
+                                    @if (SectionErrorFor(node.Section.ID, 'Number')) {
+                                        <p [id]="'cred-section-number-error-' + node.Section.ID" class="cred-tree__error" role="alert">{{ SectionErrorFor(node.Section.ID, 'Number') }}</p>
+                                    }
+                                </div>
+                                <div class="cred-tree__field">
+                                    <label [for]="'cred-section-name-' + node.Section.ID">Name</label>
+                                    <input [id]="'cred-section-name-' + node.Section.ID" name="name" type="text" class="mj-input" [(ngModel)]="EditingSection.Name"
+                                        [attr.aria-invalid]="SectionErrorFor(node.Section.ID, 'Name') ? 'true' : null"
+                                        [attr.aria-describedby]="SectionErrorFor(node.Section.ID, 'Name') ? 'cred-section-name-error-' + node.Section.ID : (SectionErrorFor(node.Section.ID, 'Form') ? 'cred-section-error-' + node.Section.ID : null)" />
+                                    @if (SectionErrorFor(node.Section.ID, 'Name')) {
+                                        <p [id]="'cred-section-name-error-' + node.Section.ID" class="cred-tree__error" role="alert">{{ SectionErrorFor(node.Section.ID, 'Name') }}</p>
+                                    }
+                                </div>
+                            </div>
+                            <div class="cred-tree__field">
+                                <label [for]="'cred-section-description-' + node.Section.ID">Description</label>
+                                <textarea [id]="'cred-section-description-' + node.Section.ID" name="description" rows="2" class="mj-input" [(ngModel)]="EditingSection.Description"></textarea>
+                            </div>
+                            <div class="cred-tree__buttons">
+                                <button mjButton Variant="primary" Size="sm" type="submit" [disabled]="IsBusy">Save section</button>
+                                <button mjButton Variant="outline" Size="sm" type="button" [disabled]="IsBusy" (click)="CancelSection()">Cancel</button>
+                            </div>
+                        </form>
+                    } @else {
+                        <div class="cred-tree__section-row">
+                            <span class="cred-tree__section-title"><span class="cred-tree__number">{{ node.Section.Number }}</span> {{ node.Section.Name }}</span>
+                            @if (View.CanAuthor) {
+                                <span class="cred-tree__buttons" role="group" [attr.aria-label]="'Section ' + node.Section.Number + ' actions'">
+                                    <button mjButton Variant="icon" Size="sm" type="button" [disabled]="IsBusy || first" (click)="MoveSection(node.Section, -1)" [AriaLabel]="'Move section ' + node.Section.Number + ' up'"><i class="fa-solid fa-arrow-up" aria-hidden="true"></i></button>
+                                    <button mjButton Variant="icon" Size="sm" type="button" [disabled]="IsBusy || last" (click)="MoveSection(node.Section, 1)" [AriaLabel]="'Move section ' + node.Section.Number + ' down'"><i class="fa-solid fa-arrow-down" aria-hidden="true"></i></button>
+                                    <button mjButton Variant="icon" Size="sm" type="button" [disabled]="IsBusy" (click)="StartEditSection(node.Section)" [AriaLabel]="'Edit section ' + node.Section.Number"><i class="fa-solid fa-pen" aria-hidden="true"></i></button>
+                                    <button mjButton Variant="icon" Size="sm" type="button" [disabled]="IsBusy" (click)="DeleteSection(node.Section)" [AriaLabel]="'Delete section ' + node.Section.Number"><i class="fa-solid fa-trash" aria-hidden="true"></i></button>
+                                    <button mjButton Variant="flat" Size="sm" type="button" [disabled]="IsBusy" (click)="AddStandard(node)" [attr.aria-label]="'Add a standard to section ' + node.Section.Number"><i class="fa-solid fa-plus" aria-hidden="true"></i> Standard</button>
+                                </span>
+                            }
+                        </div>
+                    }
+                    <div aria-live="polite">
+                        @if (SectionErrorFor(node.Section.ID, 'Form')) {
+                            <p [id]="'cred-section-error-' + node.Section.ID" class="cred-tree__error" role="alert">{{ SectionErrorFor(node.Section.ID, 'Form') }}</p>
+                        }
+                    </div>
+
+                    @if (node.Standards.length === 0) {
+                        <p class="cred-tree__empty cred-tree__empty--section">No standards in this section.</p>
+                    }
+                    <ol class="cred-tree__standards">
+                        @for (standard of node.Standards; track standard.ID; let sFirst = $first; let sLast = $last) {
+                            <li class="cred-tree__standard" [class.cred-tree__standard--selected]="IsSelected(standard.ID)">
+                                <div class="cred-tree__standard-row">
+                                    <button type="button" class="cred-tree__standard-open" (click)="SelectStandard(standard)" [attr.aria-current]="IsSelected(standard.ID) ? 'true' : null" [attr.aria-expanded]="IsSelected(standard.ID)">
+                                        <span class="cred-tree__code">{{ standard.Code }}</span>
+                                        <span class="cred-tree__statement">{{ standard.Statement }}</span>
+                                        <span class="cred-tree__tags">{{ standard.ResponseType }}@if (standard.IsInterpretive) { · Interpretive }@if (standard.IsEligibility) { · Eligibility }</span>
+                                    </button>
+                                    @if (View.CanAuthor) {
+                                        <span class="cred-tree__buttons" role="group" [attr.aria-label]="'Standard ' + standard.Code + ' actions'">
+                                            <button mjButton Variant="icon" Size="sm" type="button" [disabled]="IsBusy || sFirst" (click)="MoveStandard(node, standard, -1)" [AriaLabel]="'Move standard ' + standard.Code + ' up'"><i class="fa-solid fa-arrow-up" aria-hidden="true"></i></button>
+                                            <button mjButton Variant="icon" Size="sm" type="button" [disabled]="IsBusy || sLast" (click)="MoveStandard(node, standard, 1)" [AriaLabel]="'Move standard ' + standard.Code + ' down'"><i class="fa-solid fa-arrow-down" aria-hidden="true"></i></button>
+                                            <button mjButton Variant="icon" Size="sm" type="button" [disabled]="IsBusy" (click)="SelectStandard(standard)" [AriaLabel]="'Edit standard ' + standard.Code"><i class="fa-solid fa-pen" aria-hidden="true"></i></button>
+                                            <button mjButton Variant="icon" Size="sm" type="button" [disabled]="IsBusy" (click)="DeleteStandard(standard)" [AriaLabel]="'Delete standard ' + standard.Code"><i class="fa-solid fa-trash" aria-hidden="true"></i></button>
+                                        </span>
+                                    }
+                                </div>
+                                <div aria-live="polite">
+                                    @if (WasJustSaved(standard.ID)) {
+                                        <p class="cred-tree__saved" role="status"><i class="fa-solid fa-circle-check" aria-hidden="true"></i> Standard {{ standard.Code }} saved.</p>
+                                    }
+                                    @if (ErrorFor(standard.ID)) {
+                                        <p class="cred-tree__error" role="alert">{{ ErrorFor(standard.ID) }}</p>
+                                    }
+                                </div>
+                                @if (IsSelected(standard.ID) && EditorTemplate) {
+                                    <div class="cred-tree__editor">
+                                        <ng-container [ngTemplateOutlet]="EditorTemplate"></ng-container>
+                                    </div>
+                                }
+                            </li>
+                        }
+                    </ol>
+                    @if (IsAddingTo(node.Section.ID) && EditorTemplate) {
+                        <div class="cred-tree__editor cred-tree__editor--new">
+                            <ng-container [ngTemplateOutlet]="EditorTemplate"></ng-container>
+                        </div>
+                    }
+                </li>
+            }
+        </ol>
+
+        @if (View.CanAuthor) {
+            @if (IsAddingSection && EditingSection) {
+                <form class="cred-tree__form" (ngSubmit)="SaveSection()" novalidate aria-label="New section">
+                    <div class="cred-tree__fields">
+                        <div class="cred-tree__field cred-tree__field--number">
+                            <label for="cred-section-number-new">Number</label>
+                            <input id="cred-section-number-new" name="number" type="text" class="mj-input" autocomplete="off" [(ngModel)]="EditingSection.Number"
+                                [attr.aria-invalid]="SectionErrorFor('new-section', 'Number') ? 'true' : null"
+                                [attr.aria-describedby]="SectionErrorFor('new-section', 'Number') ? 'cred-section-number-error-new' : null" />
+                            @if (SectionErrorFor('new-section', 'Number')) {
+                                <p id="cred-section-number-error-new" class="cred-tree__error" role="alert">{{ SectionErrorFor('new-section', 'Number') }}</p>
+                            }
+                        </div>
+                        <div class="cred-tree__field">
+                            <label for="cred-section-name-new">Name</label>
+                            <input id="cred-section-name-new" name="name" type="text" class="mj-input" autocomplete="off" [(ngModel)]="EditingSection.Name"
+                                [attr.aria-invalid]="SectionErrorFor('new-section', 'Name') ? 'true' : null"
+                                [attr.aria-describedby]="SectionErrorFor('new-section', 'Name') ? 'cred-section-name-error-new' : (SectionErrorFor('new-section', 'Form') ? 'cred-section-error-new' : null)" />
+                            @if (SectionErrorFor('new-section', 'Name')) {
+                                <p id="cred-section-name-error-new" class="cred-tree__error" role="alert">{{ SectionErrorFor('new-section', 'Name') }}</p>
+                            }
+                        </div>
+                    </div>
+                    <div class="cred-tree__field">
+                        <label for="cred-section-description-new">Description</label>
+                        <textarea id="cred-section-description-new" name="description" rows="2" class="mj-input" [(ngModel)]="EditingSection.Description"></textarea>
+                    </div>
+                    <div class="cred-tree__buttons">
+                        <button mjButton Variant="primary" Size="sm" type="submit" [disabled]="IsBusy">Add section</button>
+                        <button mjButton Variant="outline" Size="sm" type="button" [disabled]="IsBusy" (click)="CancelSection()">Cancel</button>
+                    </div>
+                </form>
+            } @else {
+                <button mjButton Variant="outline" Size="sm" type="button" [disabled]="IsBusy || EditingSection !== null" (click)="StartAddSection()">
+                    <i class="fa-solid fa-plus" aria-hidden="true"></i> Add section
+                </button>
+            }
+        }
+        <div aria-live="polite">
+            @if (SectionErrorFor('new-section', 'Form')) {
+                <p id="cred-section-error-new" class="cred-tree__error" role="alert">{{ SectionErrorFor('new-section', 'Form') }}</p>
+            }
+        </div>
+    </section>
+
+    @if (View.ShowEditInDraft) {
+    <mj-dialog [Visible]="DraftDialogOpen" Title="Edit in draft" Size="sm" (Close)="CloseDraftDialog()">
+        <form class="cred-tree__form cred-tree__form--plain" (ngSubmit)="CreateDraft()" novalidate id="cred-draft-form">
+            <p class="cred-tree__dialog-text">Copies version {{ version.Label }}, with its sections, standards and document requirements, into a new Draft. Version {{ version.Label }} stays {{ version.Status }}.</p>
+            <div class="cred-tree__field">
+                <label for="cred-draft-label">Label for the new version</label>
+                <input id="cred-draft-label" name="label" type="text" class="mj-input" autocomplete="off" data-autofocus [(ngModel)]="DraftLabel"
+                    [attr.aria-invalid]="ErrorFor('draft') ? 'true' : null" [attr.aria-describedby]="ErrorFor('draft') ? 'cred-draft-error' : null" />
+                <div aria-live="polite">
+                    @if (ErrorFor('draft')) {
+                        <p id="cred-draft-error" class="cred-tree__error" role="alert">{{ ErrorFor('draft') }}</p>
+                    }
+                </div>
+            </div>
+        </form>
+        <mj-dialog-actions>
+            <button mjButton Variant="primary" type="submit" form="cred-draft-form" [disabled]="IsBusy">Create draft</button>
+            <button mjButton Variant="outline" type="button" (click)="CloseDraftDialog()">Cancel</button>
+        </mj-dialog-actions>
+    </mj-dialog>
+    }
+}

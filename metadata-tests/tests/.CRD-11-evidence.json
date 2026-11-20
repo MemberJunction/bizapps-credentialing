@@ -1,0 +1,24 @@
+{
+  "fields": {
+    "TypeID": "@lookup:MJ: Test Types.Name=Integration Test",
+    "Name": "CRD-11 - Evidence",
+    "Description": "Verify the evidence upload's rules and transaction on the server transport with fixture services: an application submitted while an upload is paused after Store.Put wins (the upload is refused with the submitted-application sentence, the frozen document stays Current, the stored file is removed); a Submitted application on one program freezes only its own documents; ConfirmDocumentCurrent sets Current and ConfirmedCurrentAt and is refused when frozen, replaced or another subject's; an attestation frozen by a submission cannot be replaced. The HTTP route, real storage and text extraction run on the client transport (pnpm run test:integration cred-evidence).",
+    "InputDefinition": {},
+    "ExpectedOutcomes": {
+      "summary": "All four cred-evidence-rules checks pass."
+    },
+    "Configuration": {
+      "tier": "deterministic",
+      "transport": "server",
+      "checks": [
+        {
+          "type": "cred-evidence-rules"
+        }
+      ]
+    },
+    "Status": "Active"
+  },
+  "primaryKey": {
+    "ID": "838E861A-FE51-45CB-B36F-405DC5248FC4"
+  }
+}
