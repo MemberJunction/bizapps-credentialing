@@ -4,8 +4,12 @@
   "type": "module",
   "description": "Server-side entity subclass overrides (validation, computed fields, save hooks). TODO(template): rename.",
   "main": "dist/index.js",
-  "files": ["/dist"],
-  "publishConfig": { "access": "public" },
+  "files": [
+    "/dist"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
   "types": "dist/index.d.ts",
   "scripts": {
     "build": "tsc && tsc-alias -f",
@@ -21,11 +25,11 @@
     "@mj-biz-apps/credentialing-entities": "0.0.0"
   },
   "peerDependencies": {
-    "@memberjunction/core": "^6.2.1",
-    "@memberjunction/core-entities": "^6.2.1",
-    "@memberjunction/generic-database-provider": "^6.2.1",
-    "@memberjunction/global": "^6.2.1",
-    "@memberjunction/sqlserver-dataprovider": "^6.2.1",
+    "@memberjunction/core": ">=6.2.1 <6.3.0",
+    "@memberjunction/core-entities": ">=6.2.1 <6.3.0",
+    "@memberjunction/generic-database-provider": ">=6.2.1 <6.3.0",
+    "@memberjunction/global": ">=6.2.1 <6.3.0",
+    "@memberjunction/sqlserver-dataprovider": ">=6.2.1 <6.3.0",
     "@mj-biz-apps/committees-entities": "^1.5.0",
     "@mj-biz-apps/common-entities": "^5.62.0"
   },
