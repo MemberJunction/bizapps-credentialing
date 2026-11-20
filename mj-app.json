@@ -4,7 +4,7 @@
   "name": "mj-bizapps-credentialing",
   "displayName": "Credentialing",
   "description": "Credentialing, certification, and licensure management for MemberJunction: credential definitions, requirements, holder records, verification, expiration and renewal cycles.",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "license": "BUSL-1.1",
   "icon": "fa-solid fa-certificate",
   "color": "#264FAF",
