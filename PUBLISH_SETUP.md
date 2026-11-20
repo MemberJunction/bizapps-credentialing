@@ -7,23 +7,32 @@ human-only setup that no workflow can do for itself.
 
 ## Branch model
 
+This repo follows release lines (`guides/RELEASE_LINES.md`):
+
 ```
-feature branch ──PR──▶ next ──(Version Packages PR, version.yml)──▶ next
-                                       │
-                          release PR next → main ──(push triggers publish.yml)──▶ npm + tag
+feature ──PR──▶ next ──backport label──▶ lts/6.2 ──(App opens Version Packages PR)──▶ main ──(publish.yml)──▶ npm
 ```
 
-- PRs land on **`next`**. `build.yml` and `changes.yml` run as checks. A migration-bearing
-  PR must carry a changeset with at least a `minor` bump (`changes.yml` enforces this).
-- `version.yml` turns the changesets on `next` into a reviewable **"Version Packages"**
-  PR: package bumps, CHANGELOGs, `mj-app.json` `version` + `mjVersionRange`, refreshed
-  lockfile. Under the default `GITHUB_TOKEN` its checks wait for **Approve and run**.
-- Releasing = one PR **`next` → `main`**; `release-readiness.yml` refuses pending
-  changesets and a patch bump that carries migrations. The push to `main` runs
-  `publish.yml`: validate → build → `changeset publish` → tag `vX.Y.Z`. It writes to no branch.
-- **Not automated:** the `mj-bizapps-common` and `mj-bizapps-tasks` version ranges in
-  `mj-app.json` are hand-maintained. Bump them in the same PR that bumps
-  `@mj-biz-apps/common-entities` / `@mj-biz-apps/tasks-entities` in `packages/Core/package.json`.
+- `next` is built on MJ Edge and **never versions or publishes**. PRs land there first, with a
+  changeset (`pnpm run change`). A migration or `metadata/` change needs at least a **`minor`**
+  changeset (`migration changeset` check).
+- A `backport lts/X.Y` label on the PR into `next` makes `backport.yml` open the cherry-pick PR
+  into that line once it merges. The changeset travels with it.
+- Every push to a line runs `version.yml`, which refreshes that line's **Version Packages PR**,
+  opened by the `blue-cypress-ci-bot` App. It runs `pnpm run version:prepare`: `changeset
+  version`, the `mj-app.json` version and MJ range sync (`ci/sync-mj-app-version.mjs`), and a
+  lockfile refresh.
+  - The newest line (`releasesThrough: main` in `release-lines.json`): `changeset-release/main`
+    → `main`. Publishes as `latest`; afterwards the App opens and merges a
+    `release-back-merge/vX.Y.Z` PR into the line.
+  - An older line (`releasesThrough: branch`): `changeset-release/lts/X.Y` → `lts/X.Y`.
+    Publishes under the dist-tag `lts-X.Y`; no back-merge.
+- **Merging that PR is the release** (`Cut the Release` dispatch, `line` input empty for the
+  newest line). `release-readiness.yml` gates it (`rr:` checks: no pending changesets, bump
+  level, metadata shipped, Postgres counterparts, release base current, migration immutability,
+  packages on npm). `publish.yml` publishes over npm OIDC under the line's dist-tag, tags
+  `vX.Y.Z`, verifies the dist-tag, and opens a PR into `next` removing the changesets it released.
+- There is no hand-opened PR into `main`, and nothing commits to `main` directly.
 
 ## Repository and branches
 
