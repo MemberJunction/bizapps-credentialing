@@ -4,8 +4,12 @@
   "type": "module",
   "description": "MJ Actions exposed by this app (generated subclasses + hand-written actions). TODO(template): rename.",
   "main": "dist/index.js",
-  "files": ["/dist"],
-  "publishConfig": { "access": "public" },
+  "files": [
+    "/dist"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
   "types": "dist/index.d.ts",
   "scripts": {
     "build": "tsc && tsc-alias -f",
@@ -20,18 +24,18 @@
     "zod": "^3.25.76"
   },
   "peerDependencies": {
-    "@memberjunction/actions": "^6.2.1",
-    "@memberjunction/actions-base": "^6.2.1",
-    "@memberjunction/core": "^6.2.1",
-    "@memberjunction/core-entities": "^6.2.1",
-    "@memberjunction/global": "^6.2.1"
+    "@memberjunction/actions": "^6.3.0-edge.1",
+    "@memberjunction/actions-base": "^6.3.0-edge.1",
+    "@memberjunction/core": "^6.3.0-edge.1",
+    "@memberjunction/core-entities": "^6.3.0-edge.1",
+    "@memberjunction/global": "^6.3.0-edge.1"
   },
   "devDependencies": {
-    "@memberjunction/actions": "6.2.2",
-    "@memberjunction/actions-base": "6.2.2",
-    "@memberjunction/core": "6.2.2",
-    "@memberjunction/core-entities": "6.2.2",
-    "@memberjunction/global": "6.2.2",
+    "@memberjunction/actions": "6.3.0-edge.1",
+    "@memberjunction/actions-base": "6.3.0-edge.1",
+    "@memberjunction/core": "6.3.0-edge.1",
+    "@memberjunction/core-entities": "6.3.0-edge.1",
+    "@memberjunction/global": "6.3.0-edge.1",
     "typescript": "^5.9.3"
   }
 }

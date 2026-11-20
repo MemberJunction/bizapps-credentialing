@@ -4,8 +4,12 @@
   "type": "module",
   "description": "Generated entity subclasses for the app schema. TODO(template): rename package + description.",
   "main": "dist/index.js",
-  "files": ["/dist"],
-  "publishConfig": { "access": "public" },
+  "files": [
+    "/dist"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
   "types": "dist/index.d.ts",
   "scripts": {
     "build": "tsc && tsc-alias -f",
@@ -20,12 +24,12 @@
     "zod": "^3.25.76"
   },
   "peerDependencies": {
-    "@memberjunction/core": "^6.2.1",
-    "@memberjunction/global": "^6.2.1"
+    "@memberjunction/core": "^6.3.0-edge.1",
+    "@memberjunction/global": "^6.3.0-edge.1"
   },
   "devDependencies": {
-    "@memberjunction/core": "6.2.2",
-    "@memberjunction/global": "6.2.2",
+    "@memberjunction/core": "6.3.0-edge.1",
+    "@memberjunction/global": "6.3.0-edge.1",
     "typescript": "^5.9.3"
   }
 }
