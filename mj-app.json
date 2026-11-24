@@ -4,7 +4,7 @@
   "name": "mj-bizapps-credentialing",
   "displayName": "Credentialing",
   "description": "Credentialing, certification, and licensure management for MemberJunction: credential definitions, requirements, holder records, verification, expiration and renewal cycles.",
-  "version": "0.0.0",
+  "version": "6.3.0-edge.1",
   "license": "BUSL-1.1",
   "icon": "fa-solid fa-certificate",
   "color": "#264FAF",
@@ -17,15 +17,15 @@
   "mjVersionRange": ">=6.3.0-edge.1 <7.0.0",
   "dependencies": {
     "mj-bizapps-common": {
-      "version": ">=5.62.0 <6.0.0",
+      "version": ">=5.62.0 <7.0.0",
       "repository": "https://github.com/MemberJunction/bizapps-common"
     },
     "mj-bizapps-tasks": {
-      "version": ">=1.13.0 <2.0.0",
+      "version": ">=1.13.0 <7.0.0",
       "repository": "https://github.com/MemberJunction/bizapps-tasks"
     },
     "mj-committees": {
-      "version": ">=1.5.0 <2.0.0",
+      "version": ">=1.5.0 <7.0.0",
       "repository": "https://github.com/MemberJunction/bizapps-committees"
     }
   },
@@ -56,16 +56,39 @@
       }
     ],
     "shared": [
-      { "name": "@mj-biz-apps/credentialing-entities", "role": "library" },
-      { "name": "@mj-biz-apps/credentialing-actions", "role": "library" },
-      { "name": "@mj-biz-apps/credentialing-core", "role": "library" },
-      { "name": "@mj-biz-apps/credentialing-core-entities-server", "role": "library" }
+      {
+        "name": "@mj-biz-apps/credentialing-entities",
+        "role": "library"
+      },
+      {
+        "name": "@mj-biz-apps/credentialing-actions",
+        "role": "library"
+      },
+      {
+        "name": "@mj-biz-apps/credentialing-core",
+        "role": "library"
+      },
+      {
+        "name": "@mj-biz-apps/credentialing-core-entities-server",
+        "role": "library"
+      }
     ]
   },
   "code": {
     "visibility": "public",
     "sourceDirectory": "packages"
   },
-  "categories": ["Business", "Credentialing", "Certification"],
-  "tags": ["credential", "certification", "license", "licensure", "renewal", "verification"]
+  "categories": [
+    "Business",
+    "Credentialing",
+    "Certification"
+  ],
+  "tags": [
+    "credential",
+    "certification",
+    "license",
+    "licensure",
+    "renewal",
+    "verification"
+  ]
 }

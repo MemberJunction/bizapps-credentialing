@@ -1,6 +1,6 @@
 {
   "name": "@mj-biz-apps/credentialing-ng",
-  "version": "0.0.0",
+  "version": "6.3.0-edge.1",
   "type": "module",
   "description": "Client bootstrap package - Angular components loaded by MJExplorer via the generated open-app bootstrap import. TODO(template): rename.",
   "main": "dist/public-api.js",
@@ -21,8 +21,8 @@
   },
   "license": "BUSL-1.1",
   "dependencies": {
-    "@mj-biz-apps/credentialing-core": "0.0.0",
-    "@mj-biz-apps/credentialing-entities": "0.0.0"
+    "@mj-biz-apps/credentialing-core": "6.3.0-edge.1",
+    "@mj-biz-apps/credentialing-entities": "6.3.0-edge.1"
   },
   "peerDependencies": {
     "@angular/common": "^21.2.22",
@@ -40,7 +40,7 @@
     "@memberjunction/ng-shared": "^6.3.0-edge.1",
     "@memberjunction/ng-shared-generic": "^6.3.0-edge.1",
     "@memberjunction/ng-ui-components": "^6.3.0-edge.1",
-    "@mj-biz-apps/committees-entities": "^1.5.0"
+    "@mj-biz-apps/committees-entities": ">=1.5.0 <7.0.0"
   },
   "devDependencies": {
     "@angular/compiler": "21.2.22",
