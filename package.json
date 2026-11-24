@@ -1,6 +1,6 @@
 {
   "name": "bizapps-credentialing",
-  "version": "0.0.0",
+  "version": "6.3.0-edge.1",
   "private": true,
   "license": "BUSL-1.1",
   "description": "BizApps Credentialing - Credentialing, certification, and licensure management built on MemberJunction",

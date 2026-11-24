@@ -1,6 +1,6 @@
 {
   "name": "@mj-biz-apps/credentialing-core",
-  "version": "0.0.0",
+  "version": "6.3.0-edge.1",
   "type": "module",
   "description": "Shared services and business logic for BizApps Credentialing: engines, services, and lifecycle helpers usable on both server and client.",
   "main": "dist/index.js",
@@ -21,14 +21,14 @@
   },
   "license": "BUSL-1.1",
   "dependencies": {
-    "@mj-biz-apps/credentialing-entities": "0.0.0"
+    "@mj-biz-apps/credentialing-entities": "6.3.0-edge.1"
   },
   "peerDependencies": {
     "@memberjunction/core": "^6.3.0-edge.1",
     "@memberjunction/global": "^6.3.0-edge.1",
-    "@mj-biz-apps/committees-entities": "^1.5.0",
-    "@mj-biz-apps/common-entities": "^5.62.0",
-    "@mj-biz-apps/tasks-entities": "^1.13.0"
+    "@mj-biz-apps/committees-entities": ">=1.5.0 <7.0.0",
+    "@mj-biz-apps/common-entities": ">=5.62.0 <7.0.0",
+    "@mj-biz-apps/tasks-entities": ">=1.13.0 <7.0.0"
   },
   "devDependencies": {
     "@memberjunction/core": "6.3.0-edge.1",

@@ -131,10 +131,10 @@ importers:
         specifier: ^21.2.22
         version: 21.2.22(@angular/animations@21.2.22(@angular/core@21.2.22(@angular/compiler@21.2.22)(rxjs@7.8.2)))(@angular/common@21.2.22(@angular/core@21.2.22(@angular/compiler@21.2.22)(rxjs@7.8.2))(rxjs@7.8.2))(@angular/core@21.2.22(@angular/compiler@21.2.22)(rxjs@7.8.2))
       '@mj-biz-apps/credentialing-core':
-        specifier: 0.0.0
+        specifier: 6.3.0-edge.1
         version: link:../Core
       '@mj-biz-apps/credentialing-entities':
-        specifier: 0.0.0
+        specifier: 6.3.0-edge.1
         version: link:../Entities
     devDependencies:
       '@angular/compiler':
@@ -186,7 +186,7 @@ importers:
   packages/Core:
     dependencies:
       '@mj-biz-apps/credentialing-entities':
-        specifier: 0.0.0
+        specifier: 6.3.0-edge.1
         version: link:../Entities
     devDependencies:
       '@memberjunction/core':
@@ -211,10 +211,10 @@ importers:
   packages/CoreEntitiesServer:
     dependencies:
       '@mj-biz-apps/credentialing-core':
-        specifier: 0.0.0
+        specifier: 6.3.0-edge.1
         version: link:../Core
       '@mj-biz-apps/credentialing-entities':
-        specifier: 0.0.0
+        specifier: 6.3.0-edge.1
         version: link:../Entities
     devDependencies:
       '@memberjunction/core':
@@ -261,16 +261,16 @@ importers:
   packages/IntegrationTests:
     dependencies:
       '@mj-biz-apps/credentialing-core':
-        specifier: 0.0.0
+        specifier: 6.3.0-edge.1
         version: link:../Core
       '@mj-biz-apps/credentialing-core-entities-server':
-        specifier: 0.0.0
+        specifier: 6.3.0-edge.1
         version: link:../CoreEntitiesServer
       '@mj-biz-apps/credentialing-entities':
-        specifier: 0.0.0
+        specifier: 6.3.0-edge.1
         version: link:../Entities
       '@mj-biz-apps/credentialing-server':
-        specifier: 0.0.0
+        specifier: 6.3.0-edge.1
         version: link:../Server
     devDependencies:
       '@memberjunction/core':
@@ -316,16 +316,16 @@ importers:
   packages/Server:
     dependencies:
       '@mj-biz-apps/credentialing-actions':
-        specifier: 0.0.0
+        specifier: 6.3.0-edge.1
         version: link:../Actions
       '@mj-biz-apps/credentialing-core':
-        specifier: 0.0.0
+        specifier: 6.3.0-edge.1
         version: link:../Core
       '@mj-biz-apps/credentialing-core-entities-server':
-        specifier: 0.0.0
+        specifier: 6.3.0-edge.1
         version: link:../CoreEntitiesServer
       '@mj-biz-apps/credentialing-entities':
-        specifier: 0.0.0
+        specifier: 6.3.0-edge.1
         version: link:../Entities
       class-validator:
         specifier: ^0.14.3
