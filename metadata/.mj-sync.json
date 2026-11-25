@@ -11,6 +11,9 @@
     "row-level-security-filters",
     "entity-permissions",
     "prompts",
-    "user-notification-types"
+    "user-notification-types",
+    "tours",
+    "learning-paths",
+    "tour-publications"
   ]
 }
