@@ -18,8 +18,8 @@ import {
 import { IsValidUUID, RegisterClass, UUIDsEqual } from '@memberjunction/global';
 import { CredentialingEntity, NOT_FOUND_REASON, StandardAuthoringRules, type EvaluationMode } from '@mj-biz-apps/credentialing-core';
 import { mjBizAppsCredentialingStandardEntity } from '@mj-biz-apps/credentialing-entities';
-import { LockedWrite } from './guards/LockedWrite.js';
-import { ParentVersionLoader, type LoadedVersion } from './guards/ParentVersionLoader.js';
+import { LockedWrite, type StaleCheckRow } from './guards/LockedWrite.js';
+import { ParentVersionLoader, type LoadedSection, type LoadedVersion } from './guards/ParentVersionLoader.js';
 import { VersionTree } from './guards/VersionTree.js';
 
 const SOURCE = 'StandardEntityServer';
@@ -228,14 +228,43 @@ export class StandardEntityServer extends mjBizAppsCredentialingStandardEntity {
     }
 
     private async deleteRefusal(): Promise<string | null> {
-        const stale = await LockedWrite.StaleReason(CredentialingEntity.Standard, this.ID, this.__mj_UpdatedAt, this.ActiveUser, this.provider);
+        const validSection = this.SectionID != null && IsValidUUID(this.SectionID);
+        const [staleRes, sectionRes, versionRes] = await RunView.FromMetadataProvider(this.provider).RunViews<
+            StaleCheckRow | LoadedSection | LoadedVersion
+        >(
+            [
+                LockedWrite.StaleParams(CredentialingEntity.Standard, this.ID),
+                ParentVersionLoader.SectionParams(this.SectionID),
+                {
+                    EntityName: CredentialingEntity.ProgramVersion,
+                    ExtraFilter: validSection
+                        ? `ID IN (SELECT s.ProgramVersionID FROM [__mj_BizAppsCredentialing].[vwSections] s WHERE s.ID = '${this.SectionID}')`
+                        : '1 = 0',
+                    Fields: ['ID', 'Status', 'ProgramID', 'ClonedFromVersionID'],
+                    ResultType: 'simple',
+                    MaxRows: 1,
+                    SkipTotalRowCount: true,
+                },
+            ],
+            this.ActiveUser,
+        );
+        if (!staleRes?.Success) {
+            LogError(`${SOURCE}: re-reading standard ${this.ID} before delete failed: ${staleRes?.ErrorMessage}`);
+            return NOT_FOUND_REASON;
+        }
+        const stale = LockedWrite.StaleReasonFromRow(staleRes.Results[0] as StaleCheckRow | undefined, this.__mj_UpdatedAt);
         if (stale != null) {
             return stale;
         }
-        const section = await ParentVersionLoader.LoadSection(this.SectionID, this.ActiveUser, this.provider);
-        if (section == null) {
+        if (!sectionRes?.Success || !versionRes?.Success) {
+            LogError(`${SOURCE}: reading section/version for standard ${this.ID} failed: ${sectionRes?.ErrorMessage ?? versionRes?.ErrorMessage}`);
             return NOT_FOUND_REASON;
         }
-        return VersionTree.EditRefusal(section.ProgramVersionID, this.ActiveUser, this.provider);
+        const section = sectionRes.Results[0] as LoadedSection | undefined;
+        const version = versionRes.Results[0] as LoadedVersion | undefined;
+        if (section == null || version == null || !UUIDsEqual(version.ID, section.ProgramVersionID)) {
+            return NOT_FOUND_REASON;
+        }
+        return LockedWrite.ReasonOf(StandardAuthoringRules.CanEditTree(version.Status));
     }
 }

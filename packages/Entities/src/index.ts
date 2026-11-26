@@ -15,4 +15,5 @@
  *
  * No tables exist yet — the model is specified in plans/active/credentialing-frd.md.
  */
-export * from './generated/entity_subclasses';
+export * from './generated/entity_subclasses.js';
+export * from './engines/CredentialingEngineBase.js';

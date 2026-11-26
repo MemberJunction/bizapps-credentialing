@@ -1,4 +1,4 @@
-import { LogError, Metadata, RunView } from '@memberjunction/core';
+import { LogError, Metadata, RunView, type IMetadataProvider } from '@memberjunction/core';
 import { NotificationEngine } from '@memberjunction/notifications';
 import { CredentialingEntity } from '@mj-biz-apps/credentialing-core';
 import { SystemUser, type StaffNotifier } from '@mj-biz-apps/credentialing-core-entities-server';
@@ -43,7 +43,7 @@ export class EngineStaffNotifier implements StaffNotifier {
         const system = SystemUser.Get('Sending submission notification');
         const provider = Metadata.Provider;
         await NotificationEngine.Instance.Config(false, system, provider);
-        const recordsTypeID = await this.resolveRecordsResourceTypeID();
+        const recordsTypeID = await this.resolveRecordsResourceTypeID(provider);
         const message = EngineStaffNotifier.SubmittedMessage(e);
 
         for (const userId of e.StaffUserIDs) {
@@ -67,11 +67,11 @@ export class EngineStaffNotifier implements StaffNotifier {
         }
     }
 
-    private async resolveRecordsResourceTypeID(): Promise<string | null> {
+    private async resolveRecordsResourceTypeID(provider: IMetadataProvider): Promise<string | null> {
         if (this.recordsResourceTypeID != null) {
             return this.recordsResourceTypeID;
         }
-        const res = await new RunView().RunView<{ ID: string }>(
+        const res = await RunView.FromMetadataProvider(provider).RunView<{ ID: string }>(
             {
                 EntityName: 'MJ: Resource Types',
                 ExtraFilter: `Name = '${RECORDS_RESOURCE_TYPE_NAME}'`,

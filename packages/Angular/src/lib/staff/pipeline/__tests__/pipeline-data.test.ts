@@ -149,6 +149,71 @@ describe('PipelineData', () => {
         });
         await expect(new PipelineData(source).Load()).rejects.toThrow('Permission denied.');
     });
+
+    it('uses PipelineReferenceCache for Programs and Program Versions and only batches the 3 transactional entities', async () => {
+        const source = new StubPipelineSource((p) => {
+            if (p.EntityName === CredentialingEntity.Application) {
+                return ok([
+                    {
+                        ID: APP_1,
+                        SubjectID: SUB_1,
+                        ProgramVersionID: VER_1,
+                        Status: 'Draft',
+                        IsHistorical: false,
+                        SubmittedAt: null,
+                        __mj_CreatedAt: '2026-11-17T10:00:00.000Z',
+                    },
+                ]);
+            }
+            if (p.EntityName === CredentialingEntity.Subject) {
+                return ok([
+                    {
+                        ID: SUB_1,
+                        AccreditingOrganizationID: ORG_A,
+                        SubjectType: 'Organization',
+                        DisplayName: 'Cached Applicant',
+                        PrimaryEmail: 'cached@example.test',
+                        Status: 'Active',
+                    },
+                ]);
+            }
+            return ok([]);
+        });
+
+        const refreshFlags: boolean[] = [];
+        const snapshot = await new PipelineData(source, {
+            async Load(forceRefresh: boolean) {
+                refreshFlags.push(forceRefresh);
+                return {
+                    Programs: [
+                        {
+                            ID: PROG_1,
+                            Name: 'Cached Program',
+                            ProgramType: 'Certification',
+                            SubjectType: 'Organization',
+                            CredentialPrefix: 'CP',
+                            AccreditingOrganizationID: ORG_A,
+                            AccreditingOrganization: 'Body A',
+                            Status: 'Active',
+                        },
+                    ],
+                    Versions: [
+                        { ID: VER_1, ProgramID: PROG_1, Label: '2026', Status: 'Active', Program: 'Cached Program' },
+                    ],
+                };
+            },
+        }).Load(true);
+
+        expect(refreshFlags).toEqual([true]);
+        expect(source.Calls).toHaveLength(1);
+        expect(source.Calls[0].map((p) => p.EntityName)).toEqual([
+            CredentialingEntity.Application,
+            CredentialingEntity.Subject,
+            CredentialingEntity.SubjectContact,
+        ]);
+        expect(snapshot.Applications[0].ProgramName).toBe('Cached Program');
+        expect(snapshot.ActiveTargets).toHaveLength(1);
+    });
 });
 
 describe('FilterPipelineApplications and PageSlice', () => {

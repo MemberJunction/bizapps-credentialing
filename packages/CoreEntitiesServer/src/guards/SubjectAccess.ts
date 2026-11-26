@@ -1,5 +1,5 @@
 import { LogError, RunView, type BaseEntity, type IMetadataProvider, type RunViewParams, type UserInfo } from '@memberjunction/core';
-import { IsValidUUID } from '@memberjunction/global';
+import { IsValidUUID, UUIDsEqual } from '@memberjunction/global';
 import {
     CREDENTIALING_APPLICANT_ROLE,
     CREDENTIALING_STAFF_ROLE,
@@ -81,10 +81,26 @@ export class SubjectAccess {
         return SubjectAccess.ownedByID<SubjectEntity>(CredentialingEntity.Subject, id, provider, user);
     }
 
-    /** The application `id` and its subject, read as `user`; then its version and program as the system user. */
+    /** The application `id` and its subject, read as `user` in one RunViews batch; then its version and program as the system user. */
     public static async Application(id: string, provider: IMetadataProvider, user: UserInfo): Promise<ApplicationAccess> {
-        const application = await SubjectAccess.ownedByID<ApplicationEntity>(CredentialingEntity.Application, id, provider, user);
-        const subject = await SubjectAccess.ownedByID<SubjectEntity>(CredentialingEntity.Subject, application.SubjectID, provider, user);
+        if (id == null || !IsValidUUID(id)) {
+            OperationSupport.Refuse(NOT_FOUND_REASON);
+        }
+        const [application, subject] = await SubjectAccess.ownedPair<ApplicationEntity, SubjectEntity>(
+            SubjectAccess.byID(CredentialingEntity.Application, id),
+            {
+                EntityName: CredentialingEntity.Subject,
+                ExtraFilter: `ID IN (SELECT a.SubjectID FROM [__mj_BizAppsCredentialing].[vwApplications] a WHERE a.ID = '${id}')`,
+                ResultType: 'entity_object',
+                MaxRows: 1,
+                SkipTotalRowCount: true,
+            },
+            provider,
+            user,
+        );
+        if (!UUIDsEqual(subject.ID, application.SubjectID)) {
+            OperationSupport.Refuse(NOT_FOUND_REASON);
+        }
         const system = SystemUser.Get('Reading the program of an application');
         const [version, program] = await SubjectAccess.systemRows<ProgramVersionEntity | ProgramEntity>(
             [
@@ -103,10 +119,26 @@ export class SubjectAccess {
         return { Application: application, Subject: subject, Version: version as ProgramVersionEntity, Program: program as ProgramEntity };
     }
 
-    /** The response `id` and its application, read as `user`; then its standard and version as the system user. */
+    /** The response `id` and its application, read as `user` in one RunViews batch; then its standard and version as the system user. */
     public static async Response(id: string, provider: IMetadataProvider, user: UserInfo): Promise<ResponseAccess> {
-        const response = await SubjectAccess.ownedByID<StandardResponseEntity>(CredentialingEntity.StandardResponse, id, provider, user);
-        const application = await SubjectAccess.ownedByID<ApplicationEntity>(CredentialingEntity.Application, response.ApplicationID, provider, user);
+        if (id == null || !IsValidUUID(id)) {
+            OperationSupport.Refuse(NOT_FOUND_REASON);
+        }
+        const [response, application] = await SubjectAccess.ownedPair<StandardResponseEntity, ApplicationEntity>(
+            SubjectAccess.byID(CredentialingEntity.StandardResponse, id),
+            {
+                EntityName: CredentialingEntity.Application,
+                ExtraFilter: `ID IN (SELECT r.ApplicationID FROM [__mj_BizAppsCredentialing].[vwStandardResponses] r WHERE r.ID = '${id}')`,
+                ResultType: 'entity_object',
+                MaxRows: 1,
+                SkipTotalRowCount: true,
+            },
+            provider,
+            user,
+        );
+        if (!UUIDsEqual(application.ID, response.ApplicationID)) {
+            OperationSupport.Refuse(NOT_FOUND_REASON);
+        }
         const system = SystemUser.Get('Reading the standard of a response');
         const [standard, version] = await SubjectAccess.systemRows<StandardEntity | ProgramVersionEntity>(
             [SubjectAccess.byID(CredentialingEntity.Standard, response.StandardID), SubjectAccess.byID(CredentialingEntity.ProgramVersion, application.ProgramVersionID)],
@@ -116,36 +148,59 @@ export class SubjectAccess {
         return { Response: response, Application: application, Standard: standard as StandardEntity, Version: version as ProgramVersionEntity };
     }
 
-    /** The evidence document `id` and its subject, read as `user`. */
+    /** The evidence document `id` and its subject, read as `user` in one RunViews batch. */
     public static async Document(id: string, provider: IMetadataProvider, user: UserInfo): Promise<DocumentAccess> {
-        const document = await SubjectAccess.ownedByID<EvidenceDocumentEntity>(CredentialingEntity.EvidenceDocument, id, provider, user);
-        const subject = await SubjectAccess.ownedByID<SubjectEntity>(CredentialingEntity.Subject, document.SubjectID, provider, user);
+        if (id == null || !IsValidUUID(id)) {
+            OperationSupport.Refuse(NOT_FOUND_REASON);
+        }
+        const [document, subject] = await SubjectAccess.ownedPair<EvidenceDocumentEntity, SubjectEntity>(
+            SubjectAccess.byID(CredentialingEntity.EvidenceDocument, id),
+            {
+                EntityName: CredentialingEntity.Subject,
+                ExtraFilter: `ID IN (SELECT d.SubjectID FROM [__mj_BizAppsCredentialing].[vwEvidenceDocuments] d WHERE d.ID = '${id}')`,
+                ResultType: 'entity_object',
+                MaxRows: 1,
+                SkipTotalRowCount: true,
+            },
+            provider,
+            user,
+        );
+        if (!UUIDsEqual(subject.ID, document.SubjectID)) {
+            OperationSupport.Refuse(NOT_FOUND_REASON);
+        }
         return { Document: document, Subject: subject };
     }
 
     /**
-     * The document requirement `id`, read as the system user, admitted only when the subject holds an
-     * application on the requirement's version. `subjectID` must come from a subject the caller was
-     * already admitted to ({@link Subject}, {@link Document}, {@link Application}).
+     * The document requirement `id`, read as the system user in one RunViews batch, admitted only
+     * when the subject holds an application on the requirement's version. `subjectID` must come
+     * from a subject the caller was already admitted to ({@link Subject}, {@link Document}, {@link Application}).
      */
     public static async Requirement(id: string, subjectID: string, provider: IMetadataProvider): Promise<DocumentRequirementEntity> {
         if (!IsValidUUID(id) || !IsValidUUID(subjectID)) {
             OperationSupport.Refuse(NOT_FOUND_REASON);
         }
         const system = SystemUser.Get('Reading a document requirement for a subject');
-        const [requirement] = await SubjectAccess.systemRows<DocumentRequirementEntity>([SubjectAccess.byID(CredentialingEntity.DocumentRequirement, id)], provider, system);
-        const held = await SubjectAccess.readRows<IDRow>(
-            {
-                EntityName: CredentialingEntity.Application,
-                ExtraFilter: `SubjectID = '${subjectID}' AND ProgramVersionID = '${requirement.ProgramVersionID}'`,
-                Fields: ['ID'],
-                ResultType: 'simple',
-                MaxRows: 1,
-            },
-            provider,
+        const [reqRes, heldRes] = await RunView.FromMetadataProvider(provider).RunViews<DocumentRequirementEntity | IDRow>(
+            [
+                SubjectAccess.byID(CredentialingEntity.DocumentRequirement, id),
+                {
+                    EntityName: CredentialingEntity.Application,
+                    ExtraFilter: `SubjectID = '${subjectID}' AND ProgramVersionID IN (SELECT r.ProgramVersionID FROM [__mj_BizAppsCredentialing].[vwDocumentRequirements] r WHERE r.ID = '${id}')`,
+                    Fields: ['ID'],
+                    ResultType: 'simple',
+                    MaxRows: 1,
+                    SkipTotalRowCount: true,
+                },
+            ],
             system,
         );
-        if (held.length === 0) {
+        if (!reqRes.Success || !heldRes.Success) {
+            LogError(`SubjectAccess: reading requirement ${id} as the system user failed: ${reqRes.ErrorMessage ?? heldRes.ErrorMessage}`);
+            OperationSupport.Refuse(NOT_FOUND_REASON);
+        }
+        const requirement = reqRes.Results[0] as DocumentRequirementEntity | undefined;
+        if (requirement == null || heldRes.Results.length === 0) {
             OperationSupport.Refuse(NOT_FOUND_REASON);
         }
         return requirement;
@@ -187,6 +242,28 @@ export class SubjectAccess {
             return 'Staff';
         }
         return null;
+    }
+
+    /** Two caller-owned rows read in one RunViews batch as `user`; refuses as not found if either does not load. */
+    private static async ownedPair<A extends BaseEntity, B extends BaseEntity>(
+        first: RunViewParams,
+        second: RunViewParams,
+        provider: IMetadataProvider,
+        user: UserInfo,
+    ): Promise<[A, B]> {
+        const results = await RunView.FromMetadataProvider(provider).RunViews<A | B>([first, second], user);
+        if (!results[0]?.Success || !results[1]?.Success) {
+            LogError(
+                `SubjectAccess: reading ${first.EntityName}/${second.EntityName} as ${user?.Email ?? 'no user'} failed: ${results[0]?.ErrorMessage ?? results[1]?.ErrorMessage}`,
+            );
+            OperationSupport.Refuse(NOT_FOUND_REASON);
+        }
+        const rowA = results[0].Results?.[0] as A | undefined;
+        const rowB = results[1].Results?.[0] as B | undefined;
+        if (rowA == null || rowB == null) {
+            OperationSupport.Refuse(NOT_FOUND_REASON);
+        }
+        return [rowA, rowB];
     }
 
     /** One row of `entityName` by `id`, read as `user`; refuses as not found when it does not load. */

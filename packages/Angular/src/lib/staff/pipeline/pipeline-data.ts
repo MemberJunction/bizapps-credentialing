@@ -7,12 +7,13 @@
 import { RunView, type IMetadataProvider, type RunViewParams, type RunViewResult } from '@memberjunction/core';
 import { UUIDsEqual } from '@memberjunction/global';
 import { CredentialingEntity } from '@mj-biz-apps/credentialing-core';
-import type {
-    mjBizAppsCredentialingApplicationEntity,
-    mjBizAppsCredentialingProgramEntity,
-    mjBizAppsCredentialingProgramVersionEntity,
-    mjBizAppsCredentialingSubjectContactEntity,
-    mjBizAppsCredentialingSubjectEntity,
+import {
+    CredentialingEngineBase,
+    type mjBizAppsCredentialingApplicationEntity,
+    type mjBizAppsCredentialingProgramEntity,
+    type mjBizAppsCredentialingProgramVersionEntity,
+    type mjBizAppsCredentialingSubjectContactEntity,
+    type mjBizAppsCredentialingSubjectEntity,
 } from '@mj-biz-apps/credentialing-entities';
 
 /** Default page size shared by the Pipeline table and Program Studio's program list. */
@@ -159,19 +160,41 @@ function isoStringOrNull(value: Date | string | null | undefined): string | null
     return trimmed.length > 0 ? trimmed : null;
 }
 
+/** Optional bounded reference cache for Programs and Program Versions (`CredentialingEngineBase`). */
+export interface PipelineReferenceCache {
+    Load(forceRefresh: boolean): Promise<{
+        Programs: readonly RawProgramRow[];
+        Versions: readonly RawProgramVersionRow[];
+    }>;
+}
+
 /** Reads the Pipeline screen's applications, contacts, programs, Active versions, and subjects in one batch. */
 export class PipelineData {
-    constructor(private readonly source: PipelineDataSource) {}
+    constructor(
+        private readonly source: PipelineDataSource,
+        private readonly referenceCache?: PipelineReferenceCache,
+    ) {}
 
     public static FromProvider(provider: IMetadataProvider): PipelineData {
         const rv = RunView.FromMetadataProvider(provider);
-        return new PipelineData({
-            RunViews: <T>(params: RunViewParams[]) => rv.RunViews<T>(params),
-        });
+        const engineCache: PipelineReferenceCache = {
+            async Load(forceRefresh: boolean) {
+                const engine = CredentialingEngineBase.Instance;
+                await engine.Config(forceRefresh, undefined, provider);
+                return {
+                    Programs: engine.Programs,
+                    Versions: engine.ProgramVersions,
+                };
+            },
+        };
+        return new PipelineData(
+            { RunViews: <T>(params: RunViewParams[]) => rv.RunViews<T>(params) },
+            engineCache,
+        );
     }
 
-    public async Load(): Promise<PipelineSnapshot> {
-        const results = await this.source.RunViews<Record<string, unknown>>([
+    public async Load(forceRefresh = false): Promise<PipelineSnapshot> {
+        const transactionalViews: RunViewParams[] = [
             {
                 EntityName: CredentialingEntity.Application,
                 Fields: ['ID', 'SubjectID', 'ProgramVersionID', 'Status', 'IsHistorical', 'SubmittedAt', 'SubmissionDispatchNote', '__mj_CreatedAt'],
@@ -190,31 +213,56 @@ export class PipelineData {
                 OrderBy: 'LastInvitedAt DESC',
                 ResultType: 'simple',
             },
-            {
-                EntityName: CredentialingEntity.Program,
-                Fields: ['ID', 'Name', 'ProgramType', 'SubjectType', 'CredentialPrefix', 'AccreditingOrganizationID', 'AccreditingOrganization', 'Status'],
-                OrderBy: 'Name ASC',
-                ResultType: 'simple',
-            },
-            {
-                EntityName: CredentialingEntity.ProgramVersion,
-                Fields: ['ID', 'ProgramID', 'Label', 'Status', 'Program'],
-                OrderBy: 'Label ASC',
-                ResultType: 'simple',
-            },
-        ]);
+        ];
 
-        for (const r of results) {
-            if (!r.Success) {
-                throw new Error(r.ErrorMessage || 'Could not load pipeline data.');
+        let rawApps: RawApplicationRow[];
+        let rawSubjects: RawSubjectRow[];
+        let rawContacts: RawSubjectContactRow[];
+        let rawPrograms: readonly RawProgramRow[];
+        let rawVersions: readonly RawProgramVersionRow[];
+
+        if (this.referenceCache != null) {
+            const [results, refs] = await Promise.all([
+                this.source.RunViews<Record<string, unknown>>(transactionalViews),
+                this.referenceCache.Load(forceRefresh),
+            ]);
+            for (const r of results) {
+                if (!r.Success) {
+                    throw new Error(r.ErrorMessage || 'Could not load pipeline data.');
+                }
             }
+            rawApps = (results[0].Results ?? []) as unknown as RawApplicationRow[];
+            rawSubjects = (results[1].Results ?? []) as unknown as RawSubjectRow[];
+            rawContacts = (results[2].Results ?? []) as unknown as RawSubjectContactRow[];
+            rawPrograms = refs.Programs;
+            rawVersions = refs.Versions;
+        } else {
+            const results = await this.source.RunViews<Record<string, unknown>>([
+                ...transactionalViews,
+                {
+                    EntityName: CredentialingEntity.Program,
+                    Fields: ['ID', 'Name', 'ProgramType', 'SubjectType', 'CredentialPrefix', 'AccreditingOrganizationID', 'AccreditingOrganization', 'Status'],
+                    OrderBy: 'Name ASC',
+                    ResultType: 'simple',
+                },
+                {
+                    EntityName: CredentialingEntity.ProgramVersion,
+                    Fields: ['ID', 'ProgramID', 'Label', 'Status', 'Program'],
+                    OrderBy: 'Label ASC',
+                    ResultType: 'simple',
+                },
+            ]);
+            for (const r of results) {
+                if (!r.Success) {
+                    throw new Error(r.ErrorMessage || 'Could not load pipeline data.');
+                }
+            }
+            rawApps = (results[0].Results ?? []) as unknown as RawApplicationRow[];
+            rawSubjects = (results[1].Results ?? []) as unknown as RawSubjectRow[];
+            rawContacts = (results[2].Results ?? []) as unknown as RawSubjectContactRow[];
+            rawPrograms = (results[3].Results ?? []) as unknown as RawProgramRow[];
+            rawVersions = (results[4].Results ?? []) as unknown as RawProgramVersionRow[];
         }
-
-        const rawApps = (results[0].Results ?? []) as unknown as RawApplicationRow[];
-        const rawSubjects = (results[1].Results ?? []) as unknown as RawSubjectRow[];
-        const rawContacts = (results[2].Results ?? []) as unknown as RawSubjectContactRow[];
-        const rawPrograms = (results[3].Results ?? []) as unknown as RawProgramRow[];
-        const rawVersions = (results[4].Results ?? []) as unknown as RawProgramVersionRow[];
 
         const subjectsById = new Map<string, RawSubjectRow>();
         for (const s of rawSubjects) {

@@ -247,7 +247,7 @@ export class PipelinePage extends BaseAngularComponent implements OnInit {
             this.cdr.markForCheck();
         }
         try {
-            this.Snapshot = await PipelineData.FromProvider(this.ProviderToUse).Load();
+            this.Snapshot = await PipelineData.FromProvider(this.ProviderToUse).Load(silent);
             if (!silent) {
                 await this.openRequestedApplication();
             }

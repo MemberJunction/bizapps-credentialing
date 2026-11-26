@@ -18,8 +18,8 @@ import {
 import { IsValidUUID, RegisterClass, UUIDsEqual } from '@memberjunction/global';
 import { CredentialingEntity, NOT_FOUND_REASON, ResponseSourceRules, type SourceDraft, type VersionStatus } from '@mj-biz-apps/credentialing-core';
 import { mjBizAppsCredentialingResponseSourceEntity } from '@mj-biz-apps/credentialing-entities';
-import { LockedWrite } from './guards/LockedWrite.js';
-import { ParentVersionLoader } from './guards/ParentVersionLoader.js';
+import { LockedWrite, type StaleCheckRow } from './guards/LockedWrite.js';
+import { type LoadedVersion } from './guards/ParentVersionLoader.js';
 import { VersionTree } from './guards/VersionTree.js';
 
 const SOURCE = 'ResponseSourceEntityServer';
@@ -118,14 +118,59 @@ export class ResponseSourceEntityServer extends mjBizAppsCredentialingResponseSo
     }
 
     private async saveRefusal(): Promise<string | null> {
+        const standardID = this.StandardID;
+        const validStandard = standardID != null && IsValidUUID(standardID);
+        const params: RunViewParams[] = [];
+        let staleIdx = -1;
         if (this.IsSaved) {
-            const stale = await LockedWrite.StaleReason(CredentialingEntity.ResponseSource, this.ID, this.__mj_UpdatedAt, this.ActiveUser, this.provider);
+            staleIdx = params.length;
+            params.push(LockedWrite.StaleParams(CredentialingEntity.ResponseSource, this.ID));
+        }
+        const standardIdx = params.length;
+        params.push({
+            EntityName: CredentialingEntity.Standard,
+            ExtraFilter: validStandard ? `ID = '${standardID}'` : '1 = 0',
+            Fields: ['ID', 'ProgramVersionID', 'IntakeMode'],
+            ResultType: 'simple',
+            MaxRows: 1,
+            SkipTotalRowCount: true,
+        });
+        const versionIdx = params.length;
+        params.push({
+            EntityName: CredentialingEntity.ProgramVersion,
+            ExtraFilter: validStandard
+                ? `ID IN (SELECT s.ProgramVersionID FROM [__mj_BizAppsCredentialing].[vwStandards] s WHERE s.ID = '${standardID}')`
+                : '1 = 0',
+            Fields: ['ID', 'Status', 'ProgramID', 'ClonedFromVersionID'],
+            ResultType: 'simple',
+            MaxRows: 1,
+            SkipTotalRowCount: true,
+        });
+
+        const results = await RunView.FromMetadataProvider(this.provider).RunViews<
+            StaleCheckRow | StandardRow | LoadedVersion
+        >(params, this.ActiveUser);
+
+        if (staleIdx >= 0) {
+            const staleRes = results[staleIdx];
+            if (!staleRes?.Success) {
+                LogError(`${SOURCE}: re-reading response source ${this.ID} failed: ${staleRes?.ErrorMessage}`);
+                return NOT_FOUND_REASON;
+            }
+            const stale = LockedWrite.StaleReasonFromRow(staleRes.Results[0] as StaleCheckRow | undefined, this.__mj_UpdatedAt);
             if (stale != null) return stale;
             if (LockedWrite.AnyChanged(this, ['StandardID'])) return 'A response source cannot be moved to another standard.';
         }
-        const standard = await this.loadStandard(this.StandardID);
-        const version = standard == null ? null : await ParentVersionLoader.LoadVersion(standard.ProgramVersionID, this.ActiveUser, this.provider);
-        if (standard == null || version == null) {
+
+        const standardRes = results[standardIdx];
+        const versionRes = results[versionIdx];
+        if (!standardRes?.Success || !versionRes?.Success) {
+            LogError(`${SOURCE}: reading standard/version for ${standardID ?? '(none)'} failed: ${standardRes?.ErrorMessage ?? versionRes?.ErrorMessage}`);
+            return NOT_FOUND_REASON;
+        }
+        const standard = standardRes.Results[0] as StandardRow | undefined;
+        const version = versionRes.Results[0] as LoadedVersion | undefined;
+        if (standard == null || version == null || !UUIDsEqual(version.ID, standard.ProgramVersionID)) {
             return NOT_FOUND_REASON;
         }
         return this.listRefusal(standard, version.Status);
