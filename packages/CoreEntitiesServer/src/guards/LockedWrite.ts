@@ -8,10 +8,17 @@ import {
     ValidationErrorInfo,
     ValidationResult,
     type IMetadataProvider,
+    type RunViewParams,
     type UserInfo,
 } from '@memberjunction/core';
 import { IsValidUUID } from '@memberjunction/global';
 import { NOT_FOUND_REASON, STALE_RECORD_REASON, type RuleResult } from '@mj-biz-apps/credentialing-core';
+
+/** The stored row fields read to check optimistic concurrency (`__mj_UpdatedAt`). */
+export interface StaleCheckRow {
+    ID: string;
+    __mj_UpdatedAt: Date | string;
+}
 
 /** What kind of write a result records. */
 export type WriteKind = 'create' | 'update' | 'delete';
@@ -110,6 +117,30 @@ export class LockedWrite {
         return result;
     }
 
+    /** RunView parameters for checking optimistic concurrency inside a caller-scoped `RunViews` batch. */
+    public static StaleParams(entityName: string, id: string): RunViewParams {
+        const filter = IsValidUUID(id) ? `ID = '${id}'` : '1 = 0';
+        return {
+            EntityName: entityName,
+            ExtraFilter: filter,
+            Fields: ['ID', '__mj_UpdatedAt'],
+            ResultType: 'simple',
+            MaxRows: 1,
+            SkipTotalRowCount: true,
+        };
+    }
+
+    /** Evaluates optimistic concurrency from a pre-fetched {@link StaleCheckRow}. */
+    public static StaleReasonFromRow(row: StaleCheckRow | null | undefined, loadedUpdatedAt: Date | null): string | null {
+        if (row == null) {
+            return NOT_FOUND_REASON;
+        }
+        if (loadedUpdatedAt == null || new Date(row.__mj_UpdatedAt).getTime() !== new Date(loadedUpdatedAt).getTime()) {
+            return STALE_RECORD_REASON;
+        }
+        return null;
+    }
+
     /**
      * Why a stored row may not be written from this snapshot, or null when it may. Re-reads the row's
      * `__mj_UpdatedAt` as the caller and compares it, as an instant, with the value the entity was
@@ -127,21 +158,14 @@ export class LockedWrite {
         if (!IsValidUUID(id)) {
             return NOT_FOUND_REASON;
         }
-        const res = await RunView.FromMetadataProvider(provider).RunView<{ ID: string; __mj_UpdatedAt: Date | string }>(
-            { EntityName: entityName, ExtraFilter: `ID = '${id}'`, Fields: ['ID', '__mj_UpdatedAt'], ResultType: 'simple', MaxRows: 1 },
+        const res = await RunView.FromMetadataProvider(provider).RunView<StaleCheckRow>(
+            LockedWrite.StaleParams(entityName, id),
             contextUser,
         );
         if (!res.Success) {
             LogError(`Re-reading ${entityName} ${id} before writing it failed: ${res.ErrorMessage}`);
             return NOT_FOUND_REASON;
         }
-        const row = res.Results[0];
-        if (row == null) {
-            return NOT_FOUND_REASON;
-        }
-        if (loadedUpdatedAt == null || new Date(row.__mj_UpdatedAt).getTime() !== new Date(loadedUpdatedAt).getTime()) {
-            return STALE_RECORD_REASON;
-        }
-        return null;
+        return LockedWrite.StaleReasonFromRow(res.Results[0], loadedUpdatedAt);
     }
 }

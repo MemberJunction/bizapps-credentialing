@@ -16,8 +16,8 @@
  *   src/lib/shared/      — StandingService: the signed-in user's roles and organizations
  */
 
-// Entity package side-effect import: fires @RegisterClass for entity subclasses once they exist.
-import '@mj-biz-apps/credentialing-entities';
+// Entity package side-effect import: fires @RegisterClass for entity subclasses and @RegisterForStartup for CredentialingEngineBase.
+import { LoadCredentialingEngineBase } from '@mj-biz-apps/credentialing-entities';
 import './lib/generated/generated-forms.module';
 
 export * from './lib/generated/generated-forms.module';
@@ -68,7 +68,7 @@ export {
     LoadApplicationRecordRedirectForm,
 } from './lib/staff/pipeline/application-record-redirect.form';
 export { InviteWizardComponent } from './lib/staff/pipeline/invite-wizard.component';
-export { PipelineData, FilterPipelineApplications, PageSlice, PIPELINE_PAGE_SIZE, type PipelineDataSource, type PagedSlice, type PipelineApplicationRow, type PipelineContactRow, type PipelineActiveTarget, type PipelineSubjectOption, type PipelineFilter, type PipelineSnapshot } from './lib/staff/pipeline/pipeline-data';
+export { PipelineData, FilterPipelineApplications, PageSlice, PIPELINE_PAGE_SIZE, type PipelineDataSource, type PipelineReferenceCache, type PagedSlice, type PipelineApplicationRow, type PipelineContactRow, type PipelineActiveTarget, type PipelineSubjectOption, type PipelineFilter, type PipelineSnapshot } from './lib/staff/pipeline/pipeline-data';
 export { InviteWizardModel, FormatInvitationOutcome, EligibleSubjectsForTarget, type InviteWizardStep, type InviteSubjectMode, type FormattedInvitationOutcome } from './lib/staff/pipeline/invite-wizard-model';
 export { CredentialingAreaResource, AREA_NOT_AVAILABLE_MESSAGE, type AreaResourceState } from './lib/resources/credentialing-area-resource';
 export { CredentialingProgramStudioResource, LoadCredentialingProgramStudioResource, PROGRAM_STUDIO_PARAMS } from './lib/resources/staff-program-studio.resource';
@@ -168,6 +168,7 @@ export {
  * bundler can conclude the modules are unused.
  */
 export function LoadBizAppsCredentialingClient(): void {
+    LoadCredentialingEngineBase();
     LoadCredentialingApplication();
     LoadCredentialingProgramStudioResource();
     LoadCredentialingPipelineResource();

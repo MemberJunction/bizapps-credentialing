@@ -11,11 +11,13 @@ import {
     type EntityDeleteOptions,
     type EntitySaveOptions,
     type IMetadataProvider,
+    type RunViewParams,
 } from '@memberjunction/core';
-import { RegisterClass, UUIDsEqual } from '@memberjunction/global';
-import { CredentialingEntity, StandardAuthoringRules } from '@mj-biz-apps/credentialing-core';
+import { IsValidUUID, RegisterClass, UUIDsEqual } from '@memberjunction/global';
+import { CredentialingEntity, NOT_FOUND_REASON, StandardAuthoringRules } from '@mj-biz-apps/credentialing-core';
 import { mjBizAppsCredentialingDocumentRequirementEntity } from '@mj-biz-apps/credentialing-entities';
-import { LockedWrite } from './guards/LockedWrite.js';
+import { LockedWrite, type StaleCheckRow } from './guards/LockedWrite.js';
+import { ParentVersionLoader, type LoadedVersion } from './guards/ParentVersionLoader.js';
 import { VersionTree } from './guards/VersionTree.js';
 
 const SOURCE = 'DocumentRequirementEntityServer';
@@ -75,60 +77,101 @@ export class DocumentRequirementEntityServer extends mjBizAppsCredentialingDocum
     }
 
     private async saveRefusal(): Promise<string | null> {
+        const needsNameCheck = !this.IsSaved || LockedWrite.AnyChanged(this, ['Name']);
+        const params: RunViewParams[] = [];
+        let staleIdx = -1;
         if (this.IsSaved) {
-            const stale = await LockedWrite.StaleReason(
-                CredentialingEntity.DocumentRequirement,
-                this.ID,
-                this.__mj_UpdatedAt,
-                this.ActiveUser,
-                this.provider,
-            );
+            staleIdx = params.length;
+            params.push(LockedWrite.StaleParams(CredentialingEntity.DocumentRequirement, this.ID));
+        }
+        const versionIdx = params.length;
+        params.push(ParentVersionLoader.VersionParams(this.ProgramVersionID));
+        let siblingsIdx = -1;
+        if (needsNameCheck) {
+            siblingsIdx = params.length;
+            params.push({
+                EntityName: CredentialingEntity.DocumentRequirement,
+                ExtraFilter: IsValidUUID(this.ProgramVersionID) ? `ProgramVersionID = '${this.ProgramVersionID}'` : '1 = 0',
+                Fields: ['ID', 'Name'],
+                ResultType: 'simple',
+                SkipTotalRowCount: true,
+            });
+        }
+
+        const results = await RunView.FromMetadataProvider(this.provider).RunViews<
+            StaleCheckRow | LoadedVersion | { ID: string; Name: string }
+        >(params, this.ActiveUser);
+
+        if (staleIdx >= 0) {
+            const staleRes = results[staleIdx];
+            if (!staleRes?.Success) {
+                LogError(`${SOURCE}: re-reading document requirement ${this.ID} failed: ${staleRes?.ErrorMessage}`);
+                return NOT_FOUND_REASON;
+            }
+            const stale = LockedWrite.StaleReasonFromRow(staleRes.Results[0] as StaleCheckRow | undefined, this.__mj_UpdatedAt);
             if (stale != null) return stale;
             if (LockedWrite.AnyChanged(this, ['ProgramVersionID'])) return 'A document requirement cannot be moved to another version.';
         }
-        const edit = await VersionTree.EditRefusal(this.ProgramVersionID, this.ActiveUser, this.provider);
+
+        const versionRes = results[versionIdx];
+        if (!versionRes?.Success) {
+            LogError(`${SOURCE}: reading version ${this.ProgramVersionID} failed: ${versionRes?.ErrorMessage}`);
+            return NOT_FOUND_REASON;
+        }
+        const version = versionRes.Results[0] as LoadedVersion | undefined;
+        if (version == null) {
+            return NOT_FOUND_REASON;
+        }
+        const edit = LockedWrite.ReasonOf(StandardAuthoringRules.CanEditTree(version.Status));
         if (edit != null) {
             return edit;
         }
-        if (!this.IsSaved || LockedWrite.AnyChanged(this, ['Name'])) {
+
+        if (needsNameCheck) {
             const text = LockedWrite.ReasonOf(StandardAuthoringRules.CheckDocumentRequirementText({ Name: this.Name }));
-            return text ?? this.nameRefusal();
+            if (text != null) {
+                return text;
+            }
+            const siblingsRes = results[siblingsIdx];
+            if (!siblingsRes?.Success) {
+                throw new Error(`reading the version's document requirements failed: ${siblingsRes?.ErrorMessage}`);
+            }
+            const name = LockedWrite.Trimmed(this.Name);
+            const siblings = siblingsRes.Results as { ID: string; Name: string }[];
+            const taken = siblings.some(
+                (r) => !(this.IsSaved && UUIDsEqual(r.ID, this.ID)) && r.Name.trim().toLowerCase() === name.toLowerCase(),
+            );
+            return taken ? `A document requirement named ${name} already exists in this version.` : null;
         }
         return null;
     }
 
-    /** A name another requirement of the version already has, compared trimmed and ignoring case. */
-    private async nameRefusal(): Promise<string | null> {
-        const res = await RunView.FromMetadataProvider(this.provider).RunView<{ ID: string; Name: string }>(
-            {
-                EntityName: CredentialingEntity.DocumentRequirement,
-                ExtraFilter: `ProgramVersionID = '${this.ProgramVersionID}'`,
-                Fields: ['ID', 'Name'],
-                ResultType: 'simple',
-            },
-            this.ActiveUser,
-        );
-        if (!res.Success) {
-            throw new Error(`reading the version's document requirements failed: ${res.ErrorMessage}`);
-        }
-        const name = LockedWrite.Trimmed(this.Name);
-        const taken = res.Results.some(
-            (r) => !(this.IsSaved && UUIDsEqual(r.ID, this.ID)) && r.Name.trim().toLowerCase() === name.toLowerCase(),
-        );
-        return taken ? `A document requirement named ${name} already exists in this version.` : null;
-    }
-
     private async deleteRefusal(): Promise<string | null> {
-        const stale = await LockedWrite.StaleReason(
-            CredentialingEntity.DocumentRequirement,
-            this.ID,
-            this.__mj_UpdatedAt,
+        const [staleRes, versionRes] = await RunView.FromMetadataProvider(this.provider).RunViews<
+            StaleCheckRow | LoadedVersion
+        >(
+            [
+                LockedWrite.StaleParams(CredentialingEntity.DocumentRequirement, this.ID),
+                ParentVersionLoader.VersionParams(this.ProgramVersionID),
+            ],
             this.ActiveUser,
-            this.provider,
         );
+        if (!staleRes?.Success) {
+            LogError(`${SOURCE}: re-reading document requirement ${this.ID} before delete failed: ${staleRes?.ErrorMessage}`);
+            return NOT_FOUND_REASON;
+        }
+        const stale = LockedWrite.StaleReasonFromRow(staleRes.Results[0] as StaleCheckRow | undefined, this.__mj_UpdatedAt);
         if (stale != null) {
             return stale;
         }
-        return VersionTree.EditRefusal(this.ProgramVersionID, this.ActiveUser, this.provider);
+        if (!versionRes?.Success) {
+            LogError(`${SOURCE}: reading version ${this.ProgramVersionID} before delete failed: ${versionRes?.ErrorMessage}`);
+            return NOT_FOUND_REASON;
+        }
+        const version = versionRes.Results[0] as LoadedVersion | undefined;
+        if (version == null) {
+            return NOT_FOUND_REASON;
+        }
+        return LockedWrite.ReasonOf(StandardAuthoringRules.CanEditTree(version.Status));
     }
 }

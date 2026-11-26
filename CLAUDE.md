@@ -112,6 +112,12 @@ written for people, a `primaryKey` on every metadata record) are in MJ's
    *linking* files are generated at the workspace parent, outside both repos, and
    are never committed anywhere.
 7. **Dependency schemas are read-only** — __mj_BizAppsCommon, __mj_BizAppsTasks and __mj_BizAppsCommittees belong to their apps; this repo never generates, migrates, or alters them (mj.config.cjs excludeSchemas + entityImportPackages).
+8. **Performance & caching (5-Rule Standard)** — see [`docs/claude/04-performance.md`](docs/claude/04-performance.md) and [`docs/isolation-read-paths.md`](docs/isolation-read-paths.md):
+   - **Rule 1 (`BaseEngine` taxonomy)**: Use `CredentialingEngineBase.Instance` (`@mj-biz-apps/credentialing-entities`, `@RegisterForStartup({ deferred: true })`) for bounded reference metadata (`Accrediting Organizations`, `Programs`, `Program Versions`) with per-entity `CanRead` gating and `ObserveProperty` auto-invalidation. Never bulk-cache applicant/transactional entities or large authoring trees in a global engine.
+   - **Rule 2 (Multi-provider / RLS `CacheLocal` safety)**: Always pass the active provider (`RunView.FromMetadataProvider(provider)`, `Config(forceRefresh, user, provider)`); never call bare `new RunView()`. Every RLS-scoped engine config MUST set `CacheLocal: false`, override active `ProviderToUse`, and clear/re-`Config` on persona or provider switch.
+   - **Rule 3 (`RunViews` batching)**: Collapse `Promise.all` and independent sequential `RunView` calls into a single `rv.RunViews([...])` batch using `ResultType: 'simple'` + narrow `Fields` + `SkipTotalRowCount: true` for read-only projections.
+   - **Rule 4 (Bounded container cache vs no filtered list caching)**: Cache bounded per-container bundles (e.g., `StandingService`, active `ProgramBundle`) with explicit invalidation; never cache unbounded or arbitrarily filtered search lists in global singletons.
+   - **Rule 5 (RLS-safe two-step entity reads)**: Always gate with caller-scoped RLS reads (`SubjectAccess`, `ParentVersionLoader`) first before any narrow `SystemUser.Get` authoring read by admitted IDs; never bypass RLS or leak foreign record existence.
 
 ## Build & dev commands
 

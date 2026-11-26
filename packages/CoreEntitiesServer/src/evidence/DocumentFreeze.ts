@@ -5,20 +5,18 @@ import { CredentialingEntity, type ApplicationStatus } from '@mj-biz-apps/creden
 /** The column of `ApplicationDocument` that names what an application froze. */
 export type FrozenTarget = 'EvidenceDocumentID' | 'DocumentAttestationID';
 
-/** An ID-only row. */
-interface ApplicationIDRow {
-    ApplicationID: string;
-}
-
 /** A status-only row. */
 interface StatusRow {
     Status: ApplicationStatus;
 }
 
+const APPLICATION_DOCUMENTS_VIEW = '[__mj_BizAppsCredentialing].[vwApplicationDocuments]';
+
 /**
  * Which applications froze a document or an attestation (FRD BR-5): the statuses of the
- * applications whose `ApplicationDocument` rows name it. Read as `user` on `provider`, so the
- * caller's row filters apply and, inside an operation's transaction, the reads see its writes.
+ * applications whose `ApplicationDocument` rows name it. Read as `user` on `provider` in a single
+ * `RunView`, so the caller's row filters apply and, inside an operation's transaction, the read
+ * sees its writes.
  */
 export class DocumentFreeze {
     /** The statuses of the applications whose frozen set names `id` in `column`. */
@@ -26,22 +24,14 @@ export class DocumentFreeze {
         if (!IsValidUUID(id)) {
             return [];
         }
-        const links = await DocumentFreeze.rows<ApplicationIDRow>(
-            { EntityName: CredentialingEntity.ApplicationDocument, ExtraFilter: `${column} = '${id}'`, Fields: ['ApplicationID'], ResultType: 'simple', IgnoreMaxRows: true },
-            provider,
-            user,
-        );
-        const applicationIDs = [...new Set(links.map((l) => l.ApplicationID).filter((a) => IsValidUUID(a)))];
-        if (applicationIDs.length === 0) {
-            return [];
-        }
         const applications = await DocumentFreeze.rows<StatusRow>(
             {
                 EntityName: CredentialingEntity.Application,
-                ExtraFilter: `ID IN (${applicationIDs.map((a) => `'${a}'`).join(', ')})`,
+                ExtraFilter: `ID IN (SELECT ad.ApplicationID FROM ${APPLICATION_DOCUMENTS_VIEW} ad WHERE ad.${column} = '${id}')`,
                 Fields: ['Status'],
                 ResultType: 'simple',
                 IgnoreMaxRows: true,
+                SkipTotalRowCount: true,
             },
             provider,
             user,

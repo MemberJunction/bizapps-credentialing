@@ -13,11 +13,13 @@ import {
     type EntityDeleteOptions,
     type EntitySaveOptions,
     type IMetadataProvider,
+    type RunViewParams,
 } from '@memberjunction/core';
-import { RegisterClass, UUIDsEqual } from '@memberjunction/global';
-import { CredentialingEntity, StandardAuthoringRules } from '@mj-biz-apps/credentialing-core';
+import { IsValidUUID, RegisterClass, UUIDsEqual } from '@memberjunction/global';
+import { CredentialingEntity, NOT_FOUND_REASON, StandardAuthoringRules } from '@mj-biz-apps/credentialing-core';
 import { mjBizAppsCredentialingSectionEntity } from '@mj-biz-apps/credentialing-entities';
-import { LockedWrite } from './guards/LockedWrite.js';
+import { LockedWrite, type StaleCheckRow } from './guards/LockedWrite.js';
+import { ParentVersionLoader, type LoadedVersion } from './guards/ParentVersionLoader.js';
 import { VersionTree } from './guards/VersionTree.js';
 
 const SOURCE = 'SectionEntityServer';
@@ -85,52 +87,115 @@ export class SectionEntityServer extends mjBizAppsCredentialingSectionEntity {
     }
 
     private async saveRefusal(): Promise<string | null> {
+        const needsNumberCheck = !this.IsSaved || LockedWrite.AnyChanged(this, ['Number']);
+        const params: RunViewParams[] = [];
+        let staleIdx = -1;
         if (this.IsSaved) {
-            const stale = await LockedWrite.StaleReason(CredentialingEntity.Section, this.ID, this.__mj_UpdatedAt, this.ActiveUser, this.provider);
+            staleIdx = params.length;
+            params.push(LockedWrite.StaleParams(CredentialingEntity.Section, this.ID));
+        }
+        const versionIdx = params.length;
+        params.push(ParentVersionLoader.VersionParams(this.ProgramVersionID));
+        let siblingsIdx = -1;
+        if (needsNumberCheck) {
+            siblingsIdx = params.length;
+            params.push({
+                EntityName: CredentialingEntity.Section,
+                ExtraFilter: IsValidUUID(this.ProgramVersionID) ? `ProgramVersionID = '${this.ProgramVersionID}'` : '1 = 0',
+                Fields: ['ID', 'Number'],
+                ResultType: 'simple',
+                SkipTotalRowCount: true,
+            });
+        }
+
+        const results = await RunView.FromMetadataProvider(this.provider).RunViews<
+            StaleCheckRow | LoadedVersion | { ID: string; Number: string }
+        >(params, this.ActiveUser);
+
+        if (staleIdx >= 0) {
+            const staleRes = results[staleIdx];
+            if (!staleRes?.Success) {
+                LogError(`${SOURCE}: re-reading section ${this.ID} failed: ${staleRes?.ErrorMessage}`);
+                return NOT_FOUND_REASON;
+            }
+            const stale = LockedWrite.StaleReasonFromRow(staleRes.Results[0] as StaleCheckRow | undefined, this.__mj_UpdatedAt);
             if (stale != null) return stale;
             if (LockedWrite.AnyChanged(this, ['ProgramVersionID'])) return 'A section cannot be moved to another version.';
         }
-        const edit = await VersionTree.EditRefusal(this.ProgramVersionID, this.ActiveUser, this.provider);
+
+        const versionRes = results[versionIdx];
+        if (!versionRes?.Success) {
+            LogError(`${SOURCE}: reading version ${this.ProgramVersionID} failed: ${versionRes?.ErrorMessage}`);
+            return NOT_FOUND_REASON;
+        }
+        const version = versionRes.Results[0] as LoadedVersion | undefined;
+        if (version == null) {
+            return NOT_FOUND_REASON;
+        }
+        const edit = LockedWrite.ReasonOf(StandardAuthoringRules.CanEditTree(version.Status));
         if (edit != null) {
             return edit;
         }
+
         if (!this.IsSaved || LockedWrite.AnyChanged(this, ['Number', 'Name'])) {
             const text = LockedWrite.ReasonOf(StandardAuthoringRules.CheckSectionText({ Number: this.Number, Name: this.Name }));
             if (text != null) return text;
         }
-        return !this.IsSaved || LockedWrite.AnyChanged(this, ['Number']) ? this.numberRefusal() : null;
-    }
 
-    /** Another section of this version with the same number (trimmed, ignoring case), read as the caller in one RunView. */
-    private async numberRefusal(): Promise<string | null> {
-        const number = LockedWrite.Trimmed(this.Number);
-        const res = await RunView.FromMetadataProvider(this.provider).RunView<{ ID: string; Number: string }>(
-            { EntityName: CredentialingEntity.Section, ExtraFilter: `ProgramVersionID = '${this.ProgramVersionID}'`, Fields: ['ID', 'Number'], ResultType: 'simple' },
-            this.ActiveUser,
-        );
-        if (!res.Success) {
-            throw new Error(`reading the version's sections failed: ${res.ErrorMessage}`);
+        if (siblingsIdx >= 0) {
+            const siblingsRes = results[siblingsIdx];
+            if (!siblingsRes?.Success) {
+                throw new Error(`reading the version's sections failed: ${siblingsRes?.ErrorMessage}`);
+            }
+            const number = LockedWrite.Trimmed(this.Number);
+            const siblings = siblingsRes.Results as { ID: string; Number: string }[];
+            const taken = siblings.some((s) => !(this.IsSaved && UUIDsEqual(s.ID, this.ID)) && (s.Number ?? '').trim().toLowerCase() === number.toLowerCase());
+            return taken ? `Section number ${number} is already used in this version.` : null;
         }
-        const taken = res.Results.some((s) => !(this.IsSaved && UUIDsEqual(s.ID, this.ID)) && (s.Number ?? '').trim().toLowerCase() === number.toLowerCase());
-        return taken ? `Section number ${number} is already used in this version.` : null;
+        return null;
     }
 
     private async deleteRefusal(): Promise<string | null> {
-        const stale = await LockedWrite.StaleReason(CredentialingEntity.Section, this.ID, this.__mj_UpdatedAt, this.ActiveUser, this.provider);
+        const [staleRes, versionRes, standardsRes] = await RunView.FromMetadataProvider(this.provider).RunViews<
+            StaleCheckRow | LoadedVersion | { ID: string }
+        >(
+            [
+                LockedWrite.StaleParams(CredentialingEntity.Section, this.ID),
+                ParentVersionLoader.VersionParams(this.ProgramVersionID),
+                {
+                    EntityName: CredentialingEntity.Standard,
+                    ExtraFilter: IsValidUUID(this.ID) ? `SectionID = '${this.ID}'` : '1 = 0',
+                    Fields: ['ID'],
+                    ResultType: 'simple',
+                    MaxRows: 1,
+                    SkipTotalRowCount: true,
+                },
+            ],
+            this.ActiveUser,
+        );
+        if (!staleRes?.Success) {
+            LogError(`${SOURCE}: re-reading section ${this.ID} before delete failed: ${staleRes?.ErrorMessage}`);
+            return NOT_FOUND_REASON;
+        }
+        const stale = LockedWrite.StaleReasonFromRow(staleRes.Results[0] as StaleCheckRow | undefined, this.__mj_UpdatedAt);
         if (stale != null) {
             return stale;
         }
-        const edit = await VersionTree.EditRefusal(this.ProgramVersionID, this.ActiveUser, this.provider);
+        if (!versionRes?.Success) {
+            LogError(`${SOURCE}: reading version ${this.ProgramVersionID} before delete failed: ${versionRes?.ErrorMessage}`);
+            return NOT_FOUND_REASON;
+        }
+        const version = versionRes.Results[0] as LoadedVersion | undefined;
+        if (version == null) {
+            return NOT_FOUND_REASON;
+        }
+        const edit = LockedWrite.ReasonOf(StandardAuthoringRules.CanEditTree(version.Status));
         if (edit != null) {
             return edit;
         }
-        const res = await RunView.FromMetadataProvider(this.provider).RunView<{ ID: string }>(
-            { EntityName: CredentialingEntity.Standard, ExtraFilter: `SectionID = '${this.ID}'`, Fields: ['ID'], ResultType: 'simple', MaxRows: 1 },
-            this.ActiveUser,
-        );
-        if (!res.Success) {
-            throw new Error(`reading the section's standards failed: ${res.ErrorMessage}`);
+        if (!standardsRes?.Success) {
+            throw new Error(`reading the section's standards failed: ${standardsRes?.ErrorMessage}`);
         }
-        return res.Results.length > 0 ? "Remove this section's standards before deleting it." : null;
+        return standardsRes.Results.length > 0 ? "Remove this section's standards before deleting it." : null;
     }
 }

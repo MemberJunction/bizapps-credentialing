@@ -140,28 +140,31 @@ export class InviteApplicantServerOperation extends InviteApplicantOperation {
         provider: IMetadataProvider,
         user: UserInfo,
     ): Promise<{ Version: LoadedVersion; Program: ProgramSummaryRow }> {
-        const version = await ParentVersionLoader.LoadVersion(versionID, user, provider);
-        if (version == null) {
-            OperationSupport.Refuse(NOT_FOUND_REASON);
-        }
-        const [programs] = await InvitationSupport.Read<ProgramSummaryRow>(
+        const escapedID = EscapeSQLString(versionID);
+        const [versions, programs] = await InvitationSupport.Read<LoadedVersion | ProgramSummaryRow>(
             [
+                ParentVersionLoader.VersionParams(versionID),
                 {
                     EntityName: CredentialingEntity.Program,
-                    ExtraFilter: `ID = '${EscapeSQLString(version.ProgramID)}'`,
+                    ExtraFilter: IsValidUUID(versionID)
+                        ? `ID IN (SELECT v.ProgramID FROM [__mj_BizAppsCredentialing].[vwProgramVersions] v WHERE v.ID = '${escapedID}')`
+                        : '1 = 0',
                     Fields: ['ID', 'AccreditingOrganizationID', 'SubjectType'],
                     ResultType: 'simple',
                     MaxRows: 1,
+                    SkipTotalRowCount: true,
                 },
             ],
             provider,
             user,
-            'program of invited version',
+            'invited version and program',
         );
-        if (programs[0] == null) {
+        const version = versions[0] as LoadedVersion | undefined;
+        const program = programs[0] as ProgramSummaryRow | undefined;
+        if (version == null || program == null || !UUIDsEqual(program.ID, version.ProgramID)) {
             OperationSupport.Refuse(NOT_FOUND_REASON);
         }
-        return { Version: version, Program: programs[0] };
+        return { Version: version, Program: program };
     }
 
     private async findUserByEmail(email: string, provider: IMetadataProvider, system: UserInfo): Promise<UserAccountRow | null> {

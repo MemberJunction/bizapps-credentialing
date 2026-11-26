@@ -8,8 +8,9 @@ import { FormsModule } from '@angular/forms';
 import { BaseAngularComponent } from '@memberjunction/ng-base-types';
 import { SharedGenericModule } from '@memberjunction/ng-shared-generic';
 import { MJButtonDirective } from '@memberjunction/ng-ui-components';
+import { CredentialingEngineBase } from '@mj-biz-apps/credentialing-entities';
 import { PIPELINE_PAGE_SIZE, PageSlice, type PagedSlice } from '../pipeline/pipeline-data';
-import { StudioData, type ProgramListRow } from './studio-data';
+import type { ProgramListRow } from './studio-data';
 import { StudioMessages } from '../studio-messages';
 
 @Component({
@@ -32,7 +33,7 @@ export class ProgramListComponent extends BaseAngularComponent implements OnInit
         if (value !== this._refreshToken) {
             this._refreshToken = value;
             if (this.initialized) {
-                void this.Load();
+                void this.Load(true);
             }
         }
     }
@@ -91,12 +92,23 @@ export class ProgramListComponent extends BaseAngularComponent implements OnInit
         void this.Load();
     }
 
-    public async Load(): Promise<void> {
+    public async Load(forceRefresh = false): Promise<void> {
         this.IsLoading = true;
         this.ErrorMessage = '';
         this.cdr.markForCheck();
         try {
-            this.Programs = await StudioData.ForProvider(this.ProviderToUse).ProgramList();
+            const engine = CredentialingEngineBase.Instance;
+            await engine.Config(forceRefresh, undefined, this.ProviderToUse);
+            this.Programs = [...engine.Programs]
+                .sort((a, b) => a.Name.localeCompare(b.Name))
+                .map((p) => ({
+                    ID: p.ID,
+                    Name: p.Name,
+                    ProgramType: p.ProgramType,
+                    CredentialPrefix: p.CredentialPrefix,
+                    AccreditingOrganization: p.AccreditingOrganization,
+                    Status: p.Status,
+                }));
         } catch (e) {
             this.ErrorMessage = StudioMessages.FromError(e, 'load');
         } finally {
