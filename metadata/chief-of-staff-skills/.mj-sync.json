@@ -1,0 +1,13 @@
+{
+  "entity": "MJ: AI Skills",
+  "filePattern": "**/.*.json",
+  "pull": {
+    "filter": "Name IN ('Credentialing & Accreditation')",
+    "relatedEntities": {
+      "MJ: AI Agent Skills": {
+        "entity": "MJ: AI Agent Skills",
+        "foreignKey": "SkillID"
+      }
+    }
+  }
+}
